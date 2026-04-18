@@ -287,10 +287,3 @@ The following issues were flagged during adversarial review and require decision
 2. **Zakat nisab and Hawl logic** — nisab threshold (gold-based vs. silver-based) and the lunar year (Hawl) requirement need fiqhi specification. The calculator must document which rulings it follows. (v4 decision)
 4. **Widget countdown strategy** — iOS WidgetKit supports `Text` with `.timer` date style for live countdowns, but this consumes timeline budget differently than static "next prayer at X:XX" displays. Decide which approach before building widgets. (v1-v2 decision)
 5. **WearOS complication refresh model** — differs architecturally from watchOS timeline model. Needs platform-specific implementation spec (e.g., `TileService.onTileRequest` with `TimelineBuilders` or periodic `WorkManager` refresh). (v2 decision)
-
-## What I noticed about how you think
-
-- You framed multiple prayer profiles as "like weather apps" — that's product thinking, not feature-list thinking. You're borrowing a proven UX paradigm from a different domain, which is exactly how good app design works.
-- You listed 15 features but when asked what makes the app special, you didn't say "everything" — you picked the two that actually differentiate. That focus is rare.
-- You're building this because Quran Majeed has specific pain points you want to fix, not because you think the market needs another prayer app. Scratching your own itch is the strongest possible motivation for an open-source project.
-- You chose the simpler architecture (independent projects) over the more technically impressive one (KMP). That's engineering maturity — choosing boring technology that lets you ship the features that matter.
