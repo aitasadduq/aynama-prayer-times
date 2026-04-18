@@ -151,7 +151,7 @@ Watch scales defined separately in §7.
 │                          │
 │    ─●─ Fajr   04:21 ✓    │  ← muted ink, passed
 │     │                    │
-│    ─●─ Sunrise 06:02 ✓   │
+│       Sunrise  06:02     │  ← ink-muted, time reference only, no dot
 │     │                    │
 │    ─●─ Dhuhr  12:47  ←   │  ← saffron, current
 │     │                    │     (moving tick)
@@ -380,6 +380,96 @@ This file governs UI decisions. Changes require:
 3. Update to this file FIRST, then code that follows.
 
 Small tweaks (adjusting a spacing token, adding a new icon) follow this process lightly. Changes to color, typography, composition (§3, §4, §5), or the Two Deliberate Departures (§9) require explicit discussion before merge.
+
+---
+
+## 16. Prayer History View
+
+**Surface:** Utilitarian treatment. Stable parchment (light) / ink (dark). No time-of-day cycle. Left-aligned, 24pt side margins, 32pt top. Tracker is listed under utilitarian screens in §2.
+
+**Five prayers tracked per day:** Fajr, Dhuhr, Asr, Maghrib, Isha. Sunrise is a time marker on the home ribbon, not a tracked prayer. Do not include a Sunrise indicator in history rows.
+
+---
+
+### Marking flow
+
+**Primary (same-day, in the moment):**
+
+Tap a prayer row on the home screen ribbon (§5). In-place bottom sheet with three states. No navigation away from home required.
+
+**Retroactive (past days — qada and corrections):**
+
+History view → tap a day row → row expands inline → each of the five prayer indicators is tappable → bottom sheet with three states.
+
+**Three prayer states:**
+
+| State | Indicator | Available |
+|---|---|---|
+| Prayed on time | filled saffron square | Within the prayer window only; greyed out for past days |
+| Prayed as Qada | filled ink-muted square | Any past missed prayer |
+| Missed | empty square, parchment-muted stroke | Explicit skip acknowledgement |
+
+**Where Qada appears in history:** On the day the prayer was *missed*, not the day it was performed. Fajr skipped Monday and made up Tuesday is shown on Monday's row as Qada. The performance date is stored as metadata but not surfaced in the primary history UI.
+
+**Copy rules:** Never use "Mark complete" or "Check in." Use: "I prayed this" / "I prayed this later (Qada)" / "I didn't pray this." Calm and direct. No exclamation marks, no encouragement copy.
+
+---
+
+### History list structure
+
+**Section headers (by week):**
+Fraunces `title` (20pt), ink. "This week" / "Last week" / "Apr 7–13".
+
+**Column header (rendered once at top of list, not repeated per section):**
+
+```
+              F  D  A  M  I
+```
+
+Single-letter prayer initials (F=Fajr, D=Dhuhr, A=Asr, M=Maghrib, I=Isha) in IBM Plex `body-sm`, ink-muted. Same convention as watch complication initials (§7).
+
+**Day row anatomy:**
+
+```
+Today         ▪ ▪ ○ ▪ ▪    4/5
+Yesterday     ▪ ▪ ▪ ▪ ▪    5/5
+Mon Apr 14    ▪ ○ ○ ▪ ▪    3/5
+```
+
+- **Left:** date label in IBM Plex `body`, ink. Today's label renders in saffron (text token only — no colored border or card treatment).
+- **Center:** 5 prayer indicator squares, 8×8pt each, 5pt gap, left to right in prayer order.
+- **Right:** count in IBM Plex `body-sm`, ink-muted. "5/5" or "3/5".
+- **Row height:** 56pt minimum (per §5 utilitarian spec).
+
+Squares, not circles. Avoids the circular ring territory (§10); reads as a printed ledger.
+
+**Expanded day row (tap to reveal):**
+
+Each prayer name with its scheduled time and status, listed vertically. Prayer name in IBM Plex `body`, scheduled time in IBM Plex `mono-num` (tabular). Each row is tappable to trigger the state bottom sheet.
+
+---
+
+### Soft aggregate header
+
+Above the list, a single descriptive line:
+
+```
+42 of 45 prayers on time this week
+```
+
+IBM Plex `body-sm`, ink-muted. Current week only. Not a streak counter — a descriptive sentence. No hero number, no reset mechanic.
+
+---
+
+### Hard rules
+
+- No calendar grid or monthly heat-map. No gradients (§10).
+- No streak counter as primary or secondary hero.
+- No circular progress indicators (§10).
+- No colored left-border on any row — including today (consistent with prayer ribbon list treatment).
+- No cards per row — flat list only.
+- No gamification copy. No "Great job!", "Keep it up!", or streak-reset warnings.
+- Sunrise is not a tracked prayer. Five indicators per row, not six.
 
 ---
 
