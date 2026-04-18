@@ -18,11 +18,15 @@ Sub-spec of `architecture-design.md`. Covers license obligations for all bundled
 
 **Strategy:** ship unmodified Adhan releases when possible. Prefer raising issues/PRs upstream over forking. If we must fork, make the fork public and named clearly (`aynama-prayer-times/adhan-kotlin-fork`).
 
-## Text: Quran (Arabic Uthmani script)
+## Text: Quran (Arabic script)
 
 **Chosen source:** **Tanzil Quran Text** (https://tanzil.net/download/).
 
-**License:** Creative Commons Attribution-NoDerivatives 3.0 Unported (CC BY-ND 3.0) for the Simple Enhanced variant. Requires:
+**Variants bundled:**
+- **Uthmani** ("Simple Enhanced") — standard script used in Arab Gulf, Middle East, and global print editions.
+- **Naskh** — preferred script for South Asian populations (Pakistan, India, Bangladesh) and the broader diaspora. Tanzil distributes a vetted Naskh variant at the same URL.
+
+**License:** Both variants are released under Creative Commons Attribution-NoDerivatives 3.0 Unported (CC BY-ND 3.0). Applies equally to Uthmani and Naskh. Requires:
 - Attribution: "Quran text courtesy of Tanzil Project."
 - No modification of the text itself.
 - Link back to tanzil.net in About.
@@ -30,9 +34,10 @@ Sub-spec of `architecture-design.md`. Covers license obligations for all bundled
 **Alternative considered:** King Fahd Complex — restrictive redistribution terms; avoid for OSS app.
 
 **Implementation:**
-- Bundle Tanzil's pre-vetted Uthmani text as SQLite in `/assets/quran/`.
-- Attribution in About screen + in the Quran view footer.
-- Never edit the bundled text programmatically (respects ND clause).
+- Bundle both variants as separate SQLite files: `/assets/quran/tanzil-uthmani.db` and `/assets/quran/tanzil-naskh.db`.
+- User selects preferred script in Settings (persisted in SharedPreferences/UserDefaults). Default: Uthmani.
+- Attribution in About screen + in the Quran view footer: "Quran text courtesy of Tanzil Project."
+- Never edit either bundled file programmatically (respects ND clause for both).
 
 ## Text: Translations
 
