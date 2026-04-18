@@ -41,7 +41,7 @@ The key architectural decision: whether to share business logic across platforms
 14. **watchOS complications** — timeline-based (see feasibility note below), showing next prayer name + time
 
 ### v4 — Content & Extras
-15. **Quran Reader** — local SQLite database with full Arabic text (Uthmani script), translation overlays, bookmarks, last-read position.
+15. **Quran Reader** — local SQLite database with full Arabic text in both **Uthmani** (Arab Gulf, Middle East) and **Naskh** (South Asia: Pakistan, India, Bangladesh) scripts. User selects preferred script in Settings. Translation overlays, bookmarks, last-read position.
 16. **Zakat Calculator** — supports Hanafi and Shafi'i nisab thresholds. Asset categories: cash, gold, silver, stocks, business inventory, receivables. Gold/silver spot prices fetched from a public API (fallback to manual entry if offline).
 17. **Taraweeh counter on smartwatch** — Ramadan-aware, tracks rakaat count per night (both WearOS + watchOS)
 18. **Quran audio recitation** — streaming + offline download of reciter audio
@@ -49,6 +49,176 @@ The key architectural decision: whether to share business logic across platforms
 ### Future Research
 17. **In-flight prayer times** — altitude-aware calculation using GPS altitude + barometric sensor. GPS accuracy degrades above ~18,000m on consumer devices, and phones typically disable GPS in airplane mode. Barometric sensors measure relative pressure, not absolute altitude. Requires dedicated research into sensor reliability at cruising altitude before committing to implementation.
 18. **Prayer detection from smartwatch sensors** — ML model trained on accelerometer/gyroscope data to detect standing, bowing (ruku), and prostrating (sujood) motions. Separate research track, not part of app architecture decisions.
+
+### Responsive & Accessibility
+
+#### Android layout breakpoints
+- **Phone (< 600dp):** Single-column Home screen. Full prayer schedule scrollable below countdown. Profile switcher via horizontal swipe.
+- **Tablet / foldable inner screen (≥ 600dp):** Two-column layout. Left column: countdown + prayer schedule. Right column: active profile details + Qibla mini-widget. Profile switcher remains a swipe gesture on the left column.
+- **Foldable outer screen:** Phone layout (single column). App should handle fold state change without restart.
+
+#### Accessibility requirements
+
+**All screens:**
+- Minimum touch target: 48dp (Android), 44pt (iOS)
+- Body text: minimum 16sp/pt, contrast ratio ≥ 4.5:1 against background
+- Support system font size scaling (SP units on Android, Dynamic Type on iOS) without layout breakage
+- No information conveyed by color alone — use text labels or icons alongside color coding
+
+**Home screen countdown:**
+- TalkBack/VoiceOver content description: "Next prayer: Asr in 2 hours 14 minutes"
+- Prayer list rows: each row announces prayer name + time + status (e.g. "Fajr, 5:12 AM, passed")
+- Profile switcher: swipe gesture documented with accessibility action ("Switch to next profile")
+
+**Qibla compass:**
+- TalkBack/VoiceOver active: announce bearing as direction ("Facing northeast, Qibla is to the southeast — turn right")
+- Short haptic pulse when device is within 5° of Qibla bearing
+- Bearing updated as sensor changes; accessibility announcement throttled to every 15° to avoid flooding
+- Calibration warning announces via live region ("Compass accuracy low — move phone in figure-8")
+
+**Prayer tracker:**
+- Each prayer row: checkbox with accessible label ("Mark Fajr as prayed")
+- Qaza count announced as: "3 prayers outstanding"
+
+### Design System (DESIGN-TODO — run /design-consultation before v1 UI work)
+
+These tokens must be defined before building any UI. Do not use platform defaults as permanent choices. Run `/design-consultation` to finalize.
+
+**Color palette (DESIGN-TODO)**
+- Primary: [DESIGN-TODO — avoid purple/indigo defaults]
+- Surface: [DESIGN-TODO]
+- On-surface: [DESIGN-TODO]
+- Accent / tonal: [DESIGN-TODO]
+- Error: system error color (red)
+- On Android: Material You dynamic color wraps these — define seed color for `DynamicColorScheme`
+- On iOS (v3+): system tints + custom brand tint
+
+**Typography (DESIGN-TODO)**
+- Do not use default system stacks (Inter, Roboto, Arial) as final choices
+- Countdown timer: tabular number variant required (digits must not reflow)
+- Prayer names: [DESIGN-TODO — consider an Arabic-script-adjacent geometric typeface or clean humanist sans]
+- Body/schedule rows: system font is acceptable here (legibility over brand)
+
+**Iconography**
+- Use system icons (Material Symbols on Android, SF Symbols on iOS) for navigation and utility
+- Do not use icons-in-colored-circles
+- App icon: [DESIGN-TODO — Kaaba / compass / crescent direction? Decide in /design-consultation]
+- Notification icon: monochrome silhouette (required for Android notification shade)
+
+**Spacing scale**
+- 4dp base unit (standard Material You)
+- Minimum touch target: 48dp (Android accessibility requirement; 44pt on iOS)
+
+### Visual Design Anti-Patterns (do not implement)
+
+This is an **APP UI** (utility, task-focused). Apply calm surface hierarchy.
+
+**Banned patterns:**
+- Colored left-border on prayer rows (`border-left: 3px solid accent`) — most recognizable prayer-app-clone pattern
+- Icon-in-colored-circle as section decoration (use system icons at utility weight)
+- Decorative arabesque / geometric pattern overlays as background texture — if used at all, they must serve information hierarchy, not fill empty space
+- Centered text on Home screen countdown — left-align creates clear reading flow
+- Generic section headings ("Prayer Times") — headings state what the area is or what the user can do
+- Separate card-per-prayer in the schedule list — use clean list rows instead
+
+**Prayer schedule row spec:**
+- Prayer name (left) + time (right) on a single row
+- No border, no card, no left-color stripe
+- Active prayer row: subtle background fill (Material You dynamic color tonal surface, or system tint on iOS)
+- Past prayers: slightly dimmed (70% opacity or secondary text color)
+- Future prayers: default text weight
+- Row tap: navigates to prayer-specific settings (notification, adhan audio)
+
+**Countdown typography:**
+- The countdown number ("2h 14m") should be the largest element on screen
+- Left-aligned, not centered
+- Use a tabular/monospaced number variant if the typeface has one — digits shouldn't reflow as time counts down
+
+### User Journey & Emotional Arc
+
+Prayer is a 5-times-daily practice with spiritual weight. The app's tone is: **calm, correct, unhurried**. Design decisions should reinforce trust, not bustle.
+
+| Step | User does | User feels | Design supports it |
+|---|---|---|---|
+| First install | Opens app | Curiosity + slight friction (setup ahead) | Warm empty state, single clear CTA, no overwhelming onboarding |
+| Creates first profile | Enters city or uses GPS | Relief when times appear | Times render immediately after profile creation, no loading delay if GPS is available |
+| Sees times for the first time | Reads prayer schedule | Recognition ("these look right") + calm | No tooltip tour, no interstitials — let the times speak. Correct times are self-evident. |
+| Opens app during Fajr window | Checks countdown | Urgency (limited time before sunrise) | Countdown reads as time-critical; "Fajr — 14m remaining" should feel different from "Maghrib — 4h 22m" |
+| Prayer time passes | App updates to next prayer | Mild reflection or guilt (if missed) | Soft cross-fade transition (countdown → 00:00 → new prayer + new countdown). Passed prayer row gets subtle 'past' treatment (slightly dimmed). No in-app sound/haptic on transition — notification already handled that. |
+| Adds a second profile | Swipes to create "Office" profile | Delight: "this is like Weather" | Horizontal swipe reveals new profile slot. Smooth spring animation. Dot indicator updates immediately. |
+| Ramadan arrives | Opens app, Imsak time appears | Attentiveness | Auto-enabled Imsak row (Fajr − 10 min) appears in schedule without user action during Ramadan; brief "Ramadan Mubarak — Imsak enabled" contextual note on first Ramadan open |
+| Year-round daily use | Opens app quickly to check next prayer | Familiarity + trust | App opens directly to Home (no splash screen after first launch). Sub-second time-to-useful-info. |
+
+**Design tone:** Calm, correct, unhurried. No gamification, no streaks on the home screen, no badges competing for attention. The app's job is to be right and stay out of the way.
+
+### Screen Information Hierarchy
+
+#### Navigation structure
+Bottom nav (4 tabs): **Home** | **Qibla** | **Tracker** | **Settings**
+
+Profile switching (horizontal swipe) is a within-Home interaction — not a separate tab. Dot indicator at bottom of Home screen shows current profile position.
+
+#### Home screen hierarchy
+```
+FIRST:   Countdown timer — largest type on screen ("2h 14m")
+SECOND:  Next prayer name — above the countdown, slightly smaller ("Asr")
+THIRD:   Active profile name + location — small, top of screen ("Home · London")
+BELOW:   Full 6-time schedule: Sunrise + 5 prayers (scrollable if needed)
+BOTTOM:  Profile dot indicator + bottom nav
+```
+The countdown is the actionable number — it's why the user opened the app.
+Full prayer schedule below is reference, not primary. It should not compete visually.
+
+#### Qibla compass screen hierarchy
+```
+FIRST:   Compass needle / compass rose — occupies majority of screen
+SECOND:  Calibration warning — appears prominently ONLY when magnetometer accuracy is low
+THIRD:   Bearing number (113° SE) and distance to Makkah — small, below compass
+```
+Users need to face the right direction, not read a number.
+Bearing is confirmation context, not the primary object.
+
+#### Prayer tracker (Qaza) screen hierarchy
+```
+FIRST:   Today's 6 prayer times (Sunrise + 5 prayers) — status at a glance (prayed / missed / pending)
+SECOND:  Outstanding Qaza count — secondary context
+THIRD:   Weekly/monthly streak — tertiary
+```
+Today is always the default view. History is accessible but not the default focal point.
+
+### Widget Specs (Android Glance — v1)
+
+Three sizes, each with a specific job:
+
+| Size | Content | Primary element |
+|---|---|---|
+| 1×1 | Prayer abbreviation + time ("ASR 15:49") | Prayer abbreviation, max 3 chars |
+| 2×2 | Next prayer name + countdown + profile name | Countdown ("2h 14m") dominates |
+| 4×2 | Next prayer countdown + full 6-time schedule | Countdown top, schedule list below |
+
+All widget sizes: tap opens app Home screen. No prayer-row taps within widget (widget interaction is launch-only in v1).
+
+Widget update strategy: see Reviewer Concern #4 (widget countdown decision).
+
+### Profile Creation Flow
+
+Full-screen flow (not a bottom sheet — city search needs keyboard + results space):
+
+1. **Profile name** — text field, pre-filled with "Home" on first profile, "Profile 2" etc. subsequently. Max 20 chars.
+2. **Location** — city search (autocomplete from offline city DB or geocoder) OR "Use current location" GPS button. GPS button auto-names the profile with detected city name if user hasn't changed it.
+3. **Calculation method** — optional step, collapsible. Default: ISNA. Shows 6 main methods with brief description. Can be changed in profile settings later.
+4. **Save** — navigates back to Home with new profile active. If first profile, home screen animates from empty state to times.
+
+Entry points to profile creation:
+- Home empty state CTA ("Create profile")
+- Profile switcher swipe past the last dot (reveals a "+" slot)
+- Settings > Profiles > "Add profile"
+
+### Ramadan Treatment
+
+No visual theme change during Ramadan. Home screen layout unchanged. Imsak row auto-appears in the prayer schedule (between the 12am midnight line and Fajr, or as a distinct row above Fajr depending on layout).
+
+First app open during Ramadan: dismissible contextual banner at top of Home screen — "Ramadan Mubarak — Imsak time enabled (Fajr − 10 min)". Tapping it navigates to notification settings. Shown once per Ramadan year (Hijri year gated).
 
 ### UX Spec: Multiple Prayer Profiles
 
@@ -61,9 +231,27 @@ A prayer profile consists of:
 
 Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot indicator. The GPS-based profile always shows current-location times. Manual profiles show times for their fixed location.
 
-**Asr calculation note:** The engine always computes both Hanafi and Shafi'i Asr times. The UI displays whichever matches the user's preference in each prayer profile. Test vectors include both values.
+**Asr calculation note:** The engine always computes both Hanafi and Shafi'i Asr times. The UI displays whichever matches the user's preference in each prayer profile. Test vectors include both values. If the user chooses, both Hanafi and Shafi'i times will be shown, one as the primary and the other as the secondary, based on user preference.
 
 **High-latitude adaptation:** Above ~48° latitude, Fajr and Isha can become undefined when the sun never reaches the required angle below the horizon. The app uses the **angle-based method** (recommended by ISNA and the Fiqh Council of North America): if the twilight angle is never reached, use 1/7th of the night for Fajr and Isha. This is the approach used by most major prayer time apps and is the default in the Adhan library. The high-latitude test vectors validate this behavior for locations like Tromsø (69.6°N) and Reykjavik (64.1°N).
+
+### Interaction State Coverage
+
+| Feature | Loading | Empty | Error | Success | Partial |
+|---|---|---|---|---|---|
+| Home screen (prayer times) | Shimmer on countdown + prayer list rows | Warm empty state: Kaaba illustration, "Set up your first prayer profile", "Create profile" CTA button | Error names cause + recovery action (e.g. "Location needed — Update location", "High-latitude times estimated — Learn more") | Prayer times shown, countdown live | Profile exists but location is stale — show last-known times with "Tap to refresh" badge |
+| Profile switcher | Skeleton dots during first load | (Covered by Home empty state) | (Covered by Home error state) | Dot indicator shows correct count + active position | — |
+| Qibla compass | Compass rose shown, needle animated to "searching" | N/A (always shows compass; worst case = inaccurate) | Magnetometer unavailable: "Compass not available on this device". Low accuracy: persistent amber banner "Hold phone flat and move in a figure-8 to calibrate" | Needle stable, accuracy = high | Low accuracy: compass shown but needle slightly desaturated + calibration banner |
+| Prayer tracker (today) | Shimmer on 6 time rows | First day: "No prayers tracked yet today — tap a prayer to mark it" | DB read error: "Could not load prayer history" + retry | Prayers shown with status icons | Some prayers prayed, some pending, some missed |
+| Prayer tracker (history) | Shimmer on calendar/list | First week: "Your prayer history will appear here" | Same as today error | History shown | — |
+| Notifications (permission) | N/A | Notification permission not granted: banner on Home "Enable notifications for prayer reminders" with Settings deep-link | Permission permanently denied: show Settings link, not a re-request dialog | Notifications scheduled, confirmation in Settings screen | — |
+| Profile creation | Save spinner on "Save" tap | N/A | Location search no results: "No cities found for '[query]'" | Profile created, swipe to it on Home | — |
+
+**Empty states rule:** Never ship "No items found." Every empty state has:
+1. A small, meaningful visual (not a decorative blob)
+2. A clear heading that explains the state in plain language
+3. A single primary action button
+4. Optional: one sentence of context
 
 ### Notification & Adhan Strategy
 
@@ -76,7 +264,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 ### Data Persistence
 
 - **Local storage:** Core Data (iOS) / Room (Android) for prayer tracker history, tasbeeh counts, user preferences, prayer profile configurations
-- **Quran text:** Pre-bundled SQLite database (~15 MB) with Uthmani text + translation tables
+- **Quran text:** Pre-bundled SQLite databases (~25 MB total): `tanzil-uthmani.db` (Arab Gulf / Middle East script) + `tanzil-naskh.db` (South Asian script). User selects preferred script in Settings. Translation tables in separate per-language SQLite files.
 - **Cloud sync:** Explicitly deferred. v1 is local-only. If added later, iCloud (iOS) and Google Drive/Firebase (Android) are natural fits.
 - **No account/login required** for any v1 feature
 
@@ -216,7 +404,7 @@ Both the Kotlin (wrapper around Adhan-Kotlin) and Swift (wrapper around Adhan-Sw
 ## Open Questions
 
 **Tracked in TODOS.md (deferred, to be resolved before v2/v3/v4):**
-- **Quran data source** — Tanzil (CC BY-ND 3.0) or alternative? Finalize translation choices (Sahih International, Maulana Fateh Muhammad Jalandhari, Kemenag). (Deferred to /plan-eng-review)
+- **Quran data source** — Tanzil (CC BY-ND 3.0), both Uthmani + Naskh variants. Translation choices: Sahih International (public domain), Maulana Fateh Muhammad Jalandhari (public domain), Kemenag/Indonesia (attribution required). Decided; see `legal-posture.md`.
 - **Gold/silver price API for zakat** — Which free API for spot prices? Candidates: GoldAPI.io (free tier), metals.live. Fallback to manual entry when offline. (Deferred to /plan-eng-review)
 - **Monetization / sustainability** — Open source with no ads — how will hosting, API costs, and ongoing development be sustained? (Deferred to TODOS.md; decide before v2)
 - **iOS CI cost** — macOS runners on GitHub Actions (~10x cost of Linux). Consider: free tier limits, self-hosted Mac mini, or separate pipelines. (Deferred to TODOS.md; decide before v3 iOS phase)
@@ -287,6 +475,37 @@ The following issues were flagged during adversarial review and require decision
 2. **Zakat nisab and Hawl logic** — nisab threshold (gold-based vs. silver-based) and the lunar year (Hawl) requirement need fiqhi specification. The calculator must document which rulings it follows. (v4 decision)
 4. **Widget countdown strategy** — iOS WidgetKit supports `Text` with `.timer` date style for live countdowns, but this consumes timeline budget differently than static "next prayer at X:XX" displays. Decide which approach before building widgets. (v1-v2 decision)
 5. **WearOS complication refresh model** — differs architecturally from watchOS timeline model. Needs platform-specific implementation spec (e.g., `TileService.onTileRequest` with `TimelineBuilders` or periodic `WorkManager` refresh). (v2 decision)
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR (PLAN) | 2 expansions added, 3 must-decides |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | — |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | issues_open (PLAN) | score: 3/10 → 8/10, 12 decisions |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+**UNRESOLVED:** 0 design decisions deferred
+**VERDICT:** Design review complete. Eng Review required before code start.
+
+## Design Review — NOT in Scope
+
+Design decisions considered during /plan-design-review (2026-04-18) and explicitly deferred:
+
+- **WearOS watch face / tile visual design** — deferred to v2. No UX spec at plan stage; watch face constraints are platform-specific and better designed when building.
+- **iOS-specific screen designs** (SwiftUI, Liquid Glass) — deferred to v3. Android is v1 target; iOS designs should derive from a working Android v1.
+- **Quran reader UI** — deferred to v4. Feature itself is v4; design is blocked on data source and licensing decisions.
+- **Zakat calculator UI** — deferred to v4. Fiqh specification decisions must happen before UI design.
+- **Dark/light mode toggle** — deferred. Both platforms provide system-level dark mode; app should follow system preference automatically. No custom toggle needed.
+- **Onboarding / walkthrough** — explicitly removed. No onboarding tour (decision made in Pass 3: times appear immediately after profile creation).
+
+## Design Review — What Already Exists
+
+- `architecture-design.md` — this document (approved, covers phases v1–v4)
+- Material You design system (Android) — governs color, spacing, typography system at platform level
+- Adhan library API — defines data models that drive UI (prayer names, calculation methods, coordinates)
+- No DESIGN.md yet — to be created by /design-consultation before v1 UI work
 
 ## What I noticed about how you think
 
