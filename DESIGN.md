@@ -383,6 +383,173 @@ Small tweaks (adjusting a spacing token, adding a new icon) follow this process 
 
 ---
 
+## 15. Notification Settings Screen — UX Spec
+
+### Overview
+
+Notifications is a utilitarian screen: stable parchment surface, no time-of-day cycle. It controls per-prayer alerts and the adhan audio selection. The screen's job is to make it fast to turn prayers on/off and to pick a voice without any friction.
+
+**Adhan model:** one global voice picker. No per-prayer adhan override — one fewer thing to explain.
+
+**Offset model:** hidden in per-prayer detail, not on the main list. Main list stays scannable.
+
+---
+
+### Information Architecture
+
+```
+Notifications
+├── [Master toggle row]
+├── PRAYERS
+│   ├── Fajr      04:21  [toggle]  [›]
+│   ├── Sunrise   06:02  [toggle]  [›]
+│   ├── Dhuhr     12:47  [toggle]  [›]
+│   ├── Asr       15:33  [toggle]  [›]
+│   ├── Maghrib   18:11  [toggle]  [›]
+│   └── Isha      19:42  [toggle]  [›]
+├── ADHAN
+│   └── Adhan voice       [Makkah  ›]
+└── OTHER
+    ├── Ramadan Imsak      [toggle]
+    └── Vibration          [With sound  ›]
+```
+
+---
+
+### Master Toggle Row
+
+- Label: IBM Plex `body` (15pt), ink — "Prayer alerts"
+- Toggle on the right, saffron track when enabled, parchment-muted track when disabled
+- Row height: 56pt
+- When OS notification permission is denied: replace the toggle with IBM Plex `body` saffron text "Enable in Settings →". Tap opens OS app-settings deep link. Do not show a toggle at all in this state.
+- When master is off: prayer rows remain visible and show their individual toggle states, but prayer name and time drop to `ink-muted`. The toggles themselves stay full opacity — user should see the underlying states clearly.
+
+No "all-off" guilt banner. It's the user's phone.
+
+---
+
+### Prayer Toggle Rows
+
+**Row anatomy** (56pt min height, 44pt dense-mode):
+
+```
+[prayer name]    [tabular time]    [toggle]  [›]
+```
+
+- **Prayer name:** IBM Plex `body` (15pt), `ink` when enabled, `ink-muted` when disabled
+- **Time:** IBM Plex `mono-num` (17pt, `tnum`), `ink-muted` always — this is reference info, not the focus
+- **Toggle:** platform-native. Track: `saffron` (#B87A2E) on, `parchment-muted` (#D4C9B1) off. Thumb: `parchment`.
+- **Chevron:** stroke icon, 1.5pt, `ink-muted`. Tapping the row body (not the toggle) navigates to the per-prayer detail sheet.
+
+**Dividers:** `parchment-muted` (#D4C9B1), 0.5pt, 24pt left inset.
+
+**Section headers:** Fraunces `title` (20pt), `ink`, left-aligned at 24pt margin. 12pt top padding above the header text, 8pt below.
+
+---
+
+### Adhan Section
+
+Single row, height 56pt:
+
+```
+Adhan voice                               Makkah  ›
+```
+
+- **Label:** IBM Plex `body`, `ink`
+- **Current selection:** IBM Plex `body-sm`, `ink-muted`, right-aligned before chevron
+
+Tapping the row navigates to the Adhan Picker screen (full navigation push, not a sheet — the list is long enough to warrant its own screen).
+
+---
+
+### Adhan Picker Screen
+
+Navigation title: "Adhan voice" — IBM Plex `body-lg` or platform nav-bar style.
+
+**Options** (radio select, single choice):
+
+| Label | Caption |
+|---|---|
+| Makkah | Al-Masjid Al-Haram |
+| Madinah | Al-Masjid An-Nabawi |
+| Egyptian | Abdul Basit Abdus Samad |
+| Turkish | Diyanet Işleri |
+| Al-Aqsa | |
+| None | Silent — no audio |
+
+**Row anatomy** (56pt):
+- **Left:** radio indicator — stroke circle, 1.5pt, `ink`. Selected state: filled center disc in `saffron`.
+- **Center:** label in IBM Plex `body` (`ink`), optional caption in IBM Plex `body-sm` (`ink-muted`) below
+- **Right:** play icon (SF Symbols `play.circle` / Material Symbols `play_circle_outline`), `ink-muted`, 24×24pt. Tapping plays a 10-second audio preview of that adhan. Only one preview plays at a time — tapping a second preview while one is playing stops the first.
+
+Selection is immediate. No "Save" or "Apply" button. Nav-back confirms. The row's radio indicator updates in place before the user navigates back.
+
+---
+
+### Other Section
+
+**Ramadan Imsak row** (64pt):
+- Label: IBM Plex `body`, `ink` — "Ramadan Imsak"
+- Caption: IBM Plex `body-sm`, `ink-muted` — "10 minutes before Fajr, during Ramadan"
+- Toggle on right, saffron when enabled
+- During Hijri Ramadan: row background shifts to `parchment-muted` (#D4C9B1) — a quiet signal the feature is seasonally active. Not saffron, not a badge. Just a tint.
+
+**Vibration row** (56pt):
+- Label: IBM Plex `body`, `ink` — "Vibration"
+- Current value right-aligned: IBM Plex `body-sm`, `ink-muted` — "Always", "With sound", or "Never"
+- Chevron. Tapping opens a 3-option action sheet or bottom picker: Always / With sound / Never
+- Default: "With sound"
+
+---
+
+### Per-Prayer Detail Sheet
+
+Presented as a bottom sheet that expands to ~60% screen height. Not a full navigation push. On Android: `ModalBottomSheet`. On iOS: `UISheetPresentationController` at `.medium` detent, expandable to `.large`.
+
+**Header** (not a row — purely decorative heading):
+- Prayer name: Fraunces `display-md` (32pt), `ink`, centered
+- Below: IBM Plex `body-sm`, `ink-muted`, centered — "Today · {time}"
+
+**Rows:**
+
+| Row | Label | Control |
+|---|---|---|
+| Alert | "Send alert" | Toggle (saffron on) |
+| Time offset | "Time offset" | Current value `›` |
+| Early reminder | "Early reminder" | Current value `›` |
+| Preview | — | Saffron text button |
+
+**Time offset picker:** -15 / -10 / -5 / 0 (On time) / +5 / +10 / +15 minutes. Default: 0. A wheel picker (iOS) or number picker (Android). Selected value displayed as "On time" or "−5 min" or "+10 min".
+
+**Early reminder picker:** Off / 5 min before / 10 min before / 15 min before. Default: Off. When set, the system fires a separate silent notification (no adhan, vibration only) at the specified interval before the prayer time.
+
+**Preview row:** IBM Plex `body`, `saffron` — "Preview adhan". No background, no border. Tapping plays a 10-second sample of the configured adhan. Row height 56pt.
+
+---
+
+### States
+
+| State | Behavior |
+|---|---|
+| OS permission denied | Master toggle replaced by "Enable in Settings →" saffron link. No prayer toggles are functional (they show, but tapping them opens the OS prompt). |
+| All individual prayers off | No summary state shown. User sees each prayer's toggle in its off state. Not our job to add a guilt banner. |
+| Master toggle off | Prayer rows visible, names/times at `ink-muted`. Individual toggle states preserved and visible — turning master back on restores previous state. |
+| Ramadan (Hijri calendar) | Imsak row gains `parchment-muted` background tint. No other visual change. |
+
+---
+
+### Accessibility
+
+- **Toggle labels:** VoiceOver/TalkBack reads the full context: "Fajr prayer alert, on, button" / "Dhuhr prayer alert, off, button"
+- **Row disclosure:** chevron accessibility label is "Fajr notification settings"
+- **Adhan preview:** "Preview {voice name} adhan, button"
+- **Time offset picker:** announces selected value as "Time offset, minus 5 minutes" or "Time offset, on time"
+- **Tap targets:** all interactive elements ≥ 44×44pt (iOS), ≥ 48×48dp (Android)
+- **Reduced motion:** toggle state changes are instant color shifts only (no spring/bounce). Sheet presentation is a simple fade rather than slide.
+- **Dynamic Type:** rows expand vertically to accommodate larger text sizes. Times remain tabular — no wrapping.
+
+---
+
 ## Provenance
 
 - Created: 2026-04-18
