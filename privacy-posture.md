@@ -60,7 +60,7 @@ Required manifest entries:
 ## Android equivalents
 
 - `POST_NOTIFICATIONS` runtime permission (API 33+).
-- `SCHEDULE_EXACT_ALARM` / `USE_EXACT_ALARM` — required for accurate adhan timing (prayer times shift minute-by-minute with seasons, so inexact alarms are unacceptable).
+- `USE_EXACT_ALARM` — declared in manifest (no user grant required). Prayer apps qualify under the alarm/clock exemption. Inexact alarms are unacceptable for prayer notification timing. Play Console requires exact alarm category declaration.
 - `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — coarse is sufficient for prayer time calculation (<1 arcminute error); prefer coarse.
 - Play Store **Data Safety form:** tick "No data collected" + "No data shared." Declare `SCHEDULE_EXACT_ALARM` usage reason in Play Console.
 
