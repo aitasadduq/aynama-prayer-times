@@ -198,7 +198,7 @@ Three sizes, each with a specific job:
 
 All widget sizes: tap opens app Home screen. No prayer-row taps within widget (widget interaction is launch-only in v1).
 
-Widget update strategy: see Reviewer Concern #4 (widget countdown decision).
+Widget update strategy (Reviewer Concern #4 — resolved): **Live countdown via `RemoteViews.setChronometerCountDown()`.** The system handles ticking natively — no WorkManager needed. Widget is updated only when the active prayer changes (~5x/day). The system-rendered countdown reads live without any periodic scheduling. Note: WorkManager's minimum periodic interval is 15 minutes — not usable for live countdowns. `setChronometerCountDown()` is the correct mechanism (API 17+).
 
 ### Profile Creation Flow
 
@@ -227,7 +227,7 @@ A prayer profile consists of:
 - **Location** (lat/long — either manual city selection or GPS)
 - **Calculation method** (MWL, ISNA, Umm al-Qura, Egyptian, Karachi, etc.)
 - **Asr calculation** (Hanafi: shadow = 2x, Shafi'i: shadow = 1x)
-- **isGPS** flag (at most one profile is GPS-based, auto-updates location)
+- **isGPS** flag (at most one profile is GPS-based, refreshes location on app open/resume via `getLastKnownLocation()` — no background location permission required)
 
 Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot indicator. The GPS-based profile always shows current-location times. Manual profiles show times for their fixed location.
 
@@ -257,13 +257,19 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 
 - Prayer time notifications scheduled as **local notifications** (no server dependency)
 - iOS: schedule 7 days of notifications ahead via `UNUserNotificationCenter` with calendar triggers. Reschedule on app foreground and via background app refresh (which is not guaranteed — the 7-day buffer ensures coverage even if background refresh is throttled by iOS)
-- Android: scheduled via `AlarmManager` (exact alarms) with a foreground service for reliability
+- Android: scheduled via `AlarmManager` (exact alarms) using `USE_EXACT_ALARM` manifest permission (no user grant required — prayer apps qualify under the alarm/clock exemption). Foreground service for audio playback.
+- **Required receivers (silent failure prevention):**
+  - `BOOT_COMPLETED` BroadcastReceiver: reschedules all active profiles' exact alarms after device reboot (AlarmManager state is wiped on reboot).
+  - `ACTION_TIMEZONE_CHANGED` BroadcastReceiver: recalculates prayer times for all active profiles and reschedules alarms (alarms scheduled in UTC would fire at wrong local time in new zone).
+- Also reschedule alarms on app open/resume to cover gaps from background kill.
+- **OEM battery optimization prompt**: immediately after notification permission is granted, send `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent. Xiaomi (MIUI), Huawei (EMUI), and Samsung (One UI) aggressively kill exact alarms; whitelisting is the standard mitigation used by every reliable alarm/prayer app. One-time prompt, proactive at setup.
 - Adhan audio: configurable per prayer (silent, vibrate, short alert, full adhan). Audio playback via notification sound attachment (iOS) / media player in foreground service (Android)
 - watchOS: mirrored notifications from phone by default; standalone scheduling if watch app runs independently
 
 ### Data Persistence
 
-- **Local storage:** Core Data (iOS) / Room (Android) for prayer tracker history, tasbeeh counts, user preferences, prayer profile configurations
+- **Local storage:** Core Data (iOS) / Room (Android) for prayer tracker history, tasbeeh counts, user preferences, prayer profile configurations. Room: `exportSchema = true`, schema JSON files committed to repo for migration safety. Observe data via `Flow<T>` — no synchronous Room queries on the main thread.
+- **Hijri date:** Use `android.icu.util.IslamicCalendar` (Android API 24+, no extra dependency) to detect Ramadan month for Imsak auto-enable and banner gating. Default: Umm al-Qura (Saudi tabular calculation). **Settings toggle:** "Ramadan start: Calculated | +1 day | +2 days" to accommodate local moon-sighting communities (many UK/North America/South Asia users follow observational start). Document as: "Ramadan detection uses Umm al-Qura calculation by default."
 - **Quran text:** Pre-bundled SQLite databases (~25 MB total): `tanzil-uthmani.db` (Arab Gulf / Middle East script) + `tanzil-naskh.db` (South Asian script). User selects preferred script in Settings. Translation tables in separate per-language SQLite files.
 - **Cloud sync:** Explicitly deferred. v1 is local-only. If added later, iCloud (iOS) and Google Drive/Firebase (Android) are natural fits.
 - **No account/login required** for any v1 feature
@@ -275,6 +281,12 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 - Watch apps and widgets are first-class features, not afterthoughts
 - Single developer building all features initially
 - Quran Majeed is the primary inspiration and competitor to improve upon
+
+## Performance Constraints
+
+- **Prayer time caching:** `Adhan.calculatePrayers()` must be called once per day per profile (not on every second/minute tick). Cache the `PrayerTimes` result in memory, invalidate only on: day rollover, profile change, or timezone change. The countdown UI computes `nextPrayer.time - now` in memory — cheap.
+- **Room on background thread:** All Room queries via `Flow<T>` observed in ViewModels. No synchronous Room calls on the main thread. Profile switching triggers a `Flow` emission, not a blocking query.
+- **Sensor sampling for Qibla:** Register `SensorManager` listener only while Qibla screen is visible. Unregister in `onPause()`. 20Hz sampling rate (`SENSOR_DELAY_UI`) is sufficient.
 
 ## Premises
 
@@ -363,9 +375,9 @@ prayer-app/
 
 ### The test vector contract
 
-**Reference source:** Test vectors are computed against the Adhan library (Batoul Apps, Apache 2.0, pinned to a specific release tag). PrayTimes.org v2.3 serves as upstream mathematical validation. The generator script validates Adhan's output against PrayTimes before committing vectors. Reference versions are pinned in `scripts/reference-versions.json` so vector reproducibility is guaranteed.
+**Reference source — two-source cross-validation:** Test vectors are generated only for cases where two independent implementations agree within tolerance: (1) PrayTimes.org Python v2.3 (`praytimes` PyPI package) and (2) Adhan-Kotlin (pinned release). The generator runs both, compares outputs, and only commits a case when both agree within ±1 minute. Cases where they disagree are logged to `scripts/disagreements.json` for manual fiqh review before acceptance. Reference versions are pinned in `scripts/reference-versions.json` so vector reproducibility is guaranteed.
 
-Vectors serve two purposes: (1) regression-test Adhan upstream (if Adhan changes and breaks something, vectors catch it), and (2) cross-validate wrapper ports on Kotlin and Swift (ensure both ports of Adhan produce identical output within tolerance).
+This produces correctness guarantees, not just regression guarantees: if Adhan was wrong from the start, the two-source check catches it. CI then tests Android + iOS Adhan wrappers against these consensus vectors to catch (1) regressions in Adhan upstream and (2) wrapper bugs.
 
 **Tolerance:** Comparisons are at the minute level. A tolerance of **±1 minute** is acceptable (different atmospheric refraction constants and rounding strategies cause this variance). Tests fail if any prayer time differs by ≥2 minutes from the expected value. Rounding rule: **round to nearest minute, Adhan upstream wins on ties.**
 
@@ -454,14 +466,42 @@ Both the Kotlin (wrapper around Adhan-Kotlin) and Swift (wrapper around Adhan-Sw
 ## Next Steps (v1 scope only)
 
 1. **Create the monorepo** with the directory structure above
-2. **Vendor Adhan library** — add Gradle dependency `com.batoulapps.adhan2:adhan2:0.0.7` (pinned, SHA-256 verified); Swift port via CocoaPods or source-copy if patching needed
+2. **Vendor Adhan library** — add Gradle dependency `com.batoulapps.adhan:adhan:1.2.1` (pinned, SHA-256 verified); Swift port (Adhan-Swift, MIT) via Swift Package Manager or CocoaPods
 3. **Build the test vector generator** — start with Makkah, Madinah, London, New York, Tromsø (69.6°N), Reykjavik (64.1°N), Cape Town (southern hemisphere) across all major calculation methods; validate generator output against Adhan upstream before committing vectors
 4. **Implement Adhan wrapper + test harness on first platform** — wrap Adhan-Kotlin, run all test vectors in CI; verify rounding rule compliance (round to nearest minute, Adhan upstream wins ties)
 5. **Build the multi-profile UX** — the weather-app-like prayer profile switcher with Qaza countdown; finalize Room schema for Qaza tracking before v1 ships
 6. **Add Qibla compass** — magnetometer integration + bearing calculation using remapped rotation matrix for tilt stability
 7. **Build home screen widget** — next prayer name + time from the active profile; apply v1 widget countdown strategy (decide: static "next prayer at X:XX" vs live countdown)
 8. **Add Imsak alarm for Ramadan** — detect Hijri month, auto-enable Imsak (Fajr − 10 min) during Ramadan
-9. **Set up CI for test vectors + reproducible builds** — Android CI validated against vectors; F-Droid reproducible-build setup from day 1
+9. **Set up CI for test vectors + reproducible builds** — Android CI validated against vectors; F-Droid reproducible-build setup from day 1. Note: Play Store submission at v1 launch; F-Droid listing goes live when F-Droid review completes (typically weeks to months after submission, not simultaneous).
+
+## Testing Requirements (v1 Android)
+
+Every codepath in the implementation plan requires a test. Framework: JUnit 4 + Roboelectric (unit/integration) + Espresso on emulator (E2E). All tests must be part of the same PR as the feature code — no deferred test PRs.
+
+### Required unit/integration tests
+
+| Test file | What to verify |
+|-----------|---------------|
+| `AdhanWrapperTest` | Valid coordinates × methods (test vectors); null/invalid lat/lon throws `IllegalArgumentException`; high-latitude fallback path; midnight boundary (23:59 vs 00:00) |
+| `ProfileRepositoryTest` | Create/update/delete/read via Room in-memory DB; GPS flag constraint (set GPS on new → old cleared); Qaza cascade on profile delete |
+| `AlarmSchedulerTest` | `scheduleAll()` sets 5 exact alarms; idempotent (called twice → no duplicate alarms); Imsak = Fajr − 10 min; daily midnight reschedule |
+| `QazaTrackerTest` | TypeConverter for status enum; mark-as-prayed write; auto-mark-as-missed after next prayer starts; qaza count query |
+| `RamadanDetectorTest` | `IslamicCalendar.RAMADAN` detection for known dates; non-Ramadan date returns false; Imsak enabled/disabled correctly |
+| `QiblaCalculatorTest` | Bearing from known coordinates to Makkah (21.4225°N, 39.8262°E) matches expected bearing ±1° |
+
+### Required E2E tests (emulator, `android-emulator-runner` GitHub Action)
+
+| Test | What to verify |
+|------|---------------|
+| `AlarmFiresWhileClosedTest` | Schedule alarm for 30 seconds ahead; close app; verify notification appears in shade |
+| `AlarmRestoredAfterRebootTest` | Schedule alarm; simulate reboot via `am broadcast -a android.intent.action.BOOT_COMPLETED`; verify alarm is rescheduled |
+
+### CI configuration
+
+- Emulator tests run in `android.yml` on `ubuntu-latest` using `reactivecircus/android-emulator-runner@v2`
+- Emulator tests gated behind a `[e2e]` label or run only on PRs targeting `main` (cost control for solo dev)
+- Unit/integration tests run on every commit
 
 ## Reviewer Concerns
 
@@ -481,13 +521,14 @@ The following issues were flagged during adversarial review and require decision
 | Review | Trigger | Why | Runs | Status | Findings |
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | CLEAR (PLAN) | 2 expansions added, 3 must-decides |
-| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 0 | — | — |
-| Design Review | `/plan-design-review` | UI/UX gaps | 1 | issues_open (PLAN) | score: 3/10 → 8/10, 12 decisions |
+| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found | 8 findings, 5 accepted |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR (PLAN) | 13 issues, 0 unresolved, 2 critical gaps closed |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR (PLAN) | score: 3/10 → 8/10, 12 decisions |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
 
-**UNRESOLVED:** 0 design decisions deferred
-**VERDICT:** Design review complete. Eng Review required before code start.
+**UNRESOLVED:** 0 decisions
+**CRITICAL GAPS CLOSED:** Maven coordinates, USE_EXACT_ALARM, OEM battery mitigation, widget mechanism, test vector source-of-truth, GPS location timing
+**VERDICT:** CEO + ENG + DESIGN CLEARED — ready to implement v1 sprint 1.
 
 ## Design Review — NOT in Scope
 
