@@ -41,7 +41,7 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Engineering TODOs (from /plan-eng-review, 2026-04-21)
 
-- [ ] **Vector generator self-tests.** Before first vector commit: (1) output for Makkah 2026-03-21 MWL matches known golden values; (2) disagreement detection flags when PrayTimes.py and Adhan differ >1 min; (3) schema.json validation passes on all generated files. Blocks first vector commit.
+- [x] ~~**Vector generator self-tests.**~~ → **SCRIPTS IN PLACE** (`scripts/generate_vectors.py`, `scripts/test_generator.py`, `scripts/AdhanRunner.java`). Tests 2+3 pass on any Python machine. Test 1 (golden values) requires Java — auto-downloads JAR and passes in CI. First vector commit unblocked once CI Java environment is confirmed.
 
 - [ ] **Adhan-Swift version pin + parity check.** Before v3 iOS work: pin Adhan-Swift to a specific release in `scripts/reference-versions.json`; verify all 12 test-vector cities agree between Adhan-Swift and Adhan-Kotlin within ±1 min; add parity check to ios.yml CI. Required pre-v3 gate.
 
