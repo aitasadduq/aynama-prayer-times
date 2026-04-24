@@ -31,9 +31,9 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Temporal Interrogation follow-ups (non-blocking, low effort)
 
-- [ ] T1 — Write minimal README before v1 code starts.
+- [x] T1 — Write minimal README before v1 code starts.
 - [x] ~~T2 — Design doc language~~ → **RESOLVED** (`com.batoulapps.adhan:adhan:1.2.1`, source-vendor only if patched)
-- [ ] T3 — Write `test-vectors/schema.json` before first vector commit.
+- [x] ~~T3~~ → **RESOLVED** (`test-vectors/schema.json` written; prayer-times only, Draft-07, validates method/tolerance/reference/cases structure)
 - [ ] T5 — Add `tags: List<String>` or `context: ProfileContext` field to Profile schema.
 - [x] ~~T6~~ → **RESOLVED** (BOOT_COMPLETED + ACTION_TIMEZONE_CHANGED BroadcastReceivers spec'd in architecture-design.md)
 - [ ] T7 — Qibla uses `SensorManager.remapCoordinateSystem` for tilt-stable bearing.
