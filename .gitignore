@@ -35,3 +35,8 @@ google-services.json
 
 .DS_Store
 .gstack/
+
+# Generator artifacts
+scripts/*.jar
+scripts/*.class
+scripts/disagreements.json
