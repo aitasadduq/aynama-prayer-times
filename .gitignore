@@ -35,3 +35,13 @@ google-services.json
 
 .DS_Store
 .gstack/
+.claude/
+
+# Android build outputs
+android/local.properties
+android/.gradle/
+
+# Script generator artifacts
+scripts/*.jar
+scripts/*.class
+scripts/disagreements.json
