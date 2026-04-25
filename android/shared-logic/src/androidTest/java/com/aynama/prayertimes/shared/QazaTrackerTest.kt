@@ -109,6 +109,14 @@ class QazaTrackerTest {
     }
 
     @Test
+    fun sql_outstanding_status_names_match_enum() {
+        // QazaEntryDao hardcodes 'MISSED' and 'INTENTION_TO_MAKEUP' in SQL —
+        // fail loudly here if they're ever renamed.
+        assertEquals("MISSED", QazaStatus.MISSED.name)
+        assertEquals("INTENTION_TO_MAKEUP", QazaStatus.INTENTION_TO_MAKEUP.name)
+    }
+
+    @Test
     fun outstanding_count_counts_missed_and_intention() = runBlocking {
         val date = LocalDate.of(2026, 4, 25)
         repo.markPrayer(profileId, Prayer.FAJR, date, QazaStatus.MISSED)
