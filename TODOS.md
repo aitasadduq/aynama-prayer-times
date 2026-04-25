@@ -4,11 +4,11 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Design TODOs (from /plan-design-review, 2026-04-18)
 
-- [ ] **Run /design-consultation before v1 UI work.** Define color palette, typeface, iconography, and app icon direction for aynama. Without brand tokens, every implementer makes color/font choices inline — produces an inconsistent app. One session produces a DESIGN.md that governs all future UI decisions. No prerequisites.
+- [x] ~~**Run /design-consultation before v1 UI work.**~~ → **COMPLETE** (DESIGN.md created 2026-04-18, covers color palette, typeface, iconography, app icon, brand tokens, all 6 sections)
 
-- [ ] **Notification settings screen UX spec.** Per-prayer toggles, adhan audio picker (silent / vibrate / short alert / full adhan), vibration option, advance notice duration (e.g. "5 min before"). The plan mentions configurable adhan per prayer but the picker UI and per-prayer toggle layout are undefined. Prevents ad-hoc notification UX. ~30 min design work. No prerequisites.
+- [x] ~~**Notification settings screen UX spec.**~~ → **COMPLETE** (DESIGN.md §15: master toggle, per-prayer rows, adhan picker with 6 voices, Imsak toggle, vibration modes, per-prayer offset/early-reminder sheets)
 
-- [ ] **Prayer tracker history view spec.** Define whether history is a calendar heat-map, a flat list, or a streak view. How does the user filter by missed/made-up/pending? How do they mark a historical Qaza as made up? The history view drives Room query design — a calendar heat-map needs different indexes than a flat list. Resolve before building the tracker screen. Depends on: Room schema (Reviewer Concern #3, already spec'd in CEO plan).
+- [x] ~~**Prayer tracker history view spec.**~~ → **COMPLETE** (DESIGN.md §16: calendar-free flat list, per-day row expansion, 5 prayer indicators (no Sunrise), marked states: on-time / Qada / missed, week sections, soft aggregate header)
 
 ## Deferred decisions (not blocking v1 code start)
 
@@ -42,6 +42,8 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 ## Engineering TODOs (from /plan-eng-review, 2026-04-21)
 
 - [x] ~~**Vector generator self-tests.**~~ → **COMPLETE** (`scripts/test_generator.py`, 9 tests pass). Golden values corrected to Adhan 1.2.1 actual output (arch-design.md had stale PrayTimes.py values): fajr=05:10, sunrise=06:24, dhuhr=12:29, asr_shafii=15:53, asr_hanafi=16:50, maghrib=18:32, isha=19:42. `architecture-design.md` golden values table needs updating separately.
+
+- [ ] **Run all test vectors in CI.** Load all 12 cities from `test-vectors/schema.json` in `android.yml` CI; parse + loop all methods (MWL, ISNA, UMM_AL_QURA, etc.). Assert each prayer time within ±1 min of test vector. Replace hardcoded Makkah-only tests in `AdhanWrapperTest.kt`. Required v1 gate (before launch) to catch Adhan upstream regressions.
 
 - [ ] **Adhan-Swift version pin + parity check.** Before v3 iOS work: pin Adhan-Swift to a specific release in `scripts/reference-versions.json`; verify all 12 test-vector cities agree between Adhan-Swift and Adhan-Kotlin within ±1 min; add parity check to ios.yml CI. Required pre-v3 gate.
 
