@@ -12,13 +12,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.aynama.prayertimes.R
 
-val Fraunces = FontFamily(
+private fun frauncesFamily(opsz: Float) = FontFamily(
     Font(
         R.font.fraunces,
         weight = FontWeight.Normal,
         variationSettings = FontVariation.Settings(
             FontVariation.Setting("wght", 400f),
-            FontVariation.Setting("opsz", 18f),
+            FontVariation.Setting("opsz", opsz),
         ),
     ),
     Font(
@@ -26,7 +26,7 @@ val Fraunces = FontFamily(
         weight = FontWeight.Medium,
         variationSettings = FontVariation.Settings(
             FontVariation.Setting("wght", 500f),
-            FontVariation.Setting("opsz", 18f),
+            FontVariation.Setting("opsz", opsz),
         ),
     ),
 )
@@ -46,25 +46,25 @@ val IbmPlexSans = FontFamily(
 
 val AynamaTypography = Typography(
     displayLarge = TextStyle(
-        fontFamily = Fraunces,
+        fontFamily = frauncesFamily(144f),
         fontWeight = FontWeight.Normal,
         fontSize = 72.sp,
         lineHeight = 72.sp,
     ),
     displayMedium = TextStyle(
-        fontFamily = Fraunces,
+        fontFamily = frauncesFamily(96f),
         fontWeight = FontWeight.Medium,
         fontSize = 48.sp,
         lineHeight = (48 * 1.05).sp,
     ),
     displaySmall = TextStyle(
-        fontFamily = Fraunces,
+        fontFamily = frauncesFamily(48f),
         fontWeight = FontWeight.Medium,
         fontSize = 32.sp,
         lineHeight = (32 * 1.1).sp,
     ),
     headlineMedium = TextStyle(
-        fontFamily = Fraunces,
+        fontFamily = frauncesFamily(20f),
         fontWeight = FontWeight.Medium,
         fontSize = 20.sp,
         lineHeight = 25.sp,

@@ -11,7 +11,7 @@ import java.time.ZoneId
 
 enum class CalculationMethodKey {
     MWL, ISNA, UMM_AL_QURA, EGYPTIAN, KARACHI,
-    DUBAI, MOON_SIGHTING_COMMITTEE, NORTH_AMERICA, KUWAIT, QATAR, SINGAPORE
+    DUBAI, MOON_SIGHTING_COMMITTEE, KUWAIT, QATAR, SINGAPORE
 }
 
 data class PrayerTimesResult(
@@ -59,7 +59,7 @@ class AdhanWrapper {
 
     private fun mapMethod(key: CalculationMethodKey): CalculationMethod = when (key) {
         CalculationMethodKey.MWL -> CalculationMethod.MUSLIM_WORLD_LEAGUE
-        CalculationMethodKey.ISNA, CalculationMethodKey.NORTH_AMERICA -> CalculationMethod.NORTH_AMERICA
+        CalculationMethodKey.ISNA -> CalculationMethod.NORTH_AMERICA
         CalculationMethodKey.UMM_AL_QURA -> CalculationMethod.UMM_AL_QURA
         CalculationMethodKey.EGYPTIAN -> CalculationMethod.EGYPTIAN
         CalculationMethodKey.KARACHI -> CalculationMethod.KARACHI
