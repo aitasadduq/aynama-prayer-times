@@ -111,18 +111,116 @@ class HomeRibbonStateTest {
     }
 
     @Test
+    fun `fajr window — next prayer name is sunrise`() {
+        assertEquals("Sunrise", deriveNextPrayerName(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(5, 0)))
+    }
+
+    @Test
+    fun `fajr window — countdown shows time until sunrise`() {
+        // now=5:00, sunrise=6:10 → 1h 10m
+        assertEquals("1h 10m", deriveCountdown(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(5, 0)))
+    }
+
+    @Test
+    fun `fajr window — next prayer time shows sunrise time`() {
+        val result = deriveNextPrayerTime(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(5, 0), formatter)
+        assertEquals("6:10 AM", result)
+    }
+
+    @Test
     fun `countdown shows time until next prayer`() {
-        // now = 10:00, next = dhuhr = 12:15 → 2h 15m = 8100s
+        // now = 10:00, next = dhuhr = 12:15 → 2h 15m
         val result = deriveCountdown(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(10, 0))
-        assertEquals("02:15:00", result)
+        assertEquals("2h 15m", result)
     }
 
     @Test
     fun `countdown wraps to tomorrow fajr after isha`() {
         // now = 23:00, all prayers passed → next = tomorrow fajr (approximate via midnight wrap)
         val result = deriveCountdown(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(23, 0))
-        // 1h to midnight + 4h30m to fajr = 5h30m = "05:30:00"
-        assertEquals("05:30:00", result)
+        // 1h to midnight + 4h30m to fajr = 5h30m
+        assertEquals("5h 30m", result)
+    }
+
+    // ---- post-midnight Isha (e.g. London in summer) ----
+
+    private val postMidnightIshaTimes = sampleTimes.copy(
+        fajr = LocalTime.of(5, 25),
+        sunrise = LocalTime.of(7, 44),
+        dhuhr = LocalTime.of(13, 0),
+        asrShafii = LocalTime.of(16, 45),
+        asrHanafi = LocalTime.of(18, 0),
+        maghrib = LocalTime.of(22, 14),
+        isha = LocalTime.of(0, 25),
+    )
+
+    @Test
+    fun `post-midnight isha — next prayer name is isha in the evening`() {
+        assertEquals("Isha", deriveNextPrayerName(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15)))
+    }
+
+    @Test
+    fun `post-midnight isha — countdown shows time until isha not fajr`() {
+        // now=22:15, isha=00:25 → 1h45m to midnight + 25m to isha = 2h10m
+        assertEquals("2h 10m", deriveCountdown(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15)))
+    }
+
+    @Test
+    fun `post-midnight isha — next prayer time is isha time`() {
+        val result = deriveNextPrayerTime(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15), formatter)
+        assertEquals("12:25 AM", result)
+    }
+
+    @Test
+    fun `post-midnight isha — ribbon shows isha as upcoming in the evening`() {
+        val rows = deriveRibbonRows(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15), false, formatter)
+        val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
+        assertEquals(RibbonState.UPCOMING, prayerRows.first { it.prayer == Prayer.ISHA }.ribbonState)
+        assertEquals(RibbonState.CURRENT, prayerRows.first { it.prayer == Prayer.MAGHRIB }.ribbonState)
+    }
+
+    @Test
+    fun `post-midnight isha — after isha wraps to fajr`() {
+        assertEquals("Fajr", deriveNextPrayerName(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 30)))
+    }
+
+    @Test
+    fun `post-midnight isha — before isha after midnight next prayer is isha`() {
+        // now=00:05, isha=00:25, fajr=05:25 → still counting down to Isha
+        assertEquals("Isha", deriveNextPrayerName(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5)))
+    }
+
+    @Test
+    fun `post-midnight isha — countdown before isha after midnight shows isha countdown`() {
+        // now=00:05, isha=00:25 → 20m
+        assertEquals("20m", deriveCountdown(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5)))
+    }
+
+    @Test
+    fun `post-midnight isha — next prayer time before isha after midnight shows isha time`() {
+        val result = deriveNextPrayerTime(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5), formatter)
+        assertEquals("12:25 AM", result)
+    }
+
+    @Test
+    fun `post-midnight isha — ribbon shows isha current after it passes`() {
+        // now=01:00, isha=00:25 → Isha is current, all daytime prayers passed
+        val rows = deriveRibbonRows(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(1, 0), false, formatter)
+        val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
+        assertEquals(RibbonState.PASSED, prayerRows.first { it.prayer == Prayer.FAJR }.ribbonState)
+        assertEquals(RibbonState.PASSED, prayerRows.first { it.prayer == Prayer.DHUHR }.ribbonState)
+        assertEquals(RibbonState.PASSED, prayerRows.first { it.prayer == Prayer.ASR }.ribbonState)
+        assertEquals(RibbonState.PASSED, prayerRows.first { it.prayer == Prayer.MAGHRIB }.ribbonState)
+        assertEquals(RibbonState.CURRENT, prayerRows.first { it.prayer == Prayer.ISHA }.ribbonState)
+    }
+
+    @Test
+    fun `post-midnight isha — ribbon shows maghrib current before isha after midnight`() {
+        // now=00:05, isha=00:25 → Isha upcoming, Maghrib current
+        val rows = deriveRibbonRows(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5), false, formatter)
+        val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
+        assertEquals(RibbonState.CURRENT, prayerRows.first { it.prayer == Prayer.MAGHRIB }.ribbonState)
+        assertEquals(RibbonState.UPCOMING, prayerRows.first { it.prayer == Prayer.ISHA }.ribbonState)
     }
 
     @Test

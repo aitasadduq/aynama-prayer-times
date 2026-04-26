@@ -17,9 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -45,8 +43,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.shared.data.entity.Prayer
+import com.aynama.prayertimes.ui.theme.IbmPlexSans
 import com.aynama.prayertimes.ui.theme.Ink
+import com.aynama.prayertimes.ui.theme.InkMuted
 import com.aynama.prayertimes.ui.theme.Parchment
+import com.aynama.prayertimes.ui.theme.ParchmentMuted
 import com.aynama.prayertimes.ui.theme.Saffron
 
 @Composable
@@ -140,19 +141,20 @@ private fun ProfilePage(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 24.dp)
             .semantics {
                 contentDescription = "Profile page ${pageIndex + 1} of $pageCount: ${profileState.profile.name}"
             },
     ) {
+        Spacer(Modifier.height(16.dp))
+
         Text(
             text = "Home · ${profileState.profile.name}",
             style = MaterialTheme.typography.bodySmall,
             color = LocalContentColor.current.copy(alpha = 0.7f),
         )
 
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
 
         Text(
             text = profileState.countdownText,
@@ -163,25 +165,31 @@ private fun ProfilePage(
         )
 
         Text(
-            text = profileState.nextPrayerName,
-            style = MaterialTheme.typography.displayMedium,
+            text = "${profileState.nextPrayerName} · ${profileState.nextPrayerTime}",
+            style = MaterialTheme.typography.displaySmall,
         )
 
-        Spacer(Modifier.height(40.dp))
+        Spacer(Modifier.height(24.dp))
 
-        profileState.ribbonRows.forEach { row ->
-            RibbonRowItem(row = row)
-            Spacer(Modifier.height(4.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            profileState.ribbonRows.forEach { row ->
+                RibbonRowItem(row = row)
+            }
         }
 
         if (profileState.outstandingQazaCount > 0) {
-            Spacer(Modifier.height(24.dp))
             Text(
                 text = "${profileState.outstandingQazaCount} outstanding Qaḍā",
                 style = MaterialTheme.typography.bodySmall,
                 color = LocalContentColor.current.copy(alpha = 0.6f),
+                modifier = Modifier.padding(bottom = 8.dp),
             )
         }
+
+        Spacer(Modifier.height(8.dp))
     }
 }
 
@@ -196,9 +204,17 @@ private fun RibbonRowItem(row: RibbonRow, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PrayerRibbonRow(row: RibbonRow.PrayerEntry, modifier: Modifier = Modifier) {
+    // On light phases LocalContentColor is Ink; on dark phases it is Parchment.
+    val isLightBackground = LocalContentColor.current == Ink
+    // Use the corresponding muted token directly (no alpha) so passed rows are readable
+    // regardless of where they fall in the gradient.
+    val mutedColor = if (isLightBackground) InkMuted else ParchmentMuted
+    // Saffron accent is unreadable on light-phase backgrounds (the Asr gradient bottom IS
+    // saffron). Use Ink on light phases so the current prayer always has contrast.
+    val currentColor = if (isLightBackground) Ink else Saffron
     val textColor = when (row.ribbonState) {
-        RibbonState.PASSED -> LocalContentColor.current.copy(alpha = 0.5f)
-        RibbonState.CURRENT -> Saffron
+        RibbonState.PASSED -> mutedColor
+        RibbonState.CURRENT -> currentColor
         RibbonState.UPCOMING -> LocalContentColor.current
     }
     val prayerName = row.prayer.displayName()
@@ -221,13 +237,13 @@ private fun PrayerRibbonRow(row: RibbonRow.PrayerEntry, modifier: Modifier = Mod
                 RibbonState.PASSED -> Text(
                     text = "✓",
                     style = MaterialTheme.typography.labelMedium,
-                    color = LocalContentColor.current.copy(alpha = 0.4f),
+                    color = mutedColor,
                 )
                 RibbonState.CURRENT -> Box(
                     modifier = Modifier
                         .size(8.dp)
                         .clip(CircleShape)
-                        .background(Saffron),
+                        .background(currentColor),
                 )
                 RibbonState.UPCOMING -> {}
             }
@@ -237,14 +253,17 @@ private fun PrayerRibbonRow(row: RibbonRow.PrayerEntry, modifier: Modifier = Mod
 
         Text(
             text = prayerName,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.headlineMedium,
             color = textColor,
             modifier = Modifier.weight(1f),
         )
 
         Text(
             text = row.displayTime,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontFamily = IbmPlexSans,
+                fontFeatureSettings = "tnum",
+            ),
             color = textColor,
             textAlign = TextAlign.End,
         )
@@ -253,7 +272,7 @@ private fun PrayerRibbonRow(row: RibbonRow.PrayerEntry, modifier: Modifier = Mod
 
 @Composable
 private fun SunriseRibbonRow(row: RibbonRow.SunriseEntry, modifier: Modifier = Modifier) {
-    val mutedColor = LocalContentColor.current.copy(alpha = 0.5f)
+    val mutedColor = if (LocalContentColor.current == Ink) InkMuted else ParchmentMuted
 
     Row(
         modifier = modifier
@@ -266,14 +285,17 @@ private fun SunriseRibbonRow(row: RibbonRow.SunriseEntry, modifier: Modifier = M
 
         Text(
             text = "Sunrise",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.headlineMedium,
             color = mutedColor,
             modifier = Modifier.weight(1f),
         )
 
         Text(
             text = row.displayTime,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontFamily = IbmPlexSans,
+                fontFeatureSettings = "tnum",
+            ),
             color = mutedColor,
             textAlign = TextAlign.End,
         )
@@ -282,7 +304,8 @@ private fun SunriseRibbonRow(row: RibbonRow.SunriseEntry, modifier: Modifier = M
 
 @Composable
 private fun ImsakRibbonRow(row: RibbonRow.ImsakEntry, modifier: Modifier = Modifier) {
-    val textColor = if (row.isPast) LocalContentColor.current.copy(alpha = 0.5f) else LocalContentColor.current
+    val mutedColor = if (LocalContentColor.current == Ink) InkMuted else ParchmentMuted
+    val textColor = if (row.isPast) mutedColor else LocalContentColor.current
 
     Row(
         modifier = modifier
@@ -295,14 +318,17 @@ private fun ImsakRibbonRow(row: RibbonRow.ImsakEntry, modifier: Modifier = Modif
 
         Text(
             text = "Imsak",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.headlineMedium,
             color = textColor,
             modifier = Modifier.weight(1f),
         )
 
         Text(
             text = row.displayTime,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontFamily = IbmPlexSans,
+                fontFeatureSettings = "tnum",
+            ),
             color = textColor,
             textAlign = TextAlign.End,
         )

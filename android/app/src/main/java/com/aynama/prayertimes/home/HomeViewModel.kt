@@ -56,6 +56,7 @@ data class ProfileUiState(
     val ribbonRows: List<RibbonRow>,
     val countdownText: String,
     val nextPrayerName: String,
+    val nextPrayerTime: String,
     val currentPhase: PrayerPhase,
     val isRamadan: Boolean,
     val showRamadanBanner: Boolean,
@@ -151,6 +152,7 @@ class HomeViewModel(
             ribbonRows = deriveRibbonRows(times, profile.asrMadhab, now, ramadan, timeFormatter),
             countdownText = deriveCountdown(times, profile.asrMadhab, now),
             nextPrayerName = deriveNextPrayerName(times, profile.asrMadhab, now),
+            nextPrayerTime = deriveNextPrayerTime(times, profile.asrMadhab, now, timeFormatter),
             currentPhase = derivePhase(times, profile.asrMadhab, now),
             isRamadan = ramadan,
             showRamadanBanner = ramadan && dismissedYear != hijriYear,
@@ -195,6 +197,8 @@ internal fun derivePhase(times: PrayerTimesResult, asrMadhab: AsrMadhab, now: Lo
 }
 
 internal fun deriveNextPrayerName(times: PrayerTimesResult, asrMadhab: AsrMadhab, now: LocalTime): String {
+    if (times.isha < times.fajr && now < times.isha) return "Isha"
+    if (now >= times.fajr && now < times.sunrise) return "Sunrise"
     val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
     val ordered = listOf(
         times.fajr to "Fajr",
@@ -203,15 +207,21 @@ internal fun deriveNextPrayerName(times: PrayerTimesResult, asrMadhab: AsrMadhab
         times.maghrib to "Maghrib",
         times.isha to "Isha",
     )
-    return ordered.firstOrNull { (t, _) -> t > now }?.second ?: "Fajr"
+    return ordered.firstOrNull { (t, _) -> t > now }?.second
+        ?: if (times.isha < times.fajr) "Isha" else "Fajr"
 }
 
 internal fun deriveCountdown(times: PrayerTimesResult, asrMadhab: AsrMadhab, now: LocalTime): String {
     val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
     val ordered = listOf(times.fajr, times.dhuhr, asr, times.maghrib, times.isha)
-    val next = ordered.firstOrNull { it > now }
+    val next = if (times.isha < times.fajr && now < times.isha) times.isha
+               else if (now >= times.fajr && now < times.sunrise) times.sunrise
+               else ordered.firstOrNull { it > now }
     val totalSeconds = if (next != null) {
         ChronoUnit.SECONDS.between(now, next)
+    } else if (times.isha < times.fajr) {
+        ChronoUnit.SECONDS.between(now, LocalTime.MAX) + 1 +
+            ChronoUnit.SECONDS.between(LocalTime.MIDNIGHT, times.isha)
     } else {
         ChronoUnit.SECONDS.between(now, LocalTime.MAX) + 1 +
             ChronoUnit.SECONDS.between(LocalTime.MIDNIGHT, times.fajr)
@@ -219,7 +229,25 @@ internal fun deriveCountdown(times: PrayerTimesResult, asrMadhab: AsrMadhab, now
     val h = totalSeconds / 3600
     val m = (totalSeconds % 3600) / 60
     val s = totalSeconds % 60
-    return "%02d:%02d:%02d".format(h, m, s)
+    return when {
+        h > 0 -> "${h}h ${m}m"
+        m > 0 -> "${m}m"
+        else -> "${s}s"
+    }
+}
+
+internal fun deriveNextPrayerTime(
+    times: PrayerTimesResult,
+    asrMadhab: AsrMadhab,
+    now: LocalTime,
+    formatter: DateTimeFormatter,
+): String {
+    if (times.isha < times.fajr && now < times.isha) return times.isha.format(formatter)
+    if (now >= times.fajr && now < times.sunrise) return times.sunrise.format(formatter)
+    val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
+    val ordered = listOf(times.fajr, times.dhuhr, asr, times.maghrib, times.isha)
+    val fallback = if (times.isha < times.fajr) times.isha else times.fajr
+    return (ordered.firstOrNull { it > now } ?: fallback).format(formatter)
 }
 
 internal fun deriveRibbonRows(
@@ -231,7 +259,16 @@ internal fun deriveRibbonRows(
 ): List<RibbonRow> {
     val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
     val prayerTimeline = listOf(times.fajr, times.dhuhr, asr, times.maghrib, times.isha)
-    val currentIndex = prayerTimeline.indexOfLast { it <= now }
+    // Prayers that cross midnight (e.g. Isha at 00:25) have a LocalTime earlier than Fajr.
+    // Including them in a naive `<= now` check would incorrectly mark them as passed during
+    // the evening. Only count a prayer as passed if it is within the same prayer-day (>= fajr).
+    val currentIndex = if (times.isha < times.fajr && now < times.fajr) {
+        if (now >= times.isha) 4 else 3
+    } else {
+        prayerTimeline.indexOfLast { prayerTime ->
+            prayerTime <= now && prayerTime >= times.fajr
+        }
+    }
 
     fun stateAt(idx: Int): RibbonState = when {
         idx < currentIndex -> RibbonState.PASSED
