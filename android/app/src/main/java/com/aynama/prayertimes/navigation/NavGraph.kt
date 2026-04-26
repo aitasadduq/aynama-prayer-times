@@ -17,6 +17,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aynama.prayertimes.R
+import com.aynama.prayertimes.home.HomeScreen
 
 private enum class Screen(val route: String, val labelRes: Int) {
     HOME("home", R.string.nav_home),
@@ -56,7 +57,14 @@ fun NavGraph() {
             startDestination = Screen.HOME.route,
             modifier = Modifier.padding(innerPadding),
         ) {
-            composable(Screen.HOME.route) { PlaceholderScreen("Home") }
+            composable(Screen.HOME.route) {
+                HomeScreen(onNavigateToSettings = {
+                    navController.navigate(Screen.SETTINGS.route) {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                })
+            }
             composable(Screen.QIBLA.route) { PlaceholderScreen("Qibla") }
             composable(Screen.TRACKER.route) { PlaceholderScreen("Tracker") }
             composable(Screen.SETTINGS.route) { PlaceholderScreen("Settings") }

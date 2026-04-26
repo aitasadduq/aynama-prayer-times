@@ -17,6 +17,9 @@ interface ProfileDao {
     @Query("SELECT * FROM profiles WHERE id = :id")
     suspend fun getById(id: Long): Profile?
 
+    @Query("SELECT COUNT(*) FROM profiles")
+    suspend fun count(): Int
+
     @Insert
     suspend fun insert(profile: Profile): Long
 

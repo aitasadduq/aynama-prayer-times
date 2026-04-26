@@ -75,69 +75,69 @@ Phases run in dependency order. Each phase should be a separate PR. Scaffold (Ph
 
 ---
 
-### Phase 1 — Room Data Layer
+### Phase 1 — Room Data Layer ✅ DONE (PR #10)
 Prerequisite for Home, Tracker, Settings, Notifications. Implement Room before building any screen.
 
 **Gradle setup**
-- [ ] Add Room (`2.8.4`) + KSP to `shared-logic/build.gradle.kts`
-- [ ] Set `ksp { arg("room.schemaLocation", ...) }` and commit `schemas/` directory
+- [x] Add Room (`2.8.4`) + KSP to `shared-logic/build.gradle.kts`
+- [x] Set `ksp { arg("room.schemaLocation", ...) }` and commit `schemas/` directory
 
 **Entities**
-- [ ] `Profile(id, name, latitude, longitude, calculationMethod, asrMadhab, isGps, sortOrder)` — at most one row has `isGps=true`
-- [ ] `QazaEntry(id, prayer, date, status: enum{missed, made_up, intention_to_makeup}, profileId, updatedAt)` — per schema in Reviewer Concern #3
+- [x] `Profile(id, name, latitude, longitude, calculationMethod, asrMadhab, isGps, sortOrder)` — at most one row has `isGps=true`
+- [x] `QazaEntry(id, prayer, date, status: enum{missed, made_up, intention_to_makeup}, profileId, updatedAt)` — per schema in Reviewer Concern #3
 
 **DAOs + Database**
-- [ ] `ProfileDao` — CRUD + `Flow<List<Profile>>`; GPS constraint enforced (set GPS on new profile → clear on old)
-- [ ] `QazaEntryDao` — insert/update, `Flow<List<QazaEntry>>` by date range, outstanding-count query
-- [ ] `AynamaDatabase` — `@Database`, `exportSchema = true`, TypeConverters for enums
+- [x] `ProfileDao` — CRUD + `Flow<List<Profile>>`; GPS constraint enforced (set GPS on new profile → clear on old)
+- [x] `QazaEntryDao` — insert/update, `Flow<List<QazaEntry>>` by date range, outstanding-count query
+- [x] `AynamaDatabase` — `@Database`, `exportSchema = true`, TypeConverters for enums
 
 **Repository layer**
-- [ ] `ProfileRepository` — wraps `ProfileDao`, exposes `Flow<List<Profile>>`; GPS profile auto-refresh via `getLastKnownLocation()` (no background location permission)
-- [ ] `QazaRepository` — wraps `QazaEntryDao`, auto-mark-as-missed when next prayer window opens
+- [x] `ProfileRepository` — wraps `ProfileDao`, exposes `Flow<List<Profile>>`; GPS profile auto-refresh via `getLastKnownLocation()` (no background location permission)
+- [x] `QazaRepository` — wraps `QazaEntryDao`, auto-mark-as-missed when next prayer window opens
 
 **Tests**
-- [ ] `ProfileRepositoryTest` — in-memory Room DB; create/update/delete/read; GPS constraint; Qaza cascade on profile delete
-- [ ] `QazaTrackerTest` — TypeConverter for status enum; mark-as-prayed write; auto-mark-as-missed after next prayer starts; outstanding-count query
+- [x] `ProfileRepositoryTest` — in-memory Room DB; create/update/delete/read; GPS constraint; Qaza cascade on profile delete
+- [x] `QazaTrackerTest` — TypeConverter for status enum; mark-as-prayed write; auto-mark-as-missed after next prayer starts; outstanding-count query
 
 ---
 
-### Phase 2 — Home Screen
+### Phase 2 — Home Screen ✅ DONE (PR #11)
 Depends on: Phase 1.
 
 **ViewModel**
-- [ ] `HomeViewModel` — observes active profile via `Flow`; calls `AdhanWrapper.getPrayerTimes()` once per day per profile; exposes `PrayerTimesUiState`; invalidates cache on day rollover, profile change, timezone change
+- [x] `HomeViewModel` — observes all profiles via `Flow`; calls `AdhanWrapper.getPrayerTimes()` once per day per profile (cached by profile id + date); exposes `HomeUiState`; 1-second tick drives countdown + ribbon state; `AynamaApplication` manual DI with debug seed profiles
 
 **Prayer timeline ribbon (DESIGN.md §5)**
-- [ ] Countdown hero: Fraunces `display-xl` (72sp), tabular numerals, left-aligned
-- [ ] Next prayer name above countdown: Fraunces `display-md`
-- [ ] Active profile label top of screen: IBM Plex `body-sm` — "Home · London"
-- [ ] Prayer rows — 3 visual states:
+- [x] Countdown hero: Fraunces `display-xl` (72sp), tabular numerals (`fontFeatureSettings = "tnum"`), left-aligned
+- [x] Next prayer name above countdown: Fraunces `display-md`
+- [x] Active profile label top of screen: IBM Plex `body-sm` — "Home · London"
+- [x] Prayer rows — 3 visual states:
   - Passed: `ink-muted`, 60% opacity, small check glyph
   - Current: saffron tick that moves down ribbon as time passes
   - Upcoming: `ink`, full opacity, no decoration
-- [ ] Sunrise row: `ink-muted`, no dot, time-reference only
-- [ ] Tap on prayer row → opens mark-prayer bottom sheet (implemented in Phase 4)
-- [ ] Time-of-day surface: slow cross-fade gradient per prayer phase (Fajr/Dhuhr/Asr/Maghrib/Isha — see DESIGN.md §3 surface table)
+- [x] Sunrise row: `ink-muted`, no dot, time-reference only
+- [ ] Tap on prayer row → opens mark-prayer bottom sheet (Phase 4 stub — no-op for now)
+- [x] Time-of-day surface: slow cross-fade gradient per prayer phase (`animateColorAsState(tween(3000))`, 6 phases)
 
 **Profile switcher**
-- [ ] Horizontal swipe between profiles (weather-app pager)
-- [ ] Dot indicator at bottom of Home content (not nav bar)
-- [ ] Swipe past last dot → reveals "+" slot → navigates to profile creation
-- [ ] Profile switcher never disrupts ribbon structure — only times and label change
+- [x] Horizontal swipe between profiles (`HorizontalPager`, weather-app pager)
+- [x] Dot indicator at bottom of Home content (not nav bar)
+- [x] Swipe past last dot → reveals "+" slot → navigates to Settings (Phase 6 profile-creation stub)
+- [x] Profile switcher never disrupts ribbon structure — only times and label change
 
 **Empty + error states**
-- [ ] Empty state (no profiles): Kaaba mark, "Set up your first prayer profile", "Create profile" CTA
-- [ ] Error state: names cause + recovery action
-- [ ] Location stale: last-known times + "Tap to refresh" badge
+- [x] Empty state (no profiles): Kaaba mark, "Set up your first prayer profile", "Create profile" CTA
+- [x] Error state: names cause + recovery action
+- [ ] Location stale: last-known times + "Tap to refresh" badge (deferred to Phase 6 GPS work)
 
 **Ramadan**
-- [ ] Imsak row auto-appears above Fajr during Hijri Ramadan month (`android.icu.util.IslamicCalendar`)
-- [ ] First Ramadan open: dismissible banner "Ramadan Mubarak — Imsak enabled (Fajr −10 min)"; shown once per Hijri year
+- [x] Imsak row auto-appears above Fajr during Hijri Ramadan month (`android.icu.util.IslamicCalendar`)
+- [x] First Ramadan open: dismissible banner "Ramadan Mubarak — Imsak enabled (Fajr −10 min)"; shown once per Hijri year (dismissed state stored as Hijri year int in SharedPreferences)
 
 **Accessibility**
-- [ ] TalkBack: "Next prayer: Asr in 2 hours 14 minutes"
-- [ ] Prayer row announces: "Fajr, 5:12 AM, passed"
-- [ ] Profile switcher: accessibility action "Switch to next profile"
+- [x] TalkBack: "Next prayer: Asr in 2 hours 14 minutes"
+- [x] Prayer row announces: "Fajr, 5:12 AM, passed"
+- [x] Profile switcher: accessibility action "Switch to next profile"
 
 ---
 
