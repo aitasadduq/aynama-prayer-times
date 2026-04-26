@@ -412,7 +412,7 @@ private fun EmptyContent(onCreateProfile: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1C1A17))
+            .background(Ink)
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -449,7 +449,7 @@ private fun EmptyContent(onCreateProfile: () -> Unit) {
         ) {
             Text(
                 text = "Create profile",
-                color = Color(0xFF1C1A17),
+                color = Ink,
             )
         }
     }
@@ -460,7 +460,7 @@ private fun ErrorContent(cause: String) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1C1A17))
+            .background(Ink)
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -488,7 +488,7 @@ private fun LoadingContent() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1C1A17)),
+            .background(Ink),
     )
 }
 

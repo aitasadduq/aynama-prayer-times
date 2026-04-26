@@ -184,6 +184,8 @@ internal fun isRamadan(date: LocalDate): Boolean {
 }
 
 internal fun derivePhase(times: PrayerTimesResult, asrMadhab: AsrMadhab, now: LocalTime): PrayerPhase {
+    if (times.isha < times.fajr && now < times.isha) return PrayerPhase.MAGHRIB
+    if (times.isha < times.fajr && now >= times.maghrib) return PrayerPhase.MAGHRIB
     val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
     return when {
         now < times.fajr -> PrayerPhase.ISHA

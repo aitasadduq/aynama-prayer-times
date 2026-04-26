@@ -234,6 +234,21 @@ class HomeRibbonStateTest {
     }
 
     @Test
+    fun `post-midnight isha — phase is MAGHRIB in the evening before midnight`() {
+        assertEquals(PrayerPhase.MAGHRIB, derivePhase(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15)))
+    }
+
+    @Test
+    fun `post-midnight isha — phase is MAGHRIB before isha passes`() {
+        assertEquals(PrayerPhase.MAGHRIB, derivePhase(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5)))
+    }
+
+    @Test
+    fun `post-midnight isha — phase is ISHA after isha passes`() {
+        assertEquals(PrayerPhase.ISHA, derivePhase(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(1, 0)))
+    }
+
+    @Test
     fun `phase derivation maps prayer windows correctly`() {
         assertEquals(PrayerPhase.ISHA, derivePhase(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(3, 0)))
         assertEquals(PrayerPhase.FAJR, derivePhase(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(5, 0)))
