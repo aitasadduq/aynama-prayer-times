@@ -141,32 +141,32 @@ Depends on: Phase 1.
 
 ---
 
-### Phase 3 — Qibla Screen
-Depends on: Phase 0 only (no Room needed).
+### Phase 3 — Qibla Screen ✅ DONE (branch android-phase2-home)
+Depends on: Phase 1 (ProfileRepository for active profile + prayer times for gradient phase).
 
 **ViewModel + sensor**
-- [ ] `QiblaViewModel` — registers `SensorManager` listener in `onResume`, unregisters in `onPause`
-- [ ] `SENSOR_DELAY_UI` (20 Hz) sampling rate
-- [ ] `SensorManager.remapCoordinateSystem` for tilt-stable bearing (T7)
-- [ ] Bearing from device coordinates to Kaaba (21.4225°N, 39.8262°E)
-- [ ] Accuracy state: `HIGH` / `MEDIUM` / `LOW` / `UNRELIABLE`
+- [x] `QiblaViewModel` — registers `SensorManager` listener in `onResume`, unregisters in `onPause`
+- [x] `SENSOR_DELAY_UI` (20 Hz) sampling rate
+- [x] `SensorManager.remapCoordinateSystem` for tilt-stable bearing (T7)
+- [x] Bearing from device coordinates to Kaaba (21.4225°N, 39.8262°E)
+- [x] Accuracy state: `HIGH` / `MEDIUM` / `LOW` / `UNRELIABLE`
 
 **UI (DESIGN.md §5)**
-- [ ] Giant custom arrow glyph (~200sp), rotates in place against parchment surface
-- [ ] Physics-based rotation (damping 0.8, stiffness 100) — no jitter
-- [ ] Degree readout below arrow: Fraunces `display-md`
-- [ ] Distance to Kaaba: IBM Plex `body-sm`
-- [ ] No cardinal N/E/S/W ring; no concentric circles; no 3D Kaaba render
-- [ ] Calibration warning banner (amber, persistent) when accuracy < HIGH: "Hold phone flat and move in a figure-8 to calibrate"
-- [ ] Magnetometer unavailable: "Compass not available on this device"
+- [x] Giant custom arrow glyph (~200sp), rotates in place against parchment surface
+- [x] Physics-based rotation (damping 0.8, stiffness 100) — no jitter
+- [x] Degree readout below arrow: Fraunces `display-md`
+- [x] Distance to Kaaba: IBM Plex `body-sm`
+- [x] No cardinal N/E/S/W ring; no concentric circles; no 3D Kaaba render
+- [x] Calibration warning banner (amber, persistent) when accuracy < HIGH: "Hold phone flat and move in a figure-8 to calibrate"
+- [x] Magnetometer unavailable: "Compass not available on this device"
 
 **Accessibility**
-- [ ] Announce bearing as direction: "Facing northeast, Qibla is to the southeast — turn right"
-- [ ] Announcement throttled to every 15° to avoid flooding
-- [ ] Short haptic pulse when within ±5° of Qibla bearing
+- [x] Announce bearing as direction: "Facing northeast, Qibla is to the southeast — turn right"
+- [x] Announcement throttled to every 15° to avoid flooding
+- [x] Short haptic pulse when within ±5° of Qibla bearing
 
 **Tests**
-- [ ] `QiblaCalculatorTest` — bearing from known coordinates to Kaaba matches expected ±1°
+- [x] `QiblaCalculatorTest` — bearing from known coordinates to Kaaba matches expected ±1°
 
 ---
 
