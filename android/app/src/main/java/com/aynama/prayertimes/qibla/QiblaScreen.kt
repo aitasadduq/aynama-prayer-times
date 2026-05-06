@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -32,18 +33,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -59,6 +63,9 @@ import com.aynama.prayertimes.ui.theme.SaffronInk
 import java.text.NumberFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
+// Set to false to hide debug overlay before shipping
+private const val SHOW_DEBUG = true
 
 @Composable
 fun QiblaScreen() {
@@ -76,9 +83,13 @@ fun QiblaScreen() {
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            vm.stop()
+        }
     }
 
+    android.util.Log.d("Qibla", "compose state=${uiState::class.simpleName}")
     when (val state = uiState) {
         QiblaUiState.Loading -> LoadingContent()
         QiblaUiState.NoProfile -> NoProfileContent()
@@ -119,13 +130,12 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
     }
 
     // Accessibility — throttle live-region announcements to every 15° of device rotation
-    val currentAzimuth = ((state.unwrappedAzimuth % 360f) + 360f) % 360f
     var lastAnnouncedAzimuth by remember { mutableFloatStateOf(-1f) }
     var announcedA11y by remember { mutableStateOf("") }
-    val azimuthDelta = abs(currentAzimuth - lastAnnouncedAzimuth).let { if (it > 180) 360 - it else it }
+    val azimuthDelta = abs(state.azimuth - lastAnnouncedAzimuth).let { if (it > 180) 360 - it else it }
     if (lastAnnouncedAzimuth < 0 || azimuthDelta >= 15f) {
-        lastAnnouncedAzimuth = currentAzimuth
-        announcedA11y = buildA11yDescription(currentAzimuth, state.qiblaBearing)
+        lastAnnouncedAzimuth = state.azimuth
+        announcedA11y = buildA11yDescription(state.azimuth, state.qiblaBearing)
     }
 
     val formattedDistance = NumberFormat.getNumberInstance().format(state.distanceKm.roundToInt())
@@ -142,16 +152,25 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
         ) {
             Spacer(Modifier.height(48.dp))
 
-            QiblaArrow(
-                rotationDegrees = animatedAngle,
-                contentColor = contentColor,
+            Box(
                 modifier = Modifier
                     .size(200.dp)
                     .semantics {
                         contentDescription = announcedA11y
                         liveRegion = LiveRegionMode.Polite
                     },
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                QiblaArrow(
+                    rotationDegrees = animatedAngle,
+                    contentColor = contentColor,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                NorthIndicator(
+                    azimuth = state.azimuth,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
             Spacer(Modifier.height(24.dp))
 
@@ -181,6 +200,88 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
                     .padding(horizontal = 16.dp, vertical = 24.dp),
             )
         }
+
+        if (SHOW_DEBUG) {
+            DebugOverlay(
+                state = state,
+                arrowAngle = targetArrowAngle,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NorthIndicator(azimuth: Float, modifier: Modifier = Modifier) {
+    // Rotates opposite to the device heading so "N" always points to magnetic north
+    Canvas(modifier = modifier.rotate(-azimuth)) {
+        val cx = size.width / 2f
+        val r = size.width / 2f - 4.dp.toPx()
+        val tipY = r * 0.08f
+        val arrowHalf = size.width * 0.06f
+
+        // Red north arrow tip
+        val arrowPath = Path().apply {
+            moveTo(cx, tipY)
+            lineTo(cx + arrowHalf, tipY + arrowHalf * 1.5f)
+            lineTo(cx - arrowHalf, tipY + arrowHalf * 1.5f)
+            close()
+        }
+        drawPath(arrowPath, color = Color(0xFFFF3B30))
+
+        // Thin stem from arrowhead to center
+        drawLine(
+            color = Color(0xFFFF3B30).copy(alpha = 0.6f),
+            start = Offset(cx, tipY + arrowHalf * 1.5f),
+            end = Offset(cx, r * 0.55f),
+            strokeWidth = 1.5.dp.toPx(),
+        )
+    }
+}
+
+@Composable
+private fun DebugOverlay(
+    state: QiblaUiState.Ready,
+    arrowAngle: Float,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        color = Color.Black.copy(alpha = 0.72f),
+        shape = RoundedCornerShape(6.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            DebugRow("RAW  ", "%.1f°".format(state.rawAzimuth))
+            DebugRow("SMTH ", "%.1f°".format(state.azimuth))
+            DebugRow("QIBLA", "%.1f°".format(state.qiblaBearing))
+            DebugRow("ARROW", "%.1f°".format(arrowAngle))
+            DebugRow("PITCH", "%.1f°".format(state.pitch))
+            DebugRow("ROLL ", "%.1f°".format(state.roll))
+            DebugRow("ACC  ", state.accuracy.name)
+        }
+    }
+}
+
+@Composable
+private fun DebugRow(label: String, value: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            color = Color(0xFFAAAAAA),
+        )
+        Text(
+            text = value,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            color = Color.White,
+        )
     }
 }
 
