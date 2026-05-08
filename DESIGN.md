@@ -170,17 +170,21 @@ Watch scales defined separately in §7.
 - Upcoming prayers: `ink`, full opacity, no decoration.
 - Profile switcher sits at the bottom edge. Tap reveals horizontal card stack (weather-app metaphor).
 
-**No circular rings. No concentric arcs. No pie charts. Anywhere in the app.**
+**No circular *progress* rings. No concentric arcs. No pie charts. No graduated cardinal dials. Anywhere in the app.** The single Qibla frame ring (§5) is the only ring permitted, and it carries no graduations or progress.
 
 ### Qibla — typographic compass
 
-**Replaces** the conventional compass-with-needle.
+**Replaces** the conventional compass-with-needle. The Qibla surface is a saffron arrow on a single quiet ring, set against the time-of-day gradient. The arrow is the figure; the ring is the frame.
 
-- Single giant custom arrow glyph (~200pt, center screen), rotating in place against parchment.
-- Degree readout in Fraunces `display-md` below. E.g. `227°`.
-- Distance to Kaaba in IBM Plex `body-sm`. E.g. `11,842 km`.
-- No cardinal N/E/S/W ring. No concentric circles. No 3D Kaaba render.
-- Reads as a letterpress print, not a cockpit.
+- Saffron Qibla arrow (~200dp on its long axis), the only figural element. Custom glyph, no needle, no chrome.
+- One quiet ring around the arrow (28dp stroke, ink-on-parchment / parchment-on-ink, single weight). Frames the arrow. Not a tick ring, not a graduated dial, not a progress arc.
+- Single "N" reference glyph riding the top of the ring, counter-rotated to stay upright. North is a *whisper* — typographic anchor, not a cardinal-ring legend. No E/S/W siblings.
+- Whole rose (arrow + ring + N) rotates as the device rotates. The arrow's angle inside the rose is fixed at the Qibla bearing; the rose's rotation cancels the device heading. Result: the arrow points at the Kaaba in world space.
+- Above the rose: a small alignment hint in IBM Plex `caption` — "Turn right 12°" / "— Aligned —" (saffron when aligned).
+- Below the rose: degree readout in Fraunces `display-md` (e.g. `227°`) and distance in IBM Plex `body-sm` (e.g. `4,832 km to the Kaaba`). Optional secondary chip row shows "Qibla / North" reference pair.
+- Calibration banner (amber, persistent) at bottom when sensor accuracy < HIGH.
+- No cardinal N/E/S/W *ring*. No concentric circles. No 3D Kaaba render. No tick marks. No degree graduations on the ring.
+- Reads as a letterpress print with a single ruled circle, not a cockpit.
 
 ### Countdown screen
 
@@ -278,10 +282,10 @@ Adds:
 
 These are the things no prayer app does. They are the product.
 
-1. **Typographic Qibla** — letter-arrow, not compass-with-needle. §5.
+1. **Typographic Qibla** — saffron arrow on a single quiet ring, framed by a Fraunces degree readout. Not a compass-with-needle, not a cardinal-ring legend, not a tick dial. The single ring frames the arrow; it is not graduated, not a progress arc, and carries no cardinal labels except a single whispered "N". §5.
 2. **Prayer timeline ribbon** — vertical line with moving sundial tick, not a circular countdown ring. §5.
 
-If a future surface proposal reintroduces a circular countdown ring or a cardinal-ring compass, reject it at design review. These are the two non-negotiable differentiators.
+If a future surface proposal reintroduces a circular countdown ring, a graduated cardinal dial (N/E/S/W ring with tick marks), or a 3D Kaaba render, reject it at design review. These are the two non-negotiable differentiators.
 
 ---
 
@@ -289,7 +293,7 @@ If a future surface proposal reintroduces a circular countdown ring or a cardina
 
 Hard rules. A PR that violates any of these gets blocked at review.
 
-- **No circular progress rings anywhere.** Not countdown, not tasbeeh, not habit tracker, not Zakat progress, not onboarding. Use linear ribbons, depleting bars, or typographic countdowns instead.
+- **No circular progress rings anywhere.** Not countdown, not tasbeeh, not habit tracker, not Zakat progress, not onboarding. Use linear ribbons, depleting bars, or typographic countdowns instead. *(Exception: the single quiet frame ring around the Qibla arrow per §5. It carries no progress, no graduations, no cardinal labels — it is a frame, not a meter.)*
 - **No mosque-green, gold-on-green, emerald, teal, purple, or indigo** anywhere in the palette, even as "just a hint."
 - **No dome silhouettes, minaret icons, or crescent-and-star** decorative motifs.
 - **No Arabic calligraphy used decoratively** as background texture, splash art, wallpaper, or ornament. Arabic script in this app is *content*. If it's on screen, it says something specific and is legible.

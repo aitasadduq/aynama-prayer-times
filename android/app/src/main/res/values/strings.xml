@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">aynama</string>
-    <string name="nav_home">Home</string>
+    <string name="nav_home">Prayers</string>
     <string name="nav_qibla">Qibla</string>
     <string name="nav_tracker">Tracker</string>
     <string name="nav_settings">Settings</string>
