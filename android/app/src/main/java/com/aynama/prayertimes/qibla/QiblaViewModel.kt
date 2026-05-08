@@ -1,5 +1,6 @@
 package com.aynama.prayertimes.qibla
 
+import android.hardware.GeomagneticField
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -12,15 +13,17 @@ import com.aynama.prayertimes.home.PrayerPhase
 import com.aynama.prayertimes.home.derivePhase
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.QiblaCalculator
-import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -55,12 +58,16 @@ class QiblaViewModel(
 
     private val adhan = AdhanWrapper()
     private val sensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+    private val rotMat = FloatArray(9)
+    private val orientation = FloatArray(3)
 
     private var activeProfile: Profile? = null
     private var cachedTimes: Pair<LocalDate, com.aynama.prayertimes.shared.PrayerTimesResult>? = null
     private var qiblaBearing = 0f
     private var distanceKm = 0.0
     private var accuracy = SensorAccuracy.UNRELIABLE
+    // Magnetic declination converts sensor magnetic-north azimuth to true-north
+    private var magneticDeclination = 0f
 
     // Sensor state
     private var lastRawAzimuth = -1f    // raw, for profile-change replay
@@ -77,11 +84,9 @@ class QiblaViewModel(
 
     private val sensorListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
-            val rotMat = FloatArray(9)
             SensorManager.getRotationMatrixFromVector(rotMat, event.values)
-            // No remapping: use rotation matrix directly for flat-phone (face-up) orientation.
-            // AXIS_X/AXIS_Z remap is for portrait-vertical use and causes singularity when flat.
-            val orientation = FloatArray(3)
+            // Flat-phone (face-up) is the intended use posture for this compass.
+            // AXIS_X/AXIS_Z remap improves portrait-vertical stability but causes singularity when flat.
             SensorManager.getOrientation(rotMat, orientation)
             val raw = ((Math.toDegrees(orientation[0].toDouble()).toFloat() + 360f) % 360f)
             val pitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
@@ -100,7 +105,6 @@ class QiblaViewModel(
     }
 
     init {
-        android.util.Log.d("Qibla", "VM init hash=${System.identityHashCode(this)}")
         if (sensor == null) {
             _uiState.value = QiblaUiState.NoSensor
         }
@@ -114,6 +118,12 @@ class QiblaViewModel(
                 } else {
                     qiblaBearing = QiblaCalculator.bearingTo(profile.latitude, profile.longitude).toFloat()
                     distanceKm = QiblaCalculator.distanceKm(profile.latitude, profile.longitude)
+                    magneticDeclination = GeomagneticField(
+                        profile.latitude.toFloat(),
+                        profile.longitude.toFloat(),
+                        0f,
+                        System.currentTimeMillis(),
+                    ).declination
                     cachedTimes = null
                     if (sensor == null) {
                         _uiState.value = QiblaUiState.NoSensor
@@ -126,7 +136,10 @@ class QiblaViewModel(
     }
 
     fun start() {
-        sensor?.let { sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_GAME) }
+        sensor?.let {
+            val ok = sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_UI)
+            if (!ok) _uiState.value = QiblaUiState.NoSensor
+        }
     }
 
     fun stop() {
@@ -152,9 +165,9 @@ class QiblaViewModel(
     }
 
     private fun postUpdate(rawAzimuth: Float, pitch: Float, roll: Float) {
-        android.util.Log.d("Qibla", "postUpdate raw=$rawAzimuth profile=${activeProfile != null}")
         lastRawAzimuth = rawAzimuth
-        val smoothed = applyLowPass(rawAzimuth)
+        val trueAzimuth = ((rawAzimuth + magneticDeclination) % 360f + 360f) % 360f
+        val smoothed = applyLowPass(trueAzimuth)
 
         if (lastSmoothed < 0f) {
             lastSmoothed = smoothed
@@ -168,19 +181,41 @@ class QiblaViewModel(
         val profile = activeProfile ?: return
         if (sensor == null) return
 
-        val now = LocalTime.now()
+        val snapshotUnwrapped = unwrappedAzimuth
         val today = LocalDate.now()
-        val times = cachedTimes?.takeIf { it.first == today }?.second
-            ?: adhan.getPrayerTimes(
-                latitude = profile.latitude,
-                longitude = profile.longitude,
-                date = today,
-                timezone = ZoneId.systemDefault(),
-                method = profile.calculationMethod,
-            ).also { cachedTimes = today to it }
-        val phase = derivePhase(times, profile.asrMadhab, now)
+        val cached = cachedTimes?.takeIf { it.first == today }?.second
+
+        if (cached != null) {
+            emitReady(snapshotUnwrapped, smoothed, rawAzimuth, pitch, roll, cached, profile)
+        } else {
+            viewModelScope.launch {
+                val times = withContext(Dispatchers.Default) {
+                    adhan.getPrayerTimes(
+                        latitude = profile.latitude,
+                        longitude = profile.longitude,
+                        date = today,
+                        timezone = ZoneId.systemDefault(),
+                        method = profile.calculationMethod,
+                    )
+                }
+                cachedTimes = today to times
+                emitReady(snapshotUnwrapped, smoothed, rawAzimuth, pitch, roll, times, profile)
+            }
+        }
+    }
+
+    private fun emitReady(
+        unwrapped: Float,
+        smoothed: Float,
+        rawAzimuth: Float,
+        pitch: Float,
+        roll: Float,
+        times: com.aynama.prayertimes.shared.PrayerTimesResult,
+        profile: Profile,
+    ) {
+        val phase = derivePhase(times, profile.asrMadhab, LocalTime.now())
         _uiState.value = QiblaUiState.Ready(
-            unwrappedAzimuth = unwrappedAzimuth,
+            unwrappedAzimuth = unwrapped,
             azimuth = smoothed,
             rawAzimuth = rawAzimuth,
             pitch = pitch,

@@ -21,7 +21,37 @@ class QiblaCalculatorTest {
     @Test
     fun bearing_result_is_in_range() {
         val bearing = QiblaCalculator.bearingTo(51.5074, -0.1278)
-        assert(bearing in 0.0..360.0) { "Bearing $bearing not in [0, 360)" }
+        assert(bearing >= 0.0 && bearing < 360.0) { "Bearing $bearing not in [0, 360)" }
+    }
+
+    @Test
+    fun bearing_atKaaba_isInRange() {
+        val bearing = QiblaCalculator.bearingTo(21.4225, 39.8262)
+        assert(bearing >= 0.0 && bearing < 360.0) { "Bearing at Kaaba $bearing not in [0, 360)" }
+    }
+
+    @Test
+    fun bearing_northPole_isInRange() {
+        val bearing = QiblaCalculator.bearingTo(90.0, 0.0)
+        assert(bearing >= 0.0 && bearing < 360.0) { "Bearing from North Pole $bearing not in [0, 360)" }
+    }
+
+    @Test
+    fun bearing_southPole_isInRange() {
+        val bearing = QiblaCalculator.bearingTo(-90.0, 0.0)
+        assert(bearing >= 0.0 && bearing < 360.0) { "Bearing from South Pole $bearing not in [0, 360)" }
+    }
+
+    @Test
+    fun bearing_antimeridian_isInRange() {
+        val bearing = QiblaCalculator.bearingTo(0.0, 180.0)
+        assert(bearing >= 0.0 && bearing < 360.0) { "Bearing from antimeridian $bearing not in [0, 360)" }
+    }
+
+    @Test
+    fun distance_atKaaba_isNearZero() {
+        val dist = QiblaCalculator.distanceKm(21.4225, 39.8262)
+        assert(dist < 1.0) { "Distance at Kaaba should be ~0 km but got $dist km" }
     }
 
     @Test

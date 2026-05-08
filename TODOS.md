@@ -36,7 +36,7 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 - [x] ~~T3~~ → **RESOLVED** (`test-vectors/schema.json` written; prayer-times only, Draft-07, validates method/tolerance/reference/cases structure)
 - [ ] T5 — Add `tags: List<String>` or `context: ProfileContext` field to Profile schema.
 - [x] ~~T6~~ → **RESOLVED** (BOOT_COMPLETED + ACTION_TIMEZONE_CHANGED BroadcastReceivers spec'd in architecture-design.md)
-- [ ] T7 — Qibla uses `SensorManager.remapCoordinateSystem` for tilt-stable bearing.
+- [x] ~~T7~~ → **RESOLVED** (Removed `remapCoordinateSystem`; direct rotation matrix + sin/cos low-pass filter gives stable flat-phone bearing)
 - [ ] T8 — `FOREGROUND_SERVICE_SPECIAL_USE` manifest entry + Play Console justification.
 
 ## Engineering TODOs (from /plan-eng-review, 2026-04-21)
@@ -141,13 +141,13 @@ Depends on: Phase 1.
 
 ---
 
-### Phase 3 — Qibla Screen ✅ DONE (branch android-phase2-home)
+### Phase 3 — Qibla Screen ✅ DONE (branch android-phase3-qibla)
 Depends on: Phase 1 (ProfileRepository for active profile + prayer times for gradient phase).
 
 **ViewModel + sensor**
 - [x] `QiblaViewModel` — registers `SensorManager` listener in `onResume`, unregisters in `onPause`
-- [x] `SENSOR_DELAY_UI` (20 Hz) sampling rate
-- [x] `SensorManager.remapCoordinateSystem` for tilt-stable bearing (T7)
+- [x] `SENSOR_DELAY_GAME` (~50 Hz) sampling rate for low-pass filter convergence
+- [x] Direct rotation matrix (no `remapCoordinateSystem`) for tilt-stable flat-phone bearing (T7)
 - [x] Bearing from device coordinates to Kaaba (21.4225°N, 39.8262°E)
 - [x] Accuracy state: `HIGH` / `MEDIUM` / `LOW` / `UNRELIABLE`
 

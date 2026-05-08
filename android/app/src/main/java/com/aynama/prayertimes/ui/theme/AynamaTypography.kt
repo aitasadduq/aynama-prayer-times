@@ -12,7 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.aynama.prayertimes.R
 
-private fun frauncesFamily(opsz: Float) = FontFamily(
+internal fun frauncesFamily(opsz: Float) = FontFamily(
     Font(
         R.font.fraunces,
         weight = FontWeight.Normal,
