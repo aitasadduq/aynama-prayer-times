@@ -58,6 +58,7 @@ import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.home.PrayerPhase
 import com.aynama.prayertimes.home.gradientColorsFor
 import com.aynama.prayertimes.home.isLightPhase
+import com.aynama.prayertimes.shared.SensorAccuracy
 import com.aynama.prayertimes.ui.theme.IbmPlexSans
 import com.aynama.prayertimes.ui.theme.Ink
 import com.aynama.prayertimes.ui.theme.InkMuted
@@ -70,7 +71,10 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val SHOW_DEBUG = false
-private const val QIBLA_ALIGNED_THRESHOLD_DEG = 5f
+// Hysteresis: enter the aligned state at ≤5°, only exit when drift exceeds 7°.
+// Prevents haptic spam when the smoothed azimuth jitters across a single threshold.
+private const val QIBLA_ALIGN_ENTER_DEG = 5f
+private const val QIBLA_ALIGN_EXIT_DEG = 7f
 private const val A11Y_ANNOUNCE_THRESHOLD_DEG = 15f
 
 @Composable
@@ -125,11 +129,16 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
     )
 
     val delta = ((state.qiblaBearing - state.azimuth + 540f) % 360f) - 180f
-    val isAligned = abs(delta) < QIBLA_ALIGNED_THRESHOLD_DEG
+    val absDelta = abs(delta)
+    var isAligned by remember { mutableStateOf(false) }
+    LaunchedEffect(absDelta) {
+        val next = if (isAligned) absDelta < QIBLA_ALIGN_EXIT_DEG else absDelta < QIBLA_ALIGN_ENTER_DEG
+        if (next != isAligned) isAligned = next
+    }
     val turnHint = when {
         isAligned -> "— Aligned —"
-        delta > 0 -> "Turn right ${abs(delta).roundToInt()}°"
-        else -> "Turn left ${abs(delta).roundToInt()}°"
+        delta > 0 -> "Turn right ${absDelta.roundToInt()}°"
+        else -> "Turn left ${absDelta.roundToInt()}°"
     }
     val hintColor by animateColorAsState(
         targetValue = if (isAligned) boxAccent else boxFgMuted,
@@ -141,8 +150,10 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
     LaunchedEffect(isAligned) {
         if (!hapticReady) { hapticReady = true; return@LaunchedEffect }
         if (isAligned) {
+            // getSystemService(Vibrator::class.java) is @Nullable on devices without
+            // a vibrator service (some tablets, emulators, AAOS). Skip silently.
             val vibrator = context.getSystemService(Vibrator::class.java)
-            if (vibrator.hasVibrator()) {
+            if (vibrator != null && vibrator.hasVibrator()) {
                 vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
             }
         }

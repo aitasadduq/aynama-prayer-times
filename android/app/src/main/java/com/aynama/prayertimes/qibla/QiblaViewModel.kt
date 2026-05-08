@@ -13,9 +13,13 @@ import com.aynama.prayertimes.home.PrayerPhase
 import com.aynama.prayertimes.home.derivePhase
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.QiblaCalculator
+import com.aynama.prayertimes.shared.QiblaSensorState
+import com.aynama.prayertimes.shared.SensorAccuracy
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,14 +28,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-
-enum class SensorAccuracy { HIGH, MEDIUM, LOW, UNRELIABLE }
 
 sealed interface QiblaUiState {
     data object Loading : QiblaUiState
@@ -54,30 +54,35 @@ sealed interface QiblaUiState {
 class QiblaViewModel(
     private val profileRepository: ProfileRepository,
     private val sensorManager: SensorManager,
+    private val adhan: AdhanWrapper = AdhanWrapper(),
+    private val clock: Clock = Clock.systemDefaultZone(),
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
 
-    private val adhan = AdhanWrapper()
     private val sensor: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     private val rotMat = FloatArray(9)
     private val orientation = FloatArray(3)
 
-    private var activeProfile: Profile? = null
-    private var cachedTimes: Pair<LocalDate, com.aynama.prayertimes.shared.PrayerTimesResult>? = null
-    private var qiblaBearing = 0f
-    private var distanceKm = 0.0
-    private var accuracy = SensorAccuracy.UNRELIABLE
-    // Magnetic declination converts sensor magnetic-north azimuth to true-north
-    private var magneticDeclination = 0f
+    // Cross-thread fields: written on Main (profile observer / coroutine), read on the
+    // sensor binder thread. @Volatile gives JMM visibility on ARM weak memory models.
+    @Volatile private var activeProfile: Profile? = null
+    @Volatile private var cachedTimes: Pair<LocalDate, com.aynama.prayertimes.shared.PrayerTimesResult>? = null
+    @Volatile private var qiblaBearing = 0f
+    @Volatile private var distanceKm = 0.0
+    // ROTATION_VECTOR is a fused virtual sensor; some OEM stacks (Samsung, Huawei) never
+    // emit an initial onAccuracyChanged, so default UNRELIABLE would pin the calibration
+    // banner forever. Default HIGH and let onAccuracyChanged drop us if real calibration
+    // is needed.
+    @Volatile private var accuracy = SensorAccuracy.HIGH
+    // Magnetic declination converts sensor magnetic-north azimuth to true-north.
+    @Volatile private var magneticDeclination = 0f
 
-    // Sensor state
-    private var lastRawAzimuth = -1f    // raw, for profile-change replay
-    private var lastSmoothed = -1f      // last smoothed value, for unwrap delta
-    private var unwrappedAzimuth = 0f
+    // Single-flight prayer-times job. Cancelled on profile change so a stale coroutine
+    // can't write the old profile's times into the new profile's cache slot.
+    private var timesJob: Job? = null
 
-    // Low-pass filter state (sin/cos space to avoid wrap-around errors)
-    private var smoothedSin = 0f
-    private var smoothedCos = 1f
-    private val LP_ALPHA = 0.15f
+    // LP filter + unwrap state. Single-threaded (sensor thread only).
+    private val sensorState = QiblaSensorState()
 
     private val _uiState = MutableStateFlow<QiblaUiState>(QiblaUiState.Loading)
     val uiState: StateFlow<QiblaUiState> = _uiState.asStateFlow()
@@ -85,8 +90,9 @@ class QiblaViewModel(
     private val sensorListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent) {
             SensorManager.getRotationMatrixFromVector(rotMat, event.values)
-            // Flat-phone (face-up) is the intended use posture for this compass.
-            // AXIS_X/AXIS_Z remap improves portrait-vertical stability but causes singularity when flat.
+            // Intentionally NOT calling remapCoordinateSystem(AXIS_X, AXIS_Z) here — it
+            // would improve vertical-portrait stability but introduces a singularity in
+            // the flat-phone (face-up) posture this compass targets.
             SensorManager.getOrientation(rotMat, orientation)
             val raw = ((Math.toDegrees(orientation[0].toDouble()).toFloat() + 360f) % 360f)
             val pitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
@@ -95,12 +101,7 @@ class QiblaViewModel(
         }
 
         override fun onAccuracyChanged(sensor: Sensor, acc: Int) {
-            accuracy = when (acc) {
-                SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> SensorAccuracy.HIGH
-                SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> SensorAccuracy.MEDIUM
-                SensorManager.SENSOR_STATUS_ACCURACY_LOW -> SensorAccuracy.LOW
-                else -> SensorAccuracy.UNRELIABLE
-            }
+            accuracy = SensorAccuracy.fromAndroid(acc)
         }
     }
 
@@ -112,24 +113,38 @@ class QiblaViewModel(
         profileRepository.observeAll()
             .map { profiles -> profiles.firstOrNull { it.isGps } ?: profiles.minByOrNull { it.sortOrder } }
             .onEach { profile ->
+                // Cancel any in-flight prayer-times fetch tied to the previous profile so
+                // it can't race the new profile's cache slot.
+                timesJob?.cancel()
+                timesJob = null
+                cachedTimes = null
                 activeProfile = profile
                 if (profile == null) {
                     _uiState.value = QiblaUiState.NoProfile
                 } else {
                     qiblaBearing = QiblaCalculator.bearingTo(profile.latitude, profile.longitude).toFloat()
                     distanceKm = QiblaCalculator.distanceKm(profile.latitude, profile.longitude)
-                    magneticDeclination = GeomagneticField(
-                        profile.latitude.toFloat(),
-                        profile.longitude.toFloat(),
-                        0f,
-                        System.currentTimeMillis(),
-                    ).declination
-                    cachedTimes = null
+                    // GeomagneticField throws when the bundled WMM model is past expiry
+                    // (e.g., WMM2020 expired 2025 on stale Android images). Falling back
+                    // to 0° declination is wrong by up to ~25° at extreme latitudes but
+                    // beats crashing the screen.
+                    magneticDeclination = try {
+                        GeomagneticField(
+                            profile.latitude.toFloat(),
+                            profile.longitude.toFloat(),
+                            0f,
+                            System.currentTimeMillis(),
+                        ).declination
+                    } catch (_: IllegalArgumentException) {
+                        0f
+                    }
                     if (sensor == null) {
                         _uiState.value = QiblaUiState.NoSensor
-                    } else if (lastRawAzimuth >= 0f) {
-                        postUpdate(lastRawAzimuth, 0f, 0f)
                     }
+                    // Don't replay sensor state from Main — the next sensor frame
+                    // (~50ms at SENSOR_DELAY_UI) will emit fresh state with the new
+                    // qibla bearing. Replaying from a different thread races the
+                    // sensor thread's mutations of the LP filter and unwrap counter.
                 }
             }
             .launchIn(viewModelScope)
@@ -150,54 +165,40 @@ class QiblaViewModel(
         sensorManager.unregisterListener(sensorListener)
     }
 
-    private fun applyLowPass(raw: Float): Float {
-        val rad = Math.toRadians(raw.toDouble())
-        val s = sin(rad).toFloat()
-        val c = cos(rad).toFloat()
-        if (lastSmoothed < 0f) {
-            smoothedSin = s
-            smoothedCos = c
-        } else {
-            smoothedSin = LP_ALPHA * s + (1f - LP_ALPHA) * smoothedSin
-            smoothedCos = LP_ALPHA * c + (1f - LP_ALPHA) * smoothedCos
-        }
-        return ((Math.toDegrees(atan2(smoothedSin.toDouble(), smoothedCos.toDouble())).toFloat() + 360f) % 360f)
-    }
-
     private fun postUpdate(rawAzimuth: Float, pitch: Float, roll: Float) {
-        lastRawAzimuth = rawAzimuth
-        val trueAzimuth = ((rawAzimuth + magneticDeclination) % 360f + 360f) % 360f
-        val smoothed = applyLowPass(trueAzimuth)
-
-        if (lastSmoothed < 0f) {
-            lastSmoothed = smoothed
-            unwrappedAzimuth = smoothed
-        } else {
-            val delta = ((smoothed - lastSmoothed + 540f) % 360f) - 180f
-            unwrappedAzimuth += delta
-            lastSmoothed = smoothed
-        }
+        val smoothed = sensorState.update(rawAzimuth, magneticDeclination)
+        val snapshotUnwrapped = sensorState.unwrapped
 
         val profile = activeProfile ?: return
         if (sensor == null) return
 
-        val snapshotUnwrapped = unwrappedAzimuth
-        val today = LocalDate.now()
+        val today = LocalDate.now(clock)
         val cached = cachedTimes?.takeIf { it.first == today }?.second
 
         if (cached != null) {
             emitReady(snapshotUnwrapped, smoothed, rawAzimuth, pitch, roll, cached, profile)
-        } else {
-            viewModelScope.launch {
-                val times = withContext(Dispatchers.Default) {
-                    adhan.getPrayerTimes(
-                        latitude = profile.latitude,
-                        longitude = profile.longitude,
-                        date = today,
-                        timezone = ZoneId.systemDefault(),
-                        method = profile.calculationMethod,
-                    )
-                }
+            return
+        }
+
+        // Single-flight: skip if a fetch is already in progress. Prevents a coroutine
+        // flood at midnight rollover when every sensor frame would otherwise launch a
+        // duplicate Adhan computation until the first one populates the cache.
+        if (timesJob?.isActive == true) return
+
+        val capturedProfileId = profile.id
+        timesJob = viewModelScope.launch {
+            val times = withContext(computeDispatcher) {
+                adhan.getPrayerTimes(
+                    latitude = profile.latitude,
+                    longitude = profile.longitude,
+                    date = today,
+                    timezone = ZoneId.systemDefault(),
+                    method = profile.calculationMethod,
+                )
+            }
+            // Profile may have changed while we were computing. Only write the cache if
+            // we're still on the same profile.
+            if (activeProfile?.id == capturedProfileId) {
                 cachedTimes = today to times
                 emitReady(snapshotUnwrapped, smoothed, rawAzimuth, pitch, roll, times, profile)
             }
@@ -213,7 +214,7 @@ class QiblaViewModel(
         times: com.aynama.prayertimes.shared.PrayerTimesResult,
         profile: Profile,
     ) {
-        val phase = derivePhase(times, profile.asrMadhab, LocalTime.now())
+        val phase = derivePhase(times, profile.asrMadhab, LocalTime.now(clock))
         _uiState.value = QiblaUiState.Ready(
             unwrappedAzimuth = unwrapped,
             azimuth = smoothed,

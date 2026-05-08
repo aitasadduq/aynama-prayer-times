@@ -146,7 +146,7 @@ Depends on: Phase 1 (ProfileRepository for active profile + prayer times for gra
 
 **ViewModel + sensor**
 - [x] `QiblaViewModel` — registers `SensorManager` listener in `onResume`, unregisters in `onPause`
-- [x] `SENSOR_DELAY_GAME` (~50 Hz) sampling rate for low-pass filter convergence
+- [x] `SENSOR_DELAY_UI` (~16 Hz) sampling rate; `LP_ALPHA = 0.15` tuned for ~6-sample (~300 ms) settling. UI rate chosen over GAME for power; convergence acceptable during normal turning.
 - [x] Direct rotation matrix (no `remapCoordinateSystem`) for tilt-stable flat-phone bearing (T7)
 - [x] Bearing from device coordinates to Kaaba (21.4225°N, 39.8262°E)
 - [x] Accuracy state: `HIGH` / `MEDIUM` / `LOW` / `UNRELIABLE`
