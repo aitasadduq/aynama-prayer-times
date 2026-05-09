@@ -29,6 +29,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +46,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.shared.data.entity.Prayer
+import com.aynama.prayertimes.shared.data.entity.QazaStatus
+import com.aynama.prayertimes.tracker.MarkPrayerSheet
+import java.time.LocalDate
 import com.aynama.prayertimes.ui.theme.IbmPlexSans
 import com.aynama.prayertimes.ui.theme.Ink
 import com.aynama.prayertimes.ui.theme.InkMuted
@@ -64,6 +70,9 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
             state = state,
             onNavigateToSettings = onNavigateToSettings,
             onDismissRamadanBanner = vm::dismissRamadanBanner,
+            onMarkPrayer = { profileId, prayer, date, status ->
+                vm.markPrayer(profileId, prayer, date, status)
+            },
         )
     }
 }
@@ -73,6 +82,7 @@ private fun LoadedContent(
     state: HomeUiState.Loaded,
     onNavigateToSettings: () -> Unit,
     onDismissRamadanBanner: () -> Unit,
+    onMarkPrayer: (profileId: Long, prayer: Prayer, date: LocalDate, status: QazaStatus) -> Unit,
 ) {
     val pageCount = state.profiles.size + 1
     val pagerState = rememberPagerState(pageCount = { pageCount })
@@ -85,6 +95,9 @@ private fun LoadedContent(
 
     val animTop by animateColorAsState(gradTop, animationSpec = tween(3000), label = "gradTop")
     val animBottom by animateColorAsState(gradBottom, animationSpec = tween(3000), label = "gradBottom")
+
+    var sheetPrayer by remember { mutableStateOf<Pair<Prayer, ProfileUiState>?>(null) }
+    val today = remember { LocalDate.now() }
 
     Box(
         modifier = Modifier
@@ -102,6 +115,9 @@ private fun LoadedContent(
                             profileState = state.profiles[page],
                             pageIndex = page,
                             pageCount = state.profiles.size,
+                            onMarkPrayer = { prayer ->
+                                sheetPrayer = prayer to state.profiles[page]
+                            },
                         )
                     } else {
                         AddProfilePage(onNavigateToSettings = onNavigateToSettings)
@@ -127,6 +143,18 @@ private fun LoadedContent(
             }
         }
     }
+
+    sheetPrayer?.let { (prayer, profileState) ->
+        MarkPrayerSheet(
+            prayer = prayer,
+            date = today,
+            currentStatus = null,
+            onSelect = { status ->
+                onMarkPrayer(profileState.profile.id, prayer, today, status)
+            },
+            onDismiss = { sheetPrayer = null },
+        )
+    }
 }
 
 @Composable
@@ -134,6 +162,7 @@ private fun ProfilePage(
     profileState: ProfileUiState,
     pageIndex: Int,
     pageCount: Int,
+    onMarkPrayer: (Prayer) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -174,7 +203,7 @@ private fun ProfilePage(
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
             profileState.ribbonRows.forEach { row ->
-                RibbonRowItem(row = row)
+                RibbonRowItem(row = row, onMarkPrayer = onMarkPrayer)
             }
         }
 
@@ -192,16 +221,24 @@ private fun ProfilePage(
 }
 
 @Composable
-private fun RibbonRowItem(row: RibbonRow, modifier: Modifier = Modifier) {
+private fun RibbonRowItem(
+    row: RibbonRow,
+    onMarkPrayer: (Prayer) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     when (row) {
-        is RibbonRow.PrayerEntry -> PrayerRibbonRow(row = row, modifier = modifier)
+        is RibbonRow.PrayerEntry -> PrayerRibbonRow(row = row, onMarkPrayer = onMarkPrayer, modifier = modifier)
         is RibbonRow.SunriseEntry -> SunriseRibbonRow(row = row, modifier = modifier)
         is RibbonRow.ImsakEntry -> ImsakRibbonRow(row = row, modifier = modifier)
     }
 }
 
 @Composable
-private fun PrayerRibbonRow(row: RibbonRow.PrayerEntry, modifier: Modifier = Modifier) {
+private fun PrayerRibbonRow(
+    row: RibbonRow.PrayerEntry,
+    onMarkPrayer: (Prayer) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     // On light phases LocalContentColor is Ink; on dark phases it is Parchment.
     val isLightBackground = LocalContentColor.current == Ink
     // Use the corresponding muted token directly (no alpha) so passed rows are readable
@@ -221,10 +258,15 @@ private fun PrayerRibbonRow(row: RibbonRow.PrayerEntry, modifier: Modifier = Mod
         RibbonState.CURRENT -> "current"
         RibbonState.UPCOMING -> "upcoming"
     }
+    val tappable = row.ribbonState == RibbonState.PASSED || row.ribbonState == RibbonState.CURRENT
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .then(
+                if (tappable) Modifier.clickable { onMarkPrayer(row.prayer) }
+                else Modifier
+            )
             .semantics {
                 contentDescription = "$prayerName ${row.displayTime}, $stateLabel"
             },

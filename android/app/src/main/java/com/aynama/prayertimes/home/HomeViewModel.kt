@@ -14,7 +14,9 @@ import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
+import com.aynama.prayertimes.shared.data.entity.QazaStatus
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -121,6 +123,10 @@ class HomeViewModel(
 
     fun dismissRamadanBanner() {
         prefs.edit().putInt(KEY_RAMADAN_BANNER_YEAR, currentHijriYear()).apply()
+    }
+
+    fun markPrayer(profileId: Long, prayer: Prayer, date: LocalDate, status: QazaStatus) {
+        viewModelScope.launch { qazaRepository.markPrayer(profileId, prayer, date, status) }
     }
 
     private fun cachedPrayerTimes(profile: Profile, today: LocalDate): PrayerTimesResult {

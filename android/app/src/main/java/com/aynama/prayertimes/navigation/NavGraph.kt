@@ -29,6 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import com.aynama.prayertimes.R
 import com.aynama.prayertimes.home.HomeScreen
 import com.aynama.prayertimes.qibla.QiblaScreen
+import com.aynama.prayertimes.tracker.TrackerScreen
 
 private enum class Screen(val route: String, val labelRes: Int, val icon: ImageVector) {
     HOME("home", R.string.nav_home, Icons.Default.Home),
@@ -85,7 +86,7 @@ fun NavGraph() {
                 })
             }
             composable(Screen.QIBLA.route) { QiblaScreen() }
-            composable(Screen.TRACKER.route) { PlaceholderScreen("Tracker") }
+            composable(Screen.TRACKER.route) { TrackerScreen() }
             composable(Screen.SETTINGS.route) { PlaceholderScreen("Settings") }
         }
     }
