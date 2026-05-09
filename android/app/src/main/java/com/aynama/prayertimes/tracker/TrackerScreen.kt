@@ -138,6 +138,7 @@ private fun LoadedTracker(state: TrackerUiState.Loaded, vm: TrackerViewModel) {
                 items(week.days, key = { it.date.toEpochDay() }) { day ->
                     DayRow(
                         day = day,
+                        today = today,
                         onToggle = { vm.toggleExpansion(day.date) },
                         onMarkPrayer = { prayer -> sheetTarget = prayer to day.date },
                     )
@@ -240,10 +241,10 @@ private fun HistoryColumnHeader() {
 @Composable
 private fun DayRow(
     day: DayState,
+    today: LocalDate,
     onToggle: () -> Unit,
     onMarkPrayer: (Prayer) -> Unit,
 ) {
-    val today = LocalDate.now()
     val isToday = day.date == today
     val dateLabel = if (isToday) {
         "Today · ${day.date.format(todayDateFmt)}"
