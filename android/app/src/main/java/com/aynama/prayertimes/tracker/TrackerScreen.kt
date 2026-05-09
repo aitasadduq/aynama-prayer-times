@@ -214,12 +214,12 @@ private fun HistoryColumnHeader() {
         Row(horizontalArrangement = Arrangement.spacedBy(squareSpacing)) {
             Prayer.entries.forEach { prayer ->
                 Box(
-                    modifier = Modifier.size(squareSize),
+                    modifier = Modifier.size((squareSizePx).dp),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = prayer.abbrev(),
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = IbmPlexSans),
+                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = IbmPlexSans),
                         color = InkMuted,
                         textAlign = TextAlign.Center,
                     )

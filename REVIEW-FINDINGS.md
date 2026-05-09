@@ -68,6 +68,14 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ---
 
+## From PR #13 — Phase 4 Prayer Tracker Screen (deferred scope)
+
+### Design / Scope
+
+- [ ] **[D1]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerViewModel.kt:85-87` — History window fixed at 4 weeks (Monday of 3 weeks ago to today). Users cannot view or track prayers older than ~30 days; data persists in database but is invisible. For long-term Qada tracking or compliance audits, users need access to older history. **Fix:** Implement a dedicated `HistoryScreen` with date-range picker or scrollable infinite list of weeks. Allow filtering by status (Qada, missed, prayed on time) and date. Route from Tracker to History via NavGraph. *(Origin: PR #13, deferred)*
+
+---
+
 ## Workflow
 
 - When you address a finding, **delete its line** rather than checking it off — keeps the file scoped to open work.
