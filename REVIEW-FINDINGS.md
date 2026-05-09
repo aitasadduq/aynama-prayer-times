@@ -68,6 +68,42 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ---
 
+## From PR #13 — Phase 4 Prayer Tracker Screen (`/review` 2026-05-09)
+
+### Design / Scope
+
+- [ ] **[D1]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerViewModel.kt:85-87` — History window fixed at 4 weeks (Monday of 3 weeks ago to today). Users cannot view or track prayers older than ~30 days; data persists in database but is invisible. For long-term Qada tracking or compliance audits, users need access to older history. **Fix:** Implement a dedicated `HistoryScreen` with date-range picker or scrollable infinite list of weeks. Allow filtering by status (Qada, missed, prayed on time) and date. Route from Tracker to History via NavGraph. *(Origin: PR #13, deferred)*
+
+### Maintainability
+
+- [ ] **[M1]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerViewModel.kt:84` — `val today = LocalDate.now()` captured inside `flatMapLatest`'s lambda — only re-evaluated when profile list re-emits. ViewModel surviving past midnight will keep stale `today`/`historyStart` values, causing incorrect "today" routing and the history window to stop sliding forward. Same hidden-clock dependency as Qibla T5. **Fix:** Inject `Clock` or `() -> LocalDate` into `TrackerViewModel`; trigger recomputation on date rollover (e.g. via a `clockFlow` similar to HomeViewModel) so `today`/`historyStart` advance without waiting for profile re-emit. *(Origin: PR #13)*
+
+- [ ] **[M2]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerViewModel.kt:72` — `prayerTimesCache: MutableMap<Pair<Long, LocalDate>, PrayerTimesResult>` grows unbounded across the ViewModel's lifetime. Bounded in practice by the 4-week window × profile count, but never evicts stale `(profileId, date)` keys after profile changes or window slides. **Fix:** Either evict entries whose date is outside `[historyStart, today]` after each window recompute, or replace with an LRU bounded by `28 × maxProfiles`. *(Origin: PR #13)*
+
+- [ ] **[M3]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerViewModel.kt:82` — `profiles.firstOrNull()` selects the first profile, diverging from HomeViewModel's selection logic and from QiblaViewModel's `firstOrNull { it.isGps } ?: minByOrNull { it.sortOrder }`. Three screens, three different active-profile selections; user can be looking at one profile on Home and a different profile on Tracker. Mirrors Qibla A4. **Fix:** Centralize active-profile selection in `ProfileRepository.observeActiveProfile()`; reuse across Home, Qibla, Tracker. *(Origin: PR #13)*
+
+- [ ] **[M4]** `android/shared-logic/src/main/java/com/aynama/prayertimes/shared/data/entity/QazaEntry.kt:11` — `QazaStatus.INTENTION_TO_MAKEUP` exists in the enum and is counted by `observeOutstandingCount` (`status IN ('MISSED', 'INTENTION_TO_MAKEUP')`), but no UI surface allows the user to set it. Dead write-path. Code reading this status (e.g. `MarkPrayerSheet.isMissed`, `prayedCount` filter) treats it identically to `MISSED`. **Fix:** Either (a) add a fourth option to `MarkPrayerSheet` ("I plan to make this up later") that writes `INTENTION_TO_MAKEUP`, or (b) drop the enum value and remove it from the outstanding-count query. Decide based on whether the spec actually requires this distinction. *(Origin: PR #13)*
+
+- [ ] **[M5]** `android/app/src/main/java/com/aynama/prayertimes/home/HomeScreen.kt:152` — `MarkPrayerSheet` invoked with `currentStatus = null` always, even when the user has already marked the prayer earlier today. Pre-selection works in TrackerScreen (line 152-159 looks up status from `state.todayRows`/`state.weeks`) but is silently dropped on Home — no consistent "current selection" affordance. **Fix:** Thread the current status through `ProfileUiState` (or via a per-prayer status map keyed off `qazaCounts` extension), pass to the sheet. *(Origin: PR #13)*
+
+- [ ] **[M6]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerViewModel.kt:212-218` — `buildAggregate` ("X of Y prayers on time this week") sums over past days only (`allHistoryDays` ends at yesterday). Today's `PRAYED_ON_TIME` entries are excluded from the "this week" aggregate. User who just prayed Fajr this morning sees the count unchanged. **Fix:** Either include today's row in the aggregate by passing `state.todayRows` into `buildAggregate`, or rename the label to "...so far this week (excluding today)" so behavior matches text. *(Origin: PR #13)*
+
+- [ ] **[M7]** `android/app/src/main/java/com/aynama/prayertimes/tracker/MarkPrayerSheet.kt:68,85-87` — `isMissed = currentStatus == MISSED || currentStatus == INTENTION_TO_MAKEUP` and the "I didn't pray this" tap always writes `MISSED`. If a user previously marked `INTENTION_TO_MAKEUP` and re-opens the sheet, the row appears selected as "missed", and a confirming tap silently overwrites `INTENTION_TO_MAKEUP` → `MISSED`. Lossy. **Fix:** Resolve in tandem with M4 — if the distinction matters, render two separate options; if it doesn't, drop `INTENTION_TO_MAKEUP` entirely. *(Origin: PR #13)*
+
+### Testing
+
+- [ ] **[T1]** `android/app/src/test/java/com/aynama/prayertimes/tracker/TrackerViewModelTest.kt` — Tests cover only pure helpers (`weekLabel`, in-line prayedCount predicate). No tests for `buildUiState`, `buildWeekSections`, `buildDayState`, `buildAggregate`, `markPrayer`, `toggleExpansion`, the flow chain, or the `Empty` branch. Regressions in week-section grouping, today-row construction, or expansion state will land silently. **Fix:** Add JVM tests with a fake `ProfileRepository`/`QazaRepository` that drive the ViewModel through Loaded/Empty transitions; assert week sections, aggregate text, expanded rows, and that `markPrayer` writes through to repository. Inject `Clock` (per M1) and a deterministic `AdhanWrapper` so prayer-time strings can be asserted. *(Origin: PR #13)*
+
+- [ ] **[T2]** `android/app/src/main/java/com/aynama/prayertimes/home/HomeViewModel.kt:128` — Newly added `markPrayer(profileId, prayer, date, status)` has zero direct tests. Repository call is one line, but it's the entry point for the Home ribbon's tap-to-mark flow and silently ignores failures (no exception channel). **Fix:** Add a unit test with a fake `QazaRepository` asserting `markPrayer` is called with the expected args; consider exposing a `Result`/error flow if user-facing failure feedback is desired later. *(Origin: PR #13)*
+
+### Adversarial / Cross-cutting
+
+- [ ] **[A1]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerScreen.kt:208-232` — `HistoryColumnHeader` renders the F/D/A/M/I letters with no `contentDescription` or `semantics` block. Screen readers read each letter as "F", "D", etc. with no context. The 5 status squares per `DayRow` also have no per-square semantics — only the row-level "$dateLabel, $prayedCount of 5 prayers" is announced. **Fix:** Add `Modifier.semantics { contentDescription = "Prayer columns: Fajr, Dhuhr, Asr, Maghrib, Isha" }` to the header row; consider making each `PrayerStatusSquare` in `DayRow` a focusable element with `contentDescription = "$prayerName: $statusLabel"` for AT users who want to inspect individual prayers without expanding the day. *(Origin: PR #13)*
+
+- [ ] **[A2]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerScreen.kt:90` — Today's prayer rows tap-target opens the mark sheet for ANY prayer regardless of whether its time has passed. A user can mark Isha as "I prayed this" at 9 AM. Home ribbon already gates this via `tappable = PASSED || CURRENT`; Tracker does not. **Fix:** Disable taps on `TodayPrayerRow` whose `scheduledTime` is in the future, or surface a confirmation when marking a not-yet-due prayer. *(Origin: PR #13)*
+
+---
+
 ## Workflow
 
 - When you address a finding, **delete its line** rather than checking it off — keeps the file scoped to open work.

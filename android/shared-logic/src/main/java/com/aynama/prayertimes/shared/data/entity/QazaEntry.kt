@@ -8,7 +8,7 @@ import java.time.LocalDate
 
 enum class Prayer { FAJR, DHUHR, ASR, MAGHRIB, ISHA }
 
-enum class QazaStatus { MISSED, MADE_UP, INTENTION_TO_MAKEUP }
+enum class QazaStatus { PRAYED_ON_TIME, MISSED, MADE_UP, INTENTION_TO_MAKEUP }
 
 @Entity(
     tableName = "qaza_entries",
