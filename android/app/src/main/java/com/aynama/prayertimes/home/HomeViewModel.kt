@@ -1,12 +1,11 @@
 package com.aynama.prayertimes.home
 
 import android.content.SharedPreferences
-import android.icu.util.Calendar
-import android.icu.util.IslamicCalendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aynama.prayertimes.AynamaApplication
+import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
@@ -107,7 +106,7 @@ class HomeViewModel(
         combine(profilesFlow, clockFlow, qazaCountsFlow(profilesFlow)) { profiles, now, qazaCounts ->
             if (profiles.isEmpty()) return@combine HomeUiState.Empty
             val today = LocalDate.now()
-            val hijriYear = currentHijriYear()
+            val hijriYear = RamadanDetector.currentHijriYear()
             val dismissedYear = prefs.getInt(KEY_RAMADAN_BANNER_YEAR, -1)
             HomeUiState.Loaded(
                 profiles.map { profile ->
@@ -122,7 +121,7 @@ class HomeViewModel(
     }
 
     fun dismissRamadanBanner() {
-        prefs.edit().putInt(KEY_RAMADAN_BANNER_YEAR, currentHijriYear()).apply()
+        prefs.edit().putInt(KEY_RAMADAN_BANNER_YEAR, RamadanDetector.currentHijriYear()).apply()
     }
 
     fun markPrayer(profileId: Long, prayer: Prayer, date: LocalDate, status: QazaStatus) {
@@ -152,7 +151,7 @@ class HomeViewModel(
         hijriYear: Int,
         dismissedYear: Int,
     ): ProfileUiState {
-        val ramadan = isRamadan(today)
+        val ramadan = RamadanDetector.isRamadan(today)
         return ProfileUiState(
             profile = profile,
             ribbonRows = deriveRibbonRows(times, profile.asrMadhab, now, ramadan, timeFormatter),
@@ -179,15 +178,6 @@ class HomeViewModel(
 }
 
 // Pure functions — internal for testability
-
-internal fun currentHijriYear(): Int =
-    IslamicCalendar().get(Calendar.YEAR)
-
-internal fun isRamadan(date: LocalDate): Boolean {
-    val instant = date.atStartOfDay(ZoneId.systemDefault()).toInstant()
-    val ic = IslamicCalendar(java.util.Date.from(instant))
-    return ic.get(Calendar.MONTH) == IslamicCalendar.RAMADAN
-}
 
 internal fun derivePhase(times: PrayerTimesResult, asrMadhab: AsrMadhab, now: LocalTime): PrayerPhase {
     if (times.isha < times.fajr && now < times.isha) return PrayerPhase.MAGHRIB
