@@ -13,6 +13,8 @@ import kotlinx.coroutines.launch
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action
+        if (action != Intent.ACTION_BOOT_COMPLETED && action != ACTION_MIDNIGHT_RESCHEDULE) return
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {

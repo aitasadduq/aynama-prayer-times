@@ -203,40 +203,40 @@ Depends on: Phase 1 (Room).
 
 ---
 
-### Phase 5 — Notifications & Adhan
+### Phase 5 — Notifications & Adhan ✅ DONE (PR #14)
 Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 
 **Manifest**
-- [ ] `USE_EXACT_ALARM` permission declared (T8)
-- [ ] `FOREGROUND_SERVICE_SPECIAL_USE` declared + Play Console justification written (T8)
-- [ ] `BOOT_COMPLETED` receiver declared
-- [ ] `ACTION_TIMEZONE_CHANGED` receiver declared
-- [ ] Foreground service for adhan audio declared
+- [x] `USE_EXACT_ALARM` permission declared (T8)
+- [x] `FOREGROUND_SERVICE_SPECIAL_USE` declared + Play Console justification written (T8)
+- [x] `BOOT_COMPLETED` receiver declared
+- [x] `ACTION_TIMEZONE_CHANGED` receiver declared
+- [x] Foreground service for adhan audio declared
 
 **AlarmScheduler**
-- [ ] `scheduleAll(profile)` — schedules 5 exact alarms via `AlarmManager.setExactAndAllowWhileIdle`
-- [ ] Imsak alarm = Fajr −10 min, scheduled only during Hijri Ramadan
-- [ ] Idempotent: calling `scheduleAll()` twice produces no duplicate alarms
-- [ ] Reschedule on app open/resume (covers gaps from background kill)
-- [ ] Daily midnight reschedule (advance to next day's times)
+- [x] `scheduleAll(profile)` — schedules 5 exact alarms via `AlarmManager.setExactAndAllowWhileIdle`
+- [x] Imsak alarm = Fajr −10 min, scheduled only during Hijri Ramadan
+- [x] Idempotent: calling `scheduleAll()` twice produces no duplicate alarms
+- [x] Reschedule on app open/resume (covers gaps from background kill)
+- [x] Daily midnight reschedule (advance to next day's times)
 
 **BroadcastReceivers**
-- [ ] `BootReceiver` — `BOOT_COMPLETED` → `scheduleAll()` for all active profiles
-- [ ] `TimezoneReceiver` — `ACTION_TIMEZONE_CHANGED` → recalculate times + `scheduleAll()`
+- [x] `BootReceiver` — `BOOT_COMPLETED` → `scheduleAll()` for all active profiles
+- [x] `TimezoneReceiver` — `ACTION_TIMEZONE_CHANGED` → recalculate times + `scheduleAll()`
 
 **Audio playback**
-- [ ] Foreground service handles adhan audio (prevents system kill mid-adhan)
-- [ ] Adhan audio assets bundled: Makkah, Madinah, Egyptian, Turkish, Al-Aqsa, Silent
+- [x] Foreground service handles adhan audio (prevents system kill mid-adhan)
+- [ ] Adhan audio assets bundled: Makkah, Madinah, Egyptian, Turkish, Al-Aqsa, Silent *(Deferred to Phase 6; using system notification sound as placeholder)*
 
 **OEM battery optimization**
-- [ ] `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent immediately after notification permission granted
-- [ ] One-time prompt; do not re-prompt
+- [x] `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent immediately after notification permission granted
+- [x] One-time prompt; do not re-prompt
 
 **Tests**
-- [ ] `AlarmSchedulerTest` — `scheduleAll()` sets 5 alarms; idempotent; Imsak = Fajr −10 min; daily midnight reschedule
-- [ ] `RamadanDetectorTest` — `IslamicCalendar.RAMADAN` detection for known dates; non-Ramadan returns false; Imsak enabled/disabled correctly
-- [ ] E2E (emulator): `AlarmFiresWhileClosedTest` — schedule alarm 30 s ahead; close app; verify notification in shade
-- [ ] E2E (emulator): `AlarmRestoredAfterRebootTest` — schedule; `am broadcast -a android.intent.action.BOOT_COMPLETED`; verify rescheduled
+- [x] `AlarmSchedulerTest` — `scheduleAll()` sets 5 alarms; idempotent; Imsak = Fajr −10 min; daily midnight reschedule
+- [x] `RamadanDetectorTest` — `IslamicCalendar.RAMADAN` detection for known dates; non-Ramadan returns false; Imsak enabled/disabled correctly
+- [ ] E2E (emulator): `AlarmFiresWhileClosedTest` — schedule alarm 30 s ahead; close app; verify notification in shade *(Deferred to Phase 8; requires android-emulator-runner CI setup)*
+- [ ] E2E (emulator): `AlarmRestoredAfterRebootTest` — schedule; `am broadcast -a android.intent.action.BOOT_COMPLETED`; verify rescheduled *(Deferred to Phase 8; requires android-emulator-runner CI setup)*
 
 ---
 

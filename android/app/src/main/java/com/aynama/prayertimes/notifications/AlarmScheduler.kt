@@ -14,6 +14,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 
 const val ACTION_PRAYER_ALARM = "com.aynama.prayertimes.PRAYER_ALARM"
+const val ACTION_MIDNIGHT_RESCHEDULE = "com.aynama.prayertimes.MIDNIGHT_RESCHEDULE"
 const val EXTRA_PROFILE_ID = "profile_id"
 const val EXTRA_PRAYER_INDEX = "prayer_index"
 
@@ -23,7 +24,6 @@ private const val PRAYER_INDEX_ASR = 2
 private const val PRAYER_INDEX_MAGHRIB = 3
 private const val PRAYER_INDEX_ISHA = 4
 private const val PRAYER_INDEX_IMSAK = 5
-private const val PRAYER_INDEX_MIDNIGHT = 9
 
 private const val MIDNIGHT_REQUEST_CODE = 9999
 
@@ -92,13 +92,17 @@ object AlarmScheduler {
             .atStartOfDay(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
-        val intent = Intent(context, BootReceiver::class.java)
+        val intent = Intent(context, BootReceiver::class.java).setAction(ACTION_MIDNIGHT_RESCHEDULE)
         val pi = PendingIntent.getBroadcast(
             context, MIDNIGHT_REQUEST_CODE, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, midnight, pi)
+        if (Build.VERSION.SDK_INT >= 31 && !alarmManager.canScheduleExactAlarms()) {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, midnight, pi)
+        } else {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, midnight, pi)
+        }
     }
 
     private fun submitAlarm(context: Context, alarmManager: AlarmManager, alarm: ScheduledAlarm) {
