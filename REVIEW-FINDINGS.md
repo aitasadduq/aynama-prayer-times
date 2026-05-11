@@ -104,6 +104,18 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ---
 
+## From PR #14 — Phase 5 Notifications (`/review` 2026-05-10)
+
+### Localization
+
+- [ ] **[L1]** `android/app/src/main/java/com/aynama/prayertimes/notifications/NotificationHelper.kt:48,55,57` — Channel names, notification titles, and description text are hardcoded English strings ("Prayer Times", "It is time for $prayerName prayer", "Adhan", "Playing…", "Prayer time alerts", "Adhan playback service"). Localization is a later-phase concern; flagging for Phase 6+ localization pass. *(Origin: PR #14, /review 2026-05-10)*
+
+### Design / Visual
+
+- [ ] **[V1]** `android/app/src/main/res/drawable/ic_notification.xml` — Icon path does not render as a clear crescent moon; visual polish needed. Revisit design in a later phase to ensure the notification icon clearly signals "prayer" or "adhan" to users. *(Origin: PR #14, /review 2026-05-10)*
+
+---
+
 ## Workflow
 
 - When you address a finding, **delete its line** rather than checking it off — keeps the file scoped to open work.

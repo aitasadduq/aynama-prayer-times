@@ -332,7 +332,6 @@ private fun ExpandedPrayerRow(row: TrackerPrayerRow, onTap: () -> Unit) {
 }
 
 private val historyDateWidth = 130.dp
-private val squareSize = 16.dp
 private val squareSizePx = 15
 private val squareSpacing = 4.dp
 
