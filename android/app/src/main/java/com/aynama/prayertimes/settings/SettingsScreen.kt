@@ -1,5 +1,13 @@
 package com.aynama.prayertimes.settings
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.location.Address
+import android.location.Geocoder
+import android.location.LocationManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -13,10 +21,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -35,19 +43,20 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
-
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aynama.prayertimes.AynamaApplication
@@ -56,6 +65,10 @@ import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.ui.theme.Ink
 import com.aynama.prayertimes.ui.theme.Saffron
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun SettingsScreen() {
@@ -176,17 +189,26 @@ private fun ProfileFormSheet(
     onDelete: (Profile) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     var name by remember { mutableStateOf(initial?.name ?: "") }
-    var lat by remember { mutableStateOf(initial?.latitude?.toString() ?: "") }
-    var lng by remember { mutableStateOf(initial?.longitude?.toString() ?: "") }
     var method by remember { mutableStateOf(initial?.calculationMethod ?: CalculationMethodKey.MWL) }
     var madhab by remember { mutableStateOf(initial?.asrMadhab ?: AsrMadhab.SHAFII) }
 
-    val latDouble = lat.toDoubleOrNull()
-    val lngDouble = lng.toDoubleOrNull()
-    val valid = name.isNotBlank()
-        && latDouble != null && latDouble in -90.0..90.0
-        && lngDouble != null && lngDouble in -180.0..180.0
+    var locationLat by remember { mutableStateOf(initial?.latitude) }
+    var locationLng by remember { mutableStateOf(initial?.longitude) }
+    var locationLabel by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        if (initial != null) {
+            locationLabel = withContext(Dispatchers.IO) {
+                reverseGeocode(context, initial.latitude, initial.longitude)
+            } ?: "${initial.latitude.formatCoord()}, ${initial.longitude.formatCoord()}"
+        }
+    }
+
+    val valid = name.isNotBlank() && locationLat != null && locationLng != null
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -211,26 +233,25 @@ private fun ProfileFormSheet(
 
             Spacer(Modifier.height(12.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = lat,
-                    onValueChange = { lat = it },
-                    label = { Text("Latitude") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    isError = lat.isNotEmpty() && (latDouble == null || latDouble !in -90.0..90.0),
-                )
-                OutlinedTextField(
-                    value = lng,
-                    onValueChange = { lng = it },
-                    label = { Text("Longitude") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    isError = lng.isNotEmpty() && (lngDouble == null || lngDouble !in -180.0..180.0),
-                )
-            }
+            LocationSection(
+                label = locationLabel,
+                hasSelection = locationLat != null,
+                onLocationSelected = { lat, lng, label ->
+                    locationLat = lat
+                    locationLng = lng
+                    locationLabel = label
+                },
+                onGpsRequested = {
+                    scope.launch {
+                        val result = withContext(Dispatchers.IO) { getGpsLocation(context) }
+                        if (result != null) {
+                            locationLat = result.first
+                            locationLng = result.second
+                            locationLabel = result.third
+                        }
+                    }
+                },
+            )
 
             Spacer(Modifier.height(12.dp))
 
@@ -255,8 +276,8 @@ private fun ProfileFormSheet(
                     )
                     onSave(base.copy(
                         name = name.trim(),
-                        latitude = latDouble!!,
-                        longitude = lngDouble!!,
+                        latitude = locationLat!!,
+                        longitude = locationLng!!,
                         calculationMethod = method,
                         asrMadhab = madhab,
                     ))
@@ -278,6 +299,113 @@ private fun ProfileFormSheet(
                     Text("Delete profile")
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LocationSection(
+    label: String,
+    hasSelection: Boolean,
+    onLocationSelected: (Double, Double, String) -> Unit,
+    onGpsRequested: () -> Unit,
+) {
+    val context = LocalContext.current
+    var isSearching by remember { mutableStateOf(!hasSelection) }
+    var query by remember { mutableStateOf("") }
+    var suggestions by remember { mutableStateOf<List<Address>>(emptyList()) }
+
+    val permLauncher = rememberLauncherForActivityResult(RequestPermission()) { granted ->
+        if (granted) onGpsRequested()
+    }
+
+    LaunchedEffect(query) {
+        if (query.length < 3) {
+            suggestions = emptyList()
+            return@LaunchedEffect
+        }
+        delay(400)
+        suggestions = withContext(Dispatchers.IO) { searchCity(context, query) }
+    }
+
+    if (!isSearching && hasSelection) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.padding(4.dp))
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+            }
+            TextButton(onClick = {
+                isSearching = true
+                query = ""
+                suggestions = emptyList()
+            }) {
+                Text("Change")
+            }
+        }
+    } else {
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            label = { Text("City or location") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+
+        if (suggestions.isNotEmpty()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                suggestions.forEach { address ->
+                    val cityLabel = buildCityLabel(address)
+                    Text(
+                        text = cityLabel,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onLocationSelected(address.latitude, address.longitude, cityLabel)
+                                isSearching = false
+                                query = ""
+                                suggestions = emptyList()
+                            }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    HorizontalDivider()
+                }
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = {
+                val hasPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                ) == PackageManager.PERMISSION_GRANTED
+                if (hasPermission) {
+                    onGpsRequested()
+                    isSearching = false
+                } else {
+                    permLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Default.LocationOn, contentDescription = null)
+            Spacer(Modifier.padding(4.dp))
+            Text("Use current location")
         }
     }
 }
@@ -352,6 +480,75 @@ private fun AsrMadhabSelector(
             }
         }
     }
+}
+
+private fun buildCityLabel(address: Address): String {
+    val city = address.locality ?: address.subAdminArea ?: address.adminArea
+    val country = address.countryName
+    return listOfNotNull(city, country).joinToString(", ").ifBlank {
+        address.getAddressLine(0) ?: "${address.latitude.formatCoord()}, ${address.longitude.formatCoord()}"
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun reverseGeocode(context: android.content.Context, lat: Double, lng: Double): String? {
+    if (!Geocoder.isPresent()) return null
+    return try {
+        val geocoder = Geocoder(context)
+        val result = if (Build.VERSION.SDK_INT >= 33) {
+            val latch = java.util.concurrent.CountDownLatch(1)
+            var addr: Address? = null
+            geocoder.getFromLocation(lat, lng, 1) { list ->
+                addr = list.firstOrNull()
+                latch.countDown()
+            }
+            latch.await(5, java.util.concurrent.TimeUnit.SECONDS)
+            addr
+        } else {
+            geocoder.getFromLocation(lat, lng, 1)?.firstOrNull()
+        } ?: return null
+        buildCityLabel(result)
+    } catch (_: Exception) {
+        null
+    }
+}
+
+@Suppress("DEPRECATION")
+private fun searchCity(context: android.content.Context, query: String): List<Address> {
+    if (!Geocoder.isPresent()) return emptyList()
+    return try {
+        val geocoder = Geocoder(context)
+        if (Build.VERSION.SDK_INT >= 33) {
+            val latch = java.util.concurrent.CountDownLatch(1)
+            val results = mutableListOf<Address>()
+            geocoder.getFromLocationName(query, 5) { list ->
+                results.addAll(list)
+                latch.countDown()
+            }
+            latch.await(5, java.util.concurrent.TimeUnit.SECONDS)
+            results
+        } else {
+            geocoder.getFromLocationName(query, 5) ?: emptyList()
+        }
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+private fun getGpsLocation(context: android.content.Context): Triple<Double, Double, String>? {
+    val lm = context.getSystemService(android.content.Context.LOCATION_SERVICE) as LocationManager
+    val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+    val location = providers.firstNotNullOfOrNull { provider ->
+        try {
+            if (lm.isProviderEnabled(provider)) {
+                @Suppress("MissingPermission")
+                lm.getLastKnownLocation(provider)
+            } else null
+        } catch (_: Exception) { null }
+    } ?: return null
+    val label = reverseGeocode(context, location.latitude, location.longitude)
+        ?: "${location.latitude.formatCoord()}, ${location.longitude.formatCoord()}"
+    return Triple(location.latitude, location.longitude, label)
 }
 
 private fun Double.formatCoord(): String = "%.4f".format(this)
