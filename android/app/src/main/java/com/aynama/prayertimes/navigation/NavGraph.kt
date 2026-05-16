@@ -1,7 +1,5 @@
 package com.aynama.prayertimes.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -16,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -29,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import com.aynama.prayertimes.R
 import com.aynama.prayertimes.home.HomeScreen
 import com.aynama.prayertimes.qibla.QiblaScreen
+import com.aynama.prayertimes.settings.SettingsScreen
 import com.aynama.prayertimes.tracker.TrackerScreen
 
 private enum class Screen(val route: String, val labelRes: Int, val icon: ImageVector) {
@@ -87,14 +85,7 @@ fun NavGraph() {
             }
             composable(Screen.QIBLA.route) { QiblaScreen() }
             composable(Screen.TRACKER.route) { TrackerScreen() }
-            composable(Screen.SETTINGS.route) { PlaceholderScreen("Settings") }
+            composable(Screen.SETTINGS.route) { SettingsScreen() }
         }
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(name: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(name)
     }
 }
