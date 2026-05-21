@@ -243,17 +243,17 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 ### Phase 6 — Settings Screen
 Depends on: Phase 1 (profiles), Phase 5 (notifications config).
 
-**Profile management**
-- [ ] Profile list with add/edit/delete
-- [ ] Profile creation full-screen flow:
+#### Phase 6a — Profile Management ✅ DONE (PR #15)
+- [x] Profile list with add/edit/delete
+- [x] Profile creation full-screen flow:
   1. Profile name field (max 20 chars, pre-filled "Home" / "Profile 2")
   2. Location: city search (offline geocoder) OR "Use current location" GPS button
   3. Calculation method picker (11 methods, brief description each, default: ISNA)
   4. Asr madhab picker (Hanafi / Shafi'i)
   5. Save → navigates back to Home with new profile active
-- [ ] GPS profile auto-names with detected city name if user hasn't edited it
+- [x] GPS profile auto-names with detected city name if user hasn't edited it
 
-**Notification settings screen (DESIGN.md §15)**
+#### Phase 6b — Notification Settings Screen
 - [ ] Master toggle row (56pt): saffron track on / parchment-muted track off
 - [ ] When OS permission denied: replace toggle with "Enable in Settings →" saffron link
 - [ ] When master off: prayer rows visible, names/times at ink-muted, toggles stay full opacity
@@ -265,14 +265,14 @@ Depends on: Phase 1 (profiles), Phase 5 (notifications config).
 - [ ] Ramadan Imsak row (64pt) with `parchment-muted` tint during active Ramadan
 - [ ] Vibration row → 3-option action sheet (Always / With sound / Never), default: With sound
 
-**Per-prayer detail sheet (DESIGN.md §15)**
+#### Phase 6c — Per-Prayer Detail Sheet
 - [ ] Bottom sheet (~60% height): `ModalBottomSheet` on Android
 - [ ] Header: prayer name Fraunces `display-md`, centered; "Today · {time}" below
 - [ ] Time offset picker: −15/−10/−5/0/+5/+10/+15 min, wheel/number picker, default 0
 - [ ] Early reminder picker: Off / 5 / 10 / 15 min before, default Off
 - [ ] Preview row: "Preview adhan" in saffron, plays 10 s sample
 
-**Hijri settings**
+#### Phase 6d — Hijri Settings
 - [ ] Ramadan start toggle: "Calculated | +1 day | +2 days" (moon-sighting accommodation)
 
 ---
