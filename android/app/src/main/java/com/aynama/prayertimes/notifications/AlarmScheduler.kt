@@ -18,12 +18,12 @@ const val ACTION_MIDNIGHT_RESCHEDULE = "com.aynama.prayertimes.MIDNIGHT_RESCHEDU
 const val EXTRA_PROFILE_ID = "profile_id"
 const val EXTRA_PRAYER_INDEX = "prayer_index"
 
-private const val PRAYER_INDEX_FAJR = 0
-private const val PRAYER_INDEX_DHUHR = 1
-private const val PRAYER_INDEX_ASR = 2
-private const val PRAYER_INDEX_MAGHRIB = 3
-private const val PRAYER_INDEX_ISHA = 4
-private const val PRAYER_INDEX_IMSAK = 5
+const val PRAYER_INDEX_FAJR = 0
+const val PRAYER_INDEX_DHUHR = 1
+const val PRAYER_INDEX_ASR = 2
+const val PRAYER_INDEX_MAGHRIB = 3
+const val PRAYER_INDEX_ISHA = 4
+const val PRAYER_INDEX_IMSAK = 5
 
 private const val MIDNIGHT_REQUEST_CODE = 9999
 
@@ -53,6 +53,9 @@ object AlarmScheduler {
     }
 
     fun scheduleForProfile(context: Context, profile: Profile, date: LocalDate = LocalDate.now()) {
+        val notifPrefs = NotificationPreferences(
+            context.getSharedPreferences("aynama_prefs", android.content.Context.MODE_PRIVATE)
+        )
         cancelForProfile(context, profile.id)
         val times = adhan.getPrayerTimes(
             latitude = profile.latitude,
@@ -62,7 +65,15 @@ object AlarmScheduler {
             method = profile.calculationMethod,
         )
         val isRamadan = RamadanDetector.isRamadan(date)
-        val alarms = buildAlarmSchedule(profile, date, isRamadan, times)
+        val alarms = buildAlarmSchedule(
+            profile = profile,
+            date = date,
+            isRamadan = isRamadan,
+            times = times,
+            masterEnabled = notifPrefs.masterEnabled,
+            prayerEnabled = { index -> notifPrefs.isPrayerEnabled(index) },
+            imsakEnabled = notifPrefs.imsakEnabled,
+        )
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val now = System.currentTimeMillis()
         for (alarm in alarms) {
@@ -132,7 +143,11 @@ fun buildAlarmSchedule(
     date: LocalDate,
     isRamadan: Boolean,
     times: PrayerTimesResult,
+    masterEnabled: Boolean = true,
+    prayerEnabled: (Int) -> Boolean = { true },
+    imsakEnabled: Boolean = true,
 ): List<ScheduledAlarm> {
+    if (!masterEnabled) return emptyList()
     val asr = if (profile.asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
     val prayers = listOf(
         PRAYER_INDEX_FAJR to times.fajr,
@@ -143,13 +158,14 @@ fun buildAlarmSchedule(
     )
     return buildList {
         for ((index, time) in prayers) {
+            if (!prayerEnabled(index)) continue
             add(ScheduledAlarm(
                 requestCode = (profile.id * 10 + index).toInt(),
                 triggerEpochMs = localTimeToEpochMs(time, date),
                 prayerName = PRAYER_NAMES[index]!!,
             ))
         }
-        if (isRamadan) {
+        if (isRamadan && imsakEnabled) {
             val imsak = times.fajr.minusMinutes(10)
             add(ScheduledAlarm(
                 requestCode = (profile.id * 10 + PRAYER_INDEX_IMSAK).toInt(),

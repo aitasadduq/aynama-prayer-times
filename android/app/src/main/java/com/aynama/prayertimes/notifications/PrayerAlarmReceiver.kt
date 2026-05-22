@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.aynama.prayertimes.AynamaApplication
 
 class PrayerAlarmReceiver : BroadcastReceiver() {
 
@@ -16,6 +17,11 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
         val prayerName = PRAYER_NAMES[prayerIndex] ?: return
         val notificationId = (profileId * 10 + prayerIndex).toInt()
         NotificationHelper.showPrayerNotification(context, prayerName, notificationId)
+
+        val prefs = (context.applicationContext as AynamaApplication).notificationPreferences
+        if (NotificationHelper.shouldVibrate(prefs.vibration, prefs.adhanVoice)) {
+            NotificationHelper.vibrateForPrayer(context)
+        }
 
         val serviceIntent = Intent(context, AdhanService::class.java)
         if (Build.VERSION.SDK_INT >= 26) {
