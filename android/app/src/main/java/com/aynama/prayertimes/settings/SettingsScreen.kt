@@ -22,9 +22,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -71,7 +73,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onNavigateToNotifications: () -> Unit = {}) {
     val app = LocalContext.current.applicationContext as AynamaApplication
     val vm: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(app))
     val profiles by vm.profiles.collectAsStateWithLifecycle()
@@ -96,6 +98,11 @@ fun SettingsScreen() {
             contentPadding = paddingValues,
             modifier = Modifier.fillMaxSize(),
         ) {
+            item {
+                NotificationsEntryRow(onClick = onNavigateToNotifications)
+                HorizontalDivider()
+            }
+
             item {
                 Text(
                     text = "Profiles",
@@ -155,6 +162,37 @@ fun SettingsScreen() {
                 showSheet = false
             },
             onDismiss = { showSheet = false },
+        )
+    }
+}
+
+@Composable
+private fun NotificationsEntryRow(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 24.dp)
+            .height(56.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Default.Notifications,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = "Notifications",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 16.dp),
+        )
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

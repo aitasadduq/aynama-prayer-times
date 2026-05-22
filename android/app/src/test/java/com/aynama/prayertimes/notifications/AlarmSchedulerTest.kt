@@ -96,4 +96,65 @@ class AlarmSchedulerTest {
         val expectedMs = localTimeToEpochMs(times.asrShafii, date)
         assertEquals(expectedMs, asrAlarm.triggerEpochMs)
     }
+
+    // Notification preference filtering tests
+
+    @Test
+    fun `buildAlarmSchedule master off returns empty list`() {
+        val alarms = buildAlarmSchedule(profile, date, isRamadan = false, times = times, masterEnabled = false)
+        assertTrue(alarms.isEmpty())
+    }
+
+    @Test
+    fun `buildAlarmSchedule master off skips Imsak even during Ramadan`() {
+        val alarms = buildAlarmSchedule(profile, date, isRamadan = true, times = times, masterEnabled = false)
+        assertTrue(alarms.isEmpty())
+    }
+
+    @Test
+    fun `buildAlarmSchedule per-prayer disabled skips that prayer`() {
+        val alarms = buildAlarmSchedule(
+            profile, date, isRamadan = false, times = times,
+            prayerEnabled = { index -> index != PRAYER_INDEX_FAJR },
+        )
+        assertFalse(alarms.any { it.prayerName == "Fajr" })
+        assertEquals(4, alarms.size)
+    }
+
+    @Test
+    fun `buildAlarmSchedule all prayers disabled returns empty list`() {
+        val alarms = buildAlarmSchedule(
+            profile, date, isRamadan = false, times = times,
+            prayerEnabled = { false },
+        )
+        assertTrue(alarms.isEmpty())
+    }
+
+    @Test
+    fun `buildAlarmSchedule imsak disabled skips Imsak during Ramadan`() {
+        val alarms = buildAlarmSchedule(
+            profile, date, isRamadan = true, times = times,
+            imsakEnabled = false,
+        )
+        assertFalse(alarms.any { it.prayerName == "Imsak" })
+        assertEquals(5, alarms.size)
+    }
+
+    @Test
+    fun `buildAlarmSchedule imsak enabled during Ramadan includes Imsak`() {
+        val alarms = buildAlarmSchedule(
+            profile, date, isRamadan = true, times = times,
+            imsakEnabled = true,
+        )
+        assertTrue(alarms.any { it.prayerName == "Imsak" })
+    }
+
+    @Test
+    fun `buildAlarmSchedule default params preserve original behaviour`() {
+        val withDefaults = buildAlarmSchedule(profile, date, isRamadan = false, times = times)
+        val explicit = buildAlarmSchedule(profile, date, isRamadan = false, times = times,
+            masterEnabled = true, prayerEnabled = { true }, imsakEnabled = true)
+        assertEquals(withDefaults.size, explicit.size)
+        assertEquals(withDefaults.map { it.prayerName }, explicit.map { it.prayerName })
+    }
 }

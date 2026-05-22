@@ -25,6 +25,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.aynama.prayertimes.R
 import com.aynama.prayertimes.home.HomeScreen
+import com.aynama.prayertimes.notifications.AdhanPickerScreen
+import com.aynama.prayertimes.notifications.NotificationSettingsScreen
 import com.aynama.prayertimes.qibla.QiblaScreen
 import com.aynama.prayertimes.settings.SettingsScreen
 import com.aynama.prayertimes.tracker.TrackerScreen
@@ -85,7 +87,20 @@ fun NavGraph() {
             }
             composable(Screen.QIBLA.route) { QiblaScreen() }
             composable(Screen.TRACKER.route) { TrackerScreen() }
-            composable(Screen.SETTINGS.route) { SettingsScreen() }
+            composable(Screen.SETTINGS.route) {
+                SettingsScreen(onNavigateToNotifications = {
+                    navController.navigate("settings/notifications")
+                })
+            }
+            composable("settings/notifications") {
+                NotificationSettingsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToAdhan = { navController.navigate("settings/notifications/adhan") },
+                )
+            }
+            composable("settings/notifications/adhan") {
+                AdhanPickerScreen(onNavigateBack = { navController.popBackStack() })
+            }
         }
     }
 }

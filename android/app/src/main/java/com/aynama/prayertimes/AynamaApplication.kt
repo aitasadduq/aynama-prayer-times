@@ -23,6 +23,9 @@ class AynamaApplication : Application() {
     val profileRepository: ProfileRepository by lazy { ProfileRepository(db.profileDao()) }
     val qazaRepository: QazaRepository by lazy { QazaRepository(db.qazaEntryDao()) }
     val prefs: SharedPreferences by lazy { getSharedPreferences("aynama_prefs", MODE_PRIVATE) }
+    val notificationPreferences: com.aynama.prayertimes.notifications.NotificationPreferences by lazy {
+        com.aynama.prayertimes.notifications.NotificationPreferences(prefs)
+    }
 
     override fun onCreate() {
         super.onCreate()
