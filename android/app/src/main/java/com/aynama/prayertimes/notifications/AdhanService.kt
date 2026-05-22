@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import com.aynama.prayertimes.AynamaApplication
 
 class AdhanService : Service() {
 
@@ -27,6 +28,13 @@ class AdhanService : Service() {
         } else {
             startForeground(NotificationHelper.ADHAN_SERVICE_NOTIF_ID, notification)
         }
+        val voice = (applicationContext as AynamaApplication).notificationPreferences.adhanVoice
+        if (voice == AdhanVoice.NONE) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        // TODO(Phase 6c): map voice → bundled adhan asset. Placeholder is the system
+        // default notification ringtone for any non-NONE selection.
         val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
         ringtone = RingtoneManager.getRingtone(this, soundUri)
         ringtone?.play()
