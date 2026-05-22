@@ -25,6 +25,12 @@ const val PRAYER_INDEX_MAGHRIB = 3
 const val PRAYER_INDEX_ISHA = 4
 const val PRAYER_INDEX_IMSAK = 5
 
+// Early reminder alarms use prayerIndex + EARLY_REMINDER_BASE_INDEX as their slot.
+// Slots 0–5: regular prayers + imsak; slots 10–14: early reminders for prayers 0–4.
+// Multiplier 20 avoids collisions across profiles.
+const val EARLY_REMINDER_BASE_INDEX = 10
+internal const val REQUEST_CODE_MULTIPLIER = 20
+
 private const val MIDNIGHT_REQUEST_CODE = 9999
 
 val PRAYER_NAMES = mapOf(
@@ -40,22 +46,45 @@ data class ScheduledAlarm(
     val requestCode: Int,
     val triggerEpochMs: Long,
     val prayerName: String,
+    val isEarlyReminder: Boolean = false,
 )
+
+// Pure function — tested without Android runtime.
+// savedProfileId: value of NotificationPreferences.notificationProfileId (-1 = unset).
+fun resolveNotificationProfile(savedProfileId: Long, profiles: List<Profile>): Profile? {
+    if (profiles.isEmpty()) return null
+    if (savedProfileId >= 0) {
+        val match = profiles.firstOrNull { it.id == savedProfileId }
+        if (match != null) return match
+    }
+    return profiles.minByOrNull { it.sortOrder }
+}
 
 object AlarmScheduler {
 
     private val adhan = AdhanWrapper()
 
     fun scheduleAll(context: Context, profiles: List<Profile>) {
-        val date = LocalDate.now()
-        profiles.forEach { scheduleForProfile(context, it, date) }
-        scheduleMidnightReschedule(context)
-    }
-
-    fun scheduleForProfile(context: Context, profile: Profile, date: LocalDate = LocalDate.now()) {
         val notifPrefs = NotificationPreferences(
             context.getSharedPreferences("aynama_prefs", android.content.Context.MODE_PRIVATE)
         )
+        // Cancel all profiles first, then schedule only the notification profile
+        profiles.forEach { cancelForProfile(context, it.id) }
+        val profile = resolveNotificationProfile(notifPrefs.notificationProfileId, profiles)
+        if (profile != null) {
+            scheduleForProfile(context, profile, LocalDate.now(), notifPrefs)
+        }
+        scheduleMidnightReschedule(context)
+    }
+
+    fun scheduleForProfile(
+        context: Context,
+        profile: Profile,
+        date: LocalDate = LocalDate.now(),
+        notifPrefs: NotificationPreferences = NotificationPreferences(
+            context.getSharedPreferences("aynama_prefs", android.content.Context.MODE_PRIVATE)
+        ),
+    ) {
         cancelForProfile(context, profile.id)
         val times = adhan.getPrayerTimes(
             latitude = profile.latitude,
@@ -65,14 +94,19 @@ object AlarmScheduler {
             method = profile.calculationMethod,
         )
         val isRamadan = RamadanDetector.isRamadan(date)
+        val pid = profile.id
         val alarms = buildAlarmSchedule(
             profile = profile,
             date = date,
             isRamadan = isRamadan,
             times = times,
             masterEnabled = notifPrefs.masterEnabled,
-            prayerEnabled = { index -> notifPrefs.isPrayerEnabled(index) },
+            prayerEnabled = { index -> notifPrefs.isPrayerEnabled(pid, index) },
             imsakEnabled = notifPrefs.imsakEnabled,
+            prayerOffset = { index -> notifPrefs.getPrayerOffset(pid, index) },
+            earlyReminderMinutes = { index -> notifPrefs.getPrayerEarlyReminder(pid, index) },
+            alertMode = { index -> notifPrefs.getAlertMode(pid, index) },
+            fixedTimeMinutes = { index -> notifPrefs.getFixedTimeMinutes(pid, index) },
         )
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         val now = System.currentTimeMillis()
@@ -84,9 +118,9 @@ object AlarmScheduler {
 
     fun cancelForProfile(context: Context, profileId: Long) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
-        for (index in 0..9) {
+        for (index in 0 until REQUEST_CODE_MULTIPLIER) {
             val intent = Intent(context, PrayerAlarmReceiver::class.java)
-            val requestCode = (profileId * 10 + index).toInt()
+            val requestCode = (profileId * REQUEST_CODE_MULTIPLIER + index).toInt()
             val pi = PendingIntent.getBroadcast(
                 context, requestCode, intent,
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
@@ -133,8 +167,8 @@ object AlarmScheduler {
         }
     }
 
-    private fun profileIdFromRequestCode(code: Int): Long = (code / 10).toLong()
-    private fun prayerIndexFromRequestCode(code: Int): Int = code % 10
+    private fun profileIdFromRequestCode(code: Int): Long = (code / REQUEST_CODE_MULTIPLIER).toLong()
+    private fun prayerIndexFromRequestCode(code: Int): Int = code % REQUEST_CODE_MULTIPLIER
 }
 
 // Pure function — tested without Android runtime
@@ -146,6 +180,10 @@ fun buildAlarmSchedule(
     masterEnabled: Boolean = true,
     prayerEnabled: (Int) -> Boolean = { true },
     imsakEnabled: Boolean = true,
+    prayerOffset: (Int) -> Int = { 0 },
+    earlyReminderMinutes: (Int) -> Int = { 0 },
+    alertMode: (Int) -> AlertTimeMode = { AlertTimeMode.OFFSET },
+    fixedTimeMinutes: (Int) -> Int = { -1 },
 ): List<ScheduledAlarm> {
     if (!masterEnabled) return emptyList()
     val asr = if (profile.asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
@@ -159,16 +197,34 @@ fun buildAlarmSchedule(
     return buildList {
         for ((index, time) in prayers) {
             if (!prayerEnabled(index)) continue
+            val effectiveTime = when {
+                alertMode(index) == AlertTimeMode.FIXED -> {
+                    val minsOfDay = fixedTimeMinutes(index)
+                    if (minsOfDay >= 0) LocalTime.of(minsOfDay / 60, minsOfDay % 60)
+                    else time.plusMinutes(prayerOffset(index).toLong())
+                }
+                else -> time.plusMinutes(prayerOffset(index).toLong())
+            }
             add(ScheduledAlarm(
-                requestCode = (profile.id * 10 + index).toInt(),
-                triggerEpochMs = localTimeToEpochMs(time, date),
+                requestCode = (profile.id * REQUEST_CODE_MULTIPLIER + index).toInt(),
+                triggerEpochMs = localTimeToEpochMs(effectiveTime, date),
                 prayerName = PRAYER_NAMES[index]!!,
             ))
+            val earlyMinutes = earlyReminderMinutes(index)
+            if (earlyMinutes > 0) {
+                val earlyTime = effectiveTime.minusMinutes(earlyMinutes.toLong())
+                add(ScheduledAlarm(
+                    requestCode = (profile.id * REQUEST_CODE_MULTIPLIER + index + EARLY_REMINDER_BASE_INDEX).toInt(),
+                    triggerEpochMs = localTimeToEpochMs(earlyTime, date),
+                    prayerName = PRAYER_NAMES[index]!!,
+                    isEarlyReminder = true,
+                ))
+            }
         }
         if (isRamadan && imsakEnabled) {
             val imsak = times.fajr.minusMinutes(10)
             add(ScheduledAlarm(
-                requestCode = (profile.id * 10 + PRAYER_INDEX_IMSAK).toInt(),
+                requestCode = (profile.id * REQUEST_CODE_MULTIPLIER + PRAYER_INDEX_IMSAK).toInt(),
                 triggerEpochMs = localTimeToEpochMs(imsak, date),
                 prayerName = "Imsak",
             ))

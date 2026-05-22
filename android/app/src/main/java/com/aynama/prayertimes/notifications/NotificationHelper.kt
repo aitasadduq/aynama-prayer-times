@@ -76,6 +76,23 @@ object NotificationHelper {
         nm.notify(notificationId, notification)
     }
 
+    fun showEarlyReminderNotification(
+        context: Context,
+        prayerName: String,
+        minutesBefore: Int,
+        notificationId: Int,
+    ) {
+        val nm = context.getSystemService(NotificationManager::class.java)
+        val notification = NotificationCompat.Builder(context, CHANNEL_PRAYER_TIMES)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(prayerName)
+            .setContentText("$prayerName in $minutesBefore minutes")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+        nm.notify(notificationId, notification)
+    }
+
     fun buildAdhanServiceNotification(context: Context): Notification =
         NotificationCompat.Builder(context, CHANNEL_ADHAN_SERVICE)
             .setSmallIcon(R.drawable.ic_notification)
