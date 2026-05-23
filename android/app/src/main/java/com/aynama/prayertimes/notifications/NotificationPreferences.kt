@@ -78,6 +78,25 @@ class NotificationPreferences(private val prefs: SharedPreferences) {
     fun setFixedTimeMinutes(profileId: Long, prayerIndex: Int, minutesOfDay: Int) =
         prefs.edit().putInt(fixedTimeKey(profileId, prayerIndex), minutesOfDay).apply()
 
+    fun migrateFromV1(profileId: Long) {
+        if (prefs.getBoolean(KEY_V1_MIGRATED, false)) return
+        val oldKeys = mapOf(
+            0 to "notif_fajr_enabled",
+            1 to "notif_dhuhr_enabled",
+            2 to "notif_asr_enabled",
+            3 to "notif_maghrib_enabled",
+            4 to "notif_isha_enabled",
+        )
+        val edit = prefs.edit()
+        oldKeys.forEach { (index, oldKey) ->
+            if (prefs.contains(oldKey)) {
+                edit.putBoolean(prayerKey(profileId, index), prefs.getBoolean(oldKey, true))
+                edit.remove(oldKey)
+            }
+        }
+        edit.putBoolean(KEY_V1_MIGRATED, true).apply()
+    }
+
     private fun prayerKey(profileId: Long, index: Int): String = "notif_prayer_${profileId}_$index"
     private fun offsetKey(profileId: Long, index: Int): String = "notif_offset_${profileId}_$index"
     private fun earlyReminderKey(profileId: Long, index: Int): String = "notif_early_${profileId}_$index"
@@ -90,5 +109,6 @@ class NotificationPreferences(private val prefs: SharedPreferences) {
         private const val KEY_IMSAK = "notif_imsak_enabled"
         private const val KEY_ADHAN_VOICE = "notif_adhan_voice"
         private const val KEY_VIBRATION = "notif_vibration"
+        private const val KEY_V1_MIGRATED = "notif_v1_migrated"
     }
 }

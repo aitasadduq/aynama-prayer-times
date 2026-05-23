@@ -188,6 +188,7 @@ class NotificationSettingsViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             val profiles = repo.observeAll().first()
             val notificationProfile = resolveNotificationProfile(prefs.notificationProfileId, profiles) ?: return@launch
+            prefs.migrateFromV1(notificationProfile.id)
             val date = LocalDate.now()
             val isRamadan = RamadanDetector.isRamadan(date)
             val times = AdhanWrapper().getPrayerTimes(

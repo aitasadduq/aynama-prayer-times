@@ -24,7 +24,9 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
         if (isEarlyReminder) {
             val minutesBefore = prefs.getPrayerEarlyReminder(profileId, prayerIndex)
             NotificationHelper.showEarlyReminderNotification(context, prayerName, minutesBefore, notificationId)
-            NotificationHelper.vibrateForPrayer(context)
+            if (NotificationHelper.shouldVibrate(prefs.vibration, prefs.adhanVoice)) {
+                NotificationHelper.vibrateForPrayer(context)
+            }
             return
         }
 

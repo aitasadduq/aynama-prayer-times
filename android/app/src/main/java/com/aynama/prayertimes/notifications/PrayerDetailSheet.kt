@@ -1,5 +1,6 @@
 package com.aynama.prayertimes.notifications
 
+import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -144,7 +145,7 @@ fun PrayerDetailSheet(
             // ALERT TIME section header
             Text(
                 text = "ALERT TIME",
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = InkMuted,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -157,12 +158,6 @@ fun PrayerDetailSheet(
                 value = formatOffset(row.offset),
                 isActive = row.alertMode == AlertTimeMode.OFFSET,
                 onClick = { showOffsetPicker = true },
-            )
-
-            HorizontalDivider(
-                color = ParchmentMuted,
-                thickness = 0.5.dp,
-                modifier = Modifier.padding(start = 60.dp),
             )
 
             // Fixed time row
@@ -327,10 +322,11 @@ private fun TimePickerDialog(
     onConfirm: (TimePickerState) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     val timePickerState = rememberTimePickerState(
         initialHour = initialHour,
         initialMinute = initialMinute,
-        is24Hour = false,
+        is24Hour = DateFormat.is24HourFormat(context),
     )
     AlertDialog(
         onDismissRequest = onDismiss,
