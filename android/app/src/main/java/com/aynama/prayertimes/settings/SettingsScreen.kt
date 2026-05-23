@@ -246,7 +246,7 @@ private fun ProfileFormSheet(
     var locationLng by remember { mutableStateOf(initial?.longitude) }
     var locationLabel by remember { mutableStateOf("") }
     var locationTimezone by remember { mutableStateOf(initial?.timezone ?: "") }
-    var useLocationTimezone by remember { mutableStateOf(initial?.useLocationTimezone ?: false) }
+    var useLocationTimezone by remember { mutableStateOf(initial?.useLocationTimezone ?: true) }
 
     LaunchedEffect(Unit) {
         if (initial != null) {

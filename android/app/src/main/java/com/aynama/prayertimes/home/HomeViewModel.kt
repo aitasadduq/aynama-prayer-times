@@ -162,14 +162,18 @@ class HomeViewModel(
         hijriYear: Int,
         dismissedYear: Int,
     ): ProfileUiState {
+        val effectiveNow = if (profile.useLocationTimezone && profile.timezone.isNotBlank())
+            LocalTime.now(profile.effectiveZoneId())
+        else
+            now
         val ramadan = RamadanDetector.isRamadan(today)
         return ProfileUiState(
             profile = profile,
-            ribbonRows = deriveRibbonRows(times, profile.asrMadhab, now, ramadan, timeFormatter),
-            countdownText = deriveCountdown(times, profile.asrMadhab, now),
-            nextPrayerName = deriveNextPrayerName(times, profile.asrMadhab, now),
-            nextPrayerTime = deriveNextPrayerTime(times, profile.asrMadhab, now, timeFormatter),
-            currentPhase = derivePhase(times, profile.asrMadhab, now),
+            ribbonRows = deriveRibbonRows(times, profile.asrMadhab, effectiveNow, ramadan, timeFormatter),
+            countdownText = deriveCountdown(times, profile.asrMadhab, effectiveNow),
+            nextPrayerName = deriveNextPrayerName(times, profile.asrMadhab, effectiveNow),
+            nextPrayerTime = deriveNextPrayerTime(times, profile.asrMadhab, effectiveNow, timeFormatter),
+            currentPhase = derivePhase(times, profile.asrMadhab, effectiveNow),
             isRamadan = ramadan,
             showRamadanBanner = ramadan && dismissedYear != hijriYear,
             outstandingQazaCount = qazaCount,
