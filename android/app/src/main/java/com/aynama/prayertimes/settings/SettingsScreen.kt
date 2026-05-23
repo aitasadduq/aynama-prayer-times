@@ -250,9 +250,21 @@ private fun ProfileFormSheet(
 
     LaunchedEffect(Unit) {
         if (initial != null) {
-            locationLabel = withContext(Dispatchers.IO) {
-                reverseGeocode(context, initial.latitude, initial.longitude)
-            } ?: "${initial.latitude.formatCoord()}, ${initial.longitude.formatCoord()}"
+            withContext(Dispatchers.IO) {
+                val address = reverseGeocodeAddress(context, initial.latitude, initial.longitude)
+                val label = address?.let { buildCityLabel(it) }
+                    ?: "${initial.latitude.formatCoord()}, ${initial.longitude.formatCoord()}"
+                val tz = when {
+                    initial.timezone.isNotBlank() -> initial.timezone
+                    initial.isGps -> ZoneId.systemDefault().id
+                    address != null -> detectTimezoneForCountry(address.countryCode)
+                    else -> ""
+                }
+                label to tz
+            }.also { (label, tz) ->
+                locationLabel = label
+                if (locationTimezone.isBlank()) locationTimezone = tz
+            }
         }
     }
 
@@ -598,11 +610,11 @@ private fun buildCityLabel(address: Address): String {
 }
 
 @Suppress("DEPRECATION")
-private fun reverseGeocode(context: android.content.Context, lat: Double, lng: Double): String? {
+private fun reverseGeocodeAddress(context: android.content.Context, lat: Double, lng: Double): Address? {
     if (!Geocoder.isPresent()) return null
     return try {
         val geocoder = Geocoder(context)
-        val result = if (Build.VERSION.SDK_INT >= 33) {
+        if (Build.VERSION.SDK_INT >= 33) {
             val latch = java.util.concurrent.CountDownLatch(1)
             var addr: Address? = null
             geocoder.getFromLocation(lat, lng, 1) { list ->
@@ -613,12 +625,14 @@ private fun reverseGeocode(context: android.content.Context, lat: Double, lng: D
             addr
         } else {
             geocoder.getFromLocation(lat, lng, 1)?.firstOrNull()
-        } ?: return null
-        buildCityLabel(result)
+        }
     } catch (_: Exception) {
         null
     }
 }
+
+private fun reverseGeocode(context: android.content.Context, lat: Double, lng: Double): String? =
+    reverseGeocodeAddress(context, lat, lng)?.let { buildCityLabel(it) }
 
 @Suppress("DEPRECATION")
 private fun searchCity(context: android.content.Context, query: String): List<Address> {
