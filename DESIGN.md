@@ -699,7 +699,7 @@ Each profile stores a location (GPS or city search). When a user travels and kee
 
 **Auto-detection rules:**
 - GPS profile: `ZoneId.systemDefault().id` (device is physically at the location).
-- City search: use `android.icu.util.TimeZone.getAvailableIDs(countryCode)` on the Geocoder result. Store the timezone only when exactly one ID is returned (single-timezone country). Leave blank otherwise — do not guess for multi-zone countries (US, RU, AU, CA, etc.).
+- City search: use `android.icu.util.TimeZone.getAvailableIDs(countryCode)` to get the country's timezone list. If exactly one zone, use it directly. If multiple zones, pick the one whose `rawOffset` is closest to `longitude / 15 × 3 600 000 ms` — the longitude-based approximation is accurate for nearly all major cities when constrained to the correct country.
 
 ### Profile edit sheet placement
 

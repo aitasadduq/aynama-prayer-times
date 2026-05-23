@@ -257,7 +257,7 @@ private fun ProfileFormSheet(
                 val tz = when {
                     initial.timezone.isNotBlank() -> initial.timezone
                     initial.isGps -> ZoneId.systemDefault().id
-                    address != null -> detectTimezoneForCountry(address.countryCode)
+                    address != null -> detectTimezoneForLocation(address.countryCode, initial.longitude)
                     else -> ""
                 }
                 label to tz
@@ -447,7 +447,7 @@ private fun LocationSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                val tz = detectTimezoneForCountry(address.countryCode)
+                                val tz = detectTimezoneForLocation(address.countryCode, address.longitude)
                                 onLocationSelected(address.latitude, address.longitude, cityLabel, tz)
                                 isSearching = false
                                 query = ""
@@ -591,11 +591,18 @@ private fun LocationTimezoneToggle(
     }
 }
 
-private fun detectTimezoneForCountry(countryCode: String?): String {
+private fun detectTimezoneForLocation(countryCode: String?, longitude: Double): String {
     if (countryCode.isNullOrBlank()) return ""
     return try {
         val ids = android.icu.util.TimeZone.getAvailableIDs(countryCode)
-        if (ids.size == 1) ids[0] else ""
+        if (ids.isEmpty()) return ""
+        if (ids.size == 1) return ids[0]
+        // Longitude gives an approximate raw UTC offset. Within the country's timezone list
+        // this is accurate enough to resolve the correct zone for nearly all major cities.
+        val approxOffsetMs = (longitude / 15.0 * 3_600_000).toInt()
+        ids.minByOrNull { id ->
+            kotlin.math.abs(android.icu.util.TimeZone.getTimeZone(id).rawOffset - approxOffsetMs)
+        } ?: ids[0]
     } catch (_: Exception) {
         ""
     }
