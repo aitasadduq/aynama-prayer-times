@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.shared.AdhanWrapper
+import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Prayer
@@ -78,7 +79,15 @@ class HomeViewModel(
 ) : ViewModel() {
 
     private val adhan = AdhanWrapper()
-    private val prayerTimesCache = mutableMapOf<Long, Pair<LocalDate, PrayerTimesResult>>()
+
+    private data class PrayerCacheKey(
+        val profileId: Long,
+        val date: LocalDate,
+        val latitude: Double,
+        val longitude: Double,
+        val method: CalculationMethodKey,
+    )
+    private val prayerTimesCache = mutableMapOf<PrayerCacheKey, PrayerTimesResult>()
     private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -129,17 +138,16 @@ class HomeViewModel(
     }
 
     private fun cachedPrayerTimes(profile: Profile, today: LocalDate): PrayerTimesResult {
-        val cached = prayerTimesCache[profile.id]
-        if (cached != null && cached.first == today) return cached.second
-        val result = adhan.getPrayerTimes(
-            latitude = profile.latitude,
-            longitude = profile.longitude,
-            date = today,
-            timezone = ZoneId.systemDefault(),
-            method = profile.calculationMethod,
-        )
-        prayerTimesCache[profile.id] = today to result
-        return result
+        val key = PrayerCacheKey(profile.id, today, profile.latitude, profile.longitude, profile.calculationMethod)
+        return prayerTimesCache.getOrPut(key) {
+            adhan.getPrayerTimes(
+                latitude = profile.latitude,
+                longitude = profile.longitude,
+                date = today,
+                timezone = ZoneId.systemDefault(),
+                method = profile.calculationMethod,
+            )
+        }
     }
 
     private fun buildProfileUiState(
