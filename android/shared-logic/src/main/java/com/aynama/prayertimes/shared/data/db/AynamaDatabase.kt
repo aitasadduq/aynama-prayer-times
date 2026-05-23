@@ -26,7 +26,7 @@ abstract class AynamaDatabase : RoomDatabase() {
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE profiles ADD COLUMN timezone TEXT NOT NULL DEFAULT ''")
-                db.execSQL("ALTER TABLE profiles ADD COLUMN use_location_timezone INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE profiles ADD COLUMN useLocationTimezone INTEGER NOT NULL DEFAULT 0")
             }
         }
 
