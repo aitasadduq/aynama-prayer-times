@@ -11,14 +11,26 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_PRAYER_ALARM) return
         val profileId = intent.getLongExtra(EXTRA_PROFILE_ID, -1L)
-        val prayerIndex = intent.getIntExtra(EXTRA_PRAYER_INDEX, -1)
-        if (profileId < 0 || prayerIndex < 0) return
+        val rawIndex = intent.getIntExtra(EXTRA_PRAYER_INDEX, -1)
+        if (profileId < 0 || rawIndex < 0) return
 
+        val isEarlyReminder = rawIndex >= EARLY_REMINDER_BASE_INDEX
+        val prayerIndex = if (isEarlyReminder) rawIndex - EARLY_REMINDER_BASE_INDEX else rawIndex
         val prayerName = PRAYER_NAMES[prayerIndex] ?: return
-        val notificationId = (profileId * 10 + prayerIndex).toInt()
-        NotificationHelper.showPrayerNotification(context, prayerName, notificationId)
+        val notificationId = (profileId * REQUEST_CODE_MULTIPLIER + rawIndex).toInt()
 
         val prefs = (context.applicationContext as AynamaApplication).notificationPreferences
+
+        if (isEarlyReminder) {
+            val minutesBefore = prefs.getPrayerEarlyReminder(profileId, prayerIndex)
+            NotificationHelper.showEarlyReminderNotification(context, prayerName, minutesBefore, notificationId)
+            if (NotificationHelper.shouldVibrate(prefs.vibration, prefs.adhanVoice)) {
+                NotificationHelper.vibrateForPrayer(context)
+            }
+            return
+        }
+
+        NotificationHelper.showPrayerNotification(context, prayerName, notificationId)
         if (NotificationHelper.shouldVibrate(prefs.vibration, prefs.adhanVoice)) {
             NotificationHelper.vibrateForPrayer(context)
         }

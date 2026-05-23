@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
+import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +28,10 @@ data class PrayerRowData(
     val name: String,
     val time: String,
     val enabled: Boolean,
+    val offset: Int = 0,
+    val earlyReminder: Int = 0,
+    val alertMode: AlertTimeMode = AlertTimeMode.OFFSET,
+    val fixedTimeMinutes: Int = -1,
 )
 
 data class NotificationSettingsUiState(
@@ -36,6 +42,10 @@ data class NotificationSettingsUiState(
     val adhanVoice: AdhanVoice = AdhanVoice.MAKKAH,
     val vibration: VibrationMode = VibrationMode.WITH_SOUND,
     val isRamadan: Boolean = false,
+    val selectedPrayerIndex: Int? = null,
+    val profiles: List<Profile> = emptyList(),
+    val notificationProfile: Profile? = null,
+    val showProfilePicker: Boolean = false,
 )
 
 class NotificationSettingsViewModel(
@@ -67,7 +77,8 @@ class NotificationSettingsViewModel(
     }
 
     fun setPrayerEnabled(index: Int, enabled: Boolean) {
-        prefs.setPrayerEnabled(index, enabled)
+        val pid = currentProfileId() ?: return
+        prefs.setPrayerEnabled(pid, index, enabled)
         _state.update { state ->
             state.copy(prayerRows = state.prayerRows.map { row ->
                 if (row.index == index) row.copy(enabled = enabled) else row
@@ -92,6 +103,75 @@ class NotificationSettingsViewModel(
         _state.update { it.copy(adhanVoice = voice) }
     }
 
+    fun openPrayerDetail(index: Int) {
+        _state.update { it.copy(selectedPrayerIndex = index) }
+    }
+
+    fun closePrayerDetail() {
+        _state.update { it.copy(selectedPrayerIndex = null) }
+        rescheduleAll()
+    }
+
+    fun setPrayerOffset(index: Int, minutes: Int) {
+        val pid = currentProfileId() ?: return
+        prefs.setPrayerOffset(pid, index, minutes)
+        _state.update { state ->
+            state.copy(prayerRows = state.prayerRows.map { row ->
+                if (row.index == index) row.copy(offset = minutes) else row
+            })
+        }
+    }
+
+    fun setPrayerEarlyReminder(index: Int, minutes: Int) {
+        val pid = currentProfileId() ?: return
+        prefs.setPrayerEarlyReminder(pid, index, minutes)
+        _state.update { state ->
+            state.copy(prayerRows = state.prayerRows.map { row ->
+                if (row.index == index) row.copy(earlyReminder = minutes) else row
+            })
+        }
+    }
+
+    fun setAlertMode(index: Int, mode: AlertTimeMode) {
+        val pid = currentProfileId() ?: return
+        prefs.setAlertMode(pid, index, mode)
+        _state.update { state ->
+            state.copy(prayerRows = state.prayerRows.map { row ->
+                if (row.index == index) row.copy(alertMode = mode) else row
+            })
+        }
+    }
+
+    fun setFixedTime(index: Int, minutesOfDay: Int) {
+        val pid = currentProfileId() ?: return
+        prefs.setFixedTimeMinutes(pid, index, minutesOfDay)
+        prefs.setAlertMode(pid, index, AlertTimeMode.FIXED)
+        _state.update { state ->
+            state.copy(prayerRows = state.prayerRows.map { row ->
+                if (row.index == index) row.copy(fixedTimeMinutes = minutesOfDay, alertMode = AlertTimeMode.FIXED) else row
+            })
+        }
+        rescheduleAll()
+    }
+
+    fun openProfilePicker() {
+        _state.update { it.copy(showProfilePicker = true) }
+    }
+
+    fun closeProfilePicker() {
+        _state.update { it.copy(showProfilePicker = false) }
+    }
+
+    fun setNotificationProfile(profileId: Long) {
+        prefs.notificationProfileId = profileId
+        val profile = _state.value.profiles.firstOrNull { it.id == profileId }
+        _state.update { it.copy(notificationProfile = profile, showProfilePicker = false) }
+        loadPrayerTimes()
+        rescheduleAll()
+    }
+
+    private fun currentProfileId(): Long? = _state.value.notificationProfile?.id
+
     private fun loadPrefs() {
         _state.update {
             it.copy(
@@ -107,17 +187,18 @@ class NotificationSettingsViewModel(
     private fun loadPrayerTimes() {
         viewModelScope.launch(Dispatchers.IO) {
             val profiles = repo.observeAll().first()
-            val firstProfile = profiles.minByOrNull { it.sortOrder } ?: return@launch
+            val notificationProfile = resolveNotificationProfile(prefs.notificationProfileId, profiles) ?: return@launch
+            prefs.migrateFromV1(notificationProfile.id)
             val date = LocalDate.now()
             val isRamadan = RamadanDetector.isRamadan(date)
             val times = AdhanWrapper().getPrayerTimes(
-                latitude = firstProfile.latitude,
-                longitude = firstProfile.longitude,
+                latitude = notificationProfile.latitude,
+                longitude = notificationProfile.longitude,
                 date = date,
-                timezone = ZoneId.systemDefault(),
-                method = firstProfile.calculationMethod,
+                timezone = notificationProfile.effectiveZoneId(),
+                method = notificationProfile.calculationMethod,
             )
-            val asr = if (firstProfile.asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
+            val asr = if (notificationProfile.asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
             val prayerEntries = listOf(
                 PRAYER_INDEX_FAJR to times.fajr,
                 PRAYER_INDEX_DHUHR to times.dhuhr,
@@ -125,15 +206,29 @@ class NotificationSettingsViewModel(
                 PRAYER_INDEX_MAGHRIB to times.maghrib,
                 PRAYER_INDEX_ISHA to times.isha,
             )
+            val pid = notificationProfile.id
             _state.update { state ->
                 state.copy(
                     isRamadan = isRamadan,
+                    profiles = profiles,
+                    notificationProfile = notificationProfile,
                     prayerRows = prayerEntries.map { (index, time) ->
+                        val mode = prefs.getAlertMode(pid, index)
+                        val fixedMins = prefs.getFixedTimeMinutes(pid, index)
+                        val displayTime = if (mode == AlertTimeMode.FIXED && fixedMins >= 0) {
+                            java.time.LocalTime.of(fixedMins / 60, fixedMins % 60).format(TIME_FMT)
+                        } else {
+                            time.plusMinutes(prefs.getPrayerOffset(pid, index).toLong()).format(TIME_FMT)
+                        }
                         PrayerRowData(
                             index = index,
                             name = PRAYER_NAMES[index]!!,
-                            time = time.format(TIME_FMT),
-                            enabled = prefs.isPrayerEnabled(index),
+                            time = displayTime,
+                            enabled = prefs.isPrayerEnabled(pid, index),
+                            offset = prefs.getPrayerOffset(pid, index),
+                            earlyReminder = prefs.getPrayerEarlyReminder(pid, index),
+                            alertMode = mode,
+                            fixedTimeMinutes = fixedMins,
                         )
                     },
                 )

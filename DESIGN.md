@@ -404,19 +404,47 @@ Notifications is a utilitarian screen: stable parchment surface, no time-of-day 
 ```
 Notifications
 ├── [Master toggle row]
-├── PRAYERS
-│   ├── Fajr      04:21  [toggle]  [›]
-│   ├── Sunrise   06:02  [toggle]  [›]
-│   ├── Dhuhr     12:47  [toggle]  [›]
-│   ├── Asr       15:33  [toggle]  [›]
-│   ├── Maghrib   18:11  [toggle]  [›]
-│   └── Isha      19:42  [toggle]  [›]
-├── ADHAN
-│   └── Adhan voice       [Makkah  ›]
-└── OTHER
-    ├── Ramadan Imsak      [toggle]
-    └── Vibration          [With sound  ›]
+└── (when master on)
+    ├── [Profile row]          Alerts for   London  ›
+    ├── PRAYERS
+    │   ├── Fajr      04:21  [toggle]  [›]
+    │   ├── Dhuhr     12:47  [toggle]  [›]
+    │   ├── Asr       15:33  [toggle]  [›]
+    │   ├── Maghrib   18:11  [toggle]  [›]
+    │   └── Isha      19:42  [toggle]  [›]
+    ├── ADHAN
+    │   └── Adhan voice       [Makkah  ›]
+    └── OTHER
+        ├── Ramadan Imsak      [toggle]
+        └── Vibration          [With sound  ›]
 ```
+
+---
+
+### Profile Row
+
+Appears immediately below the master toggle, only when the master toggle is on. Hidden when master is off. Lets the user pick which location profile the notification alarms are scoped to. The label "Alerts for" is intentional — it communicates that the entire alert system applies to exactly one profile at a time.
+
+**Row anatomy** (56pt):
+
+```
+Alerts for                                 London  ›
+```
+
+- **Label:** IBM Plex `body`, `ink` — "Alerts for"
+- **Current value:** IBM Plex `body-sm`, `ink-muted`, right of chevron — the profile name
+- **Chevron:** `ink-muted`
+
+Tapping opens the **Profile Picker Sheet** — a `ModalBottomSheet` listing all profiles. The active profile has a saffron checkmark on the right. No radio indicator; checkmark is the convention for single-select lists in this context.
+
+**Profile Picker Sheet:**
+
+- Title: "Profile" — Fraunces `headline` (`headlineMedium`), `ink`, 24pt left, 8pt vertical padding
+- Rows (56pt each): IBM Plex `body`, `ink` for name; saffron checkmark icon on right when selected
+- Dividers: `parchment-muted`, 0.5pt, 24pt left inset between rows
+- Selection is immediate — sheet auto-dismisses on tap
+
+**Profile-scoped settings:** per-prayer toggles, offsets, early reminders, alert modes, and fixed times are all stored independently per profile. Switching profiles loads that profile's saved settings. Global settings (master toggle, adhan voice, vibration, Imsak toggle) are NOT profile-scoped — they apply regardless of which profile is selected.
 
 ---
 
@@ -519,11 +547,17 @@ Presented as a bottom sheet that expands to ~60% screen height. Not a full navig
 | Row | Label | Control |
 |---|---|---|
 | Alert | "Send alert" | Toggle (saffron on) |
-| Time offset | "Time offset" | Current value `›` |
+| Alert time — Offset | "Offset" | Radio + current value `›` |
+| Alert time — Fixed | "Fixed time" | Radio + current value `›` |
 | Early reminder | "Early reminder" | Current value `›` |
 | Preview | — | Saffron text button |
 
-**Time offset picker:** -15 / -10 / -5 / 0 (On time) / +5 / +10 / +15 minutes. Default: 0. A wheel picker (iOS) or number picker (Android). Selected value displayed as "On time" or "−5 min" or "+10 min".
+**Alert time mode (two rows, visually grouped):** The user picks exactly one of two modes. Rows are rendered back-to-back with a `parchment-muted` section header "ALERT TIME" above them and no internal divider between the two rows. Each row carries a radio indicator (filled circle = active, empty circle = inactive) at the leading edge, colored `saffron` when selected and `ink-muted` when not. The active row label and value are `ink`; the inactive row label and value are `ink-muted`. Mode switches only on picker *confirm* — cancelling the picker leaves the mode unchanged.
+
+- **Offset mode (default):** Secondary label shows current offset value ("On time", "−5 min", "+10 min"). Tapping opens the offset picker sheet.
+- **Fixed time mode:** Secondary label shows chosen clock time ("6:00 AM") or "Not set" if no time has been selected. Tapping opens a Material3 `TimePicker` dialog (Android) / `DatePicker` in time mode (iOS). Selecting a time both saves it and activates Fixed mode. The chosen time controls when the alarm fires and the time displayed in the notification settings prayer row. Home-screen prayer ribbon always shows the calculated adhan time regardless of this setting.
+
+**Time offset picker:** -15 / -10 / -5 / 0 (On time) / +5 / +10 / +15 minutes. Default: 0. Selected value displayed as "On time" or "−5 min" or "+10 min".
 
 **Early reminder picker:** Off / 5 min before / 10 min before / 15 min before. Default: Off. When set, the system fires a separate silent notification (no adhan, vibration only) at the specified interval before the prayer time.
 
@@ -649,4 +683,48 @@ IBM Plex `body-sm`, ink-muted. Current week only. Not a streak counter — a des
 - No colored left-border on any row — including today (consistent with prayer ribbon list treatment).
 - No cards per row — flat list only.
 - No gamification copy. No "Great job!", "Keep it up!", or streak-reset warnings.
+
+---
+
+## 17. Profile Edit Sheet — Timezone Toggle
+
+### Context
+
+Each profile stores a location (GPS or city search). When a user travels and keeps a "London" profile, they may want to see London prayer times in London time — even while their device is on a different timezone. The timezone toggle addresses this.
+
+### Data model
+
+- `timezone: String` — IANA timezone ID auto-detected at profile creation (e.g. `"Europe/London"`). Blank when detection fails.
+- `useLocationTimezone: Boolean` — user-controlled toggle; `false` by default (device timezone).
+
+**Auto-detection rules:**
+- GPS profile: `ZoneId.systemDefault().id` (device is physically at the location).
+- City search: use `android.icu.util.TimeZone.getAvailableIDs(countryCode)` to get the country's timezone list. If exactly one zone, use it directly. If multiple zones, pick the one whose `rawOffset` is closest to `longitude / 15 × 3 600 000 ms` — the longitude-based approximation is accurate for nearly all major cities when constrained to the correct country.
+
+### Profile edit sheet placement
+
+The toggle appears in the profile edit/create bottom sheet, below the location row and above the calculation method picker. Only rendered when `timezone` is non-blank.
+
+```
+Location        London, UK          ›
+Use location time zone              [toggle]
+Calculation method  MWL             ›
+Asr school          Shafi'i         ›
+```
+
+- Row label: IBM Plex `body`, ink. "Use location time zone"
+- Sub-label (below row label, IBM Plex `body-sm`, ink-muted): the timezone ID in abbreviated human form, e.g. `"London time (GMT+1)"`. Derive from `ZoneId.of(timezone).getDisplayName(TextStyle.FULL, Locale.getDefault())`.
+- Toggle: platform-native. Enabled state: saffron track, parchment thumb. Disabled state: parchment-muted track.
+- When `timezone` is blank: do not render this row at all.
+
+### Disabled / unavailable state
+
+When timezone auto-detection failed (blank `timezone`), the row is hidden entirely. No ghost row, no "unknown" label. Silence is clearer than a disabled toggle with an unexplained subtitle.
+
+### Behavior
+
+- Default: toggle off — device timezone applies.
+- Toggle on: prayer times and alarm scheduling use `ZoneId.of(profile.timezone)`.
+- Toggle off: prayer times and alarm scheduling use `ZoneId.systemDefault()`.
+- The home screen ribbon, countdown, and alarm triggers all use the same resolved timezone (`profile.effectiveZoneId()`), so they stay consistent.
 - Sunrise is not a tracked prayer. Five indicators per row, not six.

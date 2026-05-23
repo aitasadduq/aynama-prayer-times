@@ -228,6 +228,30 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ---
 
+## From PR #17 — Phase 6c per-prayer detail, fixed-time mode, profile scoping (`/review` 2026-05-23)
+
+### Ask / Design
+
+- [ ] **[A5]** `android/app/src/main/java/com/aynama/prayertimes/notifications/NotificationSettingsScreen.kt` — `ProfilePickerSheet`'s selected-profile name is colored Saffron AND a checkmark is shown. Saffron name + checkmark is double-indicating; DESIGN.md convention for pickers (AdhanPicker, VibrationSheet) uses checkmark only. **Fix:** Drop the Saffron color on the selected name; keep only the Saffron checkmark to indicate selection. *(Origin: PR #17, /review 2026-05-23)*
+
+- [ ] **[A6]** `android/app/src/main/java/com/aynama/prayertimes/home/HomeViewModel.kt` — `prayerTimesCache: mutableMapOf<PrayerCacheKey, PrayerTimesResult>()` is unbounded and never evicts. Previous per-profile cache (Map keyed by `Long`) was naturally bounded by profile count; the new `PrayerCacheKey(profileId, date, lat, lng, method, timezone)` key accumulates one entry per unique date+location combo across the ViewModel's lifetime. **Fix:** Bound the cache — either `LinkedHashMap(16, 0.75f, true)` limited to N entries via `removeEldestEntry`, or evict keys whose date is not today on each cache access. A bound of 10 entries covers all realistic concurrent profiles + a few days of background recalculation. *(Origin: PR #17, /review 2026-05-23)*
+
+### Notes
+
+- [ ] **[N1]** `android/app/src/main/java/com/aynama/prayertimes/notifications/NotificationSettingsScreen.kt` — Developer comments left in the vibration/prayer-index wiring block: `// Vibration sheet — keep local state since we replaced the onClick placeholder above` and `// Actually wire vibration properly:` precede `val selectedIndex = state.selectedPrayerIndex`. Dead commentary. **Fix:** Remove the two comment lines. *(Origin: PR #17, /review 2026-05-23)*
+
+- [ ] **[N2]** `android/app/src/main/java/com/aynama/prayertimes/notifications/PrayerDetailSheet.kt:274` — `val valueColor = if (isActive) InkMuted else InkMuted` — both branches produce the same value. Dead branch. **Fix:** Replace with `val valueColor = InkMuted`. *(Origin: PR #17, /review 2026-05-23)*
+
+- [ ] **[N3]** `android/app/src/main/java/com/aynama/prayertimes/notifications/PrayerDetailSheet.kt:102` — Prayer name header uses `displaySmall`; the TODOS.md note says the intended style is `display-md`. **Fix:** Align to the spec — change `displaySmall` to `displayMedium` (or the equivalent opsz token once M8 from PR #12 is resolved). *(Origin: PR #17, /review 2026-05-23)*
+
+- [ ] **[N4]** `android/app/src/main/java/com/aynama/prayertimes/notifications/AlarmScheduler.kt` — `cancelForProfile` iterates `0 until REQUEST_CODE_MULTIPLIER` (= 20) to cancel PendingIntents, but the highest slot actually used is 14 (early-reminder base index 10 + prayer index 4). The bound is a hard constant, not derived from `EARLY_REMINDER_BASE_INDEX + MAX_PRAYER_INDEX`. If slot layout changes, the cancel loop and the constant will drift silently. **Fix:** Replace the literal `20` upper bound with `EARLY_REMINDER_BASE_INDEX + PRAYER_NAMES.size` so the cancel range is always exactly the set of possible slots. *(Origin: PR #17, /review 2026-05-23)*
+
+- [ ] **[N5]** `android/app/src/main/java/com/aynama/prayertimes/notifications/AlarmScheduler.kt` — `REQUEST_CODE_MULTIPLIER` changed from 10 → 20 in this PR. Existing `PendingIntent`s registered with the old multiplier (10×profileId + index) are not cancelled by the new `cancelForProfile` (which cancels 20×profileId + rawIndex). Users who had alarms scheduled before this update will have ghost alarms firing in the OS until the device reboots or the OS expires them. **Fix:** On first run after upgrade, cancel the old request codes explicitly: iterate `for (rawIndex in 0 until 10)` with `OLD_MULTIPLIER = 10` and call `PendingIntent.cancel` on `profileId * 10 + rawIndex`. Guard with the same V1 migration flag used by `NotificationPreferences.migrateFromV1`. *(Origin: PR #17, /review 2026-05-23)*
+
+- [ ] **[N6]** `android/app/src/main/java/com/aynama/prayertimes/notifications/PrayerDetailSheet.kt:60-71` — `formatFixedTime` formats in 12h AM/PM unconditionally. If `is24Hour` is true for the device, the fixed-time display string on the main row (outside the picker) still shows 12h format, inconsistent with the now-corrected `TimePickerDialog`. **Fix:** Pass the 24h flag into `formatFixedTime` (or a new `formatFixedTime(minutesOfDay, is24Hour)` overload) and format accordingly: `"%d:%02d".format(h, m)` when 24h. *(Origin: PR #17, /review 2026-05-23)*
+
+---
+
 ## Workflow
 
 - When you address a finding, **delete its line** rather than checking it off — keeps the file scoped to open work.

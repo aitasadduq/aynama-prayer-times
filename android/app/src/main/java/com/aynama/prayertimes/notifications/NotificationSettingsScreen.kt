@@ -6,18 +6,19 @@ import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -49,7 +50,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aynama.prayertimes.AynamaApplication
-import com.aynama.prayertimes.ui.theme.Ink
+import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.ui.theme.InkMuted
 import com.aynama.prayertimes.ui.theme.Parchment
 import com.aynama.prayertimes.ui.theme.ParchmentMuted
@@ -67,6 +68,8 @@ fun NotificationSettingsScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    var showVibrationSheet by remember { mutableStateOf(false) }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -78,8 +81,6 @@ fun NotificationSettingsScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-
-    var showVibrationSheet by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -122,6 +123,15 @@ fun NotificationSettingsScreen(
             }
 
             if (state.masterEnabled) {
+                // Profile row — only shown when master is on
+                item {
+                    ProfileRow(
+                        profileName = state.notificationProfile?.name ?: "—",
+                        onClick = { vm.openProfilePicker() },
+                    )
+                    HorizontalDivider(color = ParchmentMuted, thickness = 0.5.dp)
+                }
+
                 // PRAYERS section
                 item { SectionHeader(title = "PRAYERS") }
 
@@ -132,6 +142,7 @@ fun NotificationSettingsScreen(
                             masterEnabled = true,
                             permissionGranted = state.permissionGranted,
                             onToggle = { vm.setPrayerEnabled(row.index, it) },
+                            onOpenDetail = { vm.openPrayerDetail(row.index) },
                             onOpenSettings = {
                                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                                     data = Uri.fromParts("package", context.packageName, null)
@@ -189,6 +200,127 @@ fun NotificationSettingsScreen(
                 showVibrationSheet = false
             },
             onDismiss = { showVibrationSheet = false },
+        )
+    }
+
+    if (state.showProfilePicker) {
+        ProfilePickerSheet(
+            profiles = state.profiles,
+            selectedProfileId = state.notificationProfile?.id,
+            onSelect = { vm.setNotificationProfile(it) },
+            onDismiss = { vm.closeProfilePicker() },
+        )
+    }
+
+    // Vibration sheet — keep local state since we replaced the onClick placeholder above
+    // Actually wire vibration properly:
+    val selectedIndex = state.selectedPrayerIndex
+    val selectedRow = selectedIndex?.let { idx -> state.prayerRows.find { it.index == idx } }
+    if (selectedRow != null) {
+        PrayerDetailSheet(
+            row = selectedRow,
+            onSetEnabled = { vm.setPrayerEnabled(selectedRow.index, it) },
+            onSetOffset = { vm.setPrayerOffset(selectedRow.index, it) },
+            onSetEarlyReminder = { vm.setPrayerEarlyReminder(selectedRow.index, it) },
+            onSetAlertMode = { vm.setAlertMode(selectedRow.index, it) },
+            onSetFixedTime = { vm.setFixedTime(selectedRow.index, it) },
+            onDismiss = { vm.closePrayerDetail() },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProfilePickerSheet(
+    profiles: List<Profile>,
+    selectedProfileId: Long?,
+    onSelect: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 48.dp),
+        ) {
+            Text(
+                text = "Profile",
+                style = MaterialTheme.typography.headlineMedium,
+                modifier = Modifier.padding(start = 24.dp, top = 8.dp, bottom = 8.dp, end = 24.dp),
+            )
+            profiles.forEachIndexed { i, profile ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clickable {
+                            scope.launch { sheetState.hide() }.invokeOnCompletion { onSelect(profile.id) }
+                        }
+                        .padding(horizontal = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = profile.name,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (profile.id == selectedProfileId) Saffron else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (profile.id == selectedProfileId) {
+                        Icon(
+                            Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = Saffron,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+                if (i < profiles.lastIndex) {
+                    HorizontalDivider(
+                        color = ParchmentMuted,
+                        thickness = 0.5.dp,
+                        modifier = Modifier.padding(start = 24.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileRow(
+    profileName: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "Alerts for",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = profileName,
+            style = MaterialTheme.typography.bodySmall,
+            color = InkMuted,
+            modifier = Modifier.padding(end = 4.dp),
+        )
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = InkMuted,
         )
     }
 }
@@ -253,6 +385,7 @@ private fun PrayerToggleRow(
     masterEnabled: Boolean,
     permissionGranted: Boolean,
     onToggle: (Boolean) -> Unit,
+    onOpenDetail: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     val nameColor = if (masterEnabled) MaterialTheme.colorScheme.onSurface else InkMuted
@@ -260,7 +393,7 @@ private fun PrayerToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .clickable(enabled = !permissionGranted) { onOpenSettings() }
+            .clickable { if (permissionGranted) onOpenDetail() else onOpenSettings() }
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -432,15 +565,13 @@ private fun VibrationSheet(
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(start = 24.dp, top = 8.dp, bottom = 8.dp, end = 24.dp),
             )
-            VibrationMode.entries.forEach { mode ->
+            VibrationMode.entries.forEachIndexed { i, mode ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
                         .clickable {
-                            scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                onSelect(mode)
-                            }
+                            scope.launch { sheetState.hide() }.invokeOnCompletion { onSelect(mode) }
                         }
                         .padding(horizontal = 24.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -452,7 +583,7 @@ private fun VibrationSheet(
                         modifier = Modifier.weight(1f),
                     )
                 }
-                if (mode != VibrationMode.entries.last()) {
+                if (i < VibrationMode.entries.lastIndex) {
                     HorizontalDivider(
                         color = ParchmentMuted,
                         thickness = 0.5.dp,

@@ -3,6 +3,7 @@ package com.aynama.prayertimes.shared.data.entity
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.aynama.prayertimes.shared.CalculationMethodKey
+import java.time.ZoneId
 
 enum class AsrMadhab { SHAFII, HANAFI }
 
@@ -16,4 +17,10 @@ data class Profile(
     val asrMadhab: AsrMadhab,
     val isGps: Boolean,
     val sortOrder: Int,
+    val timezone: String = "",
+    val useLocationTimezone: Boolean = false,
 )
+
+fun Profile.effectiveZoneId(): ZoneId =
+    if (useLocationTimezone && timezone.isNotBlank()) ZoneId.of(timezone)
+    else ZoneId.systemDefault()

@@ -42,6 +42,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -66,11 +68,17 @@ import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.ui.theme.Ink
+import com.aynama.prayertimes.ui.theme.InkMuted
+import com.aynama.prayertimes.ui.theme.Parchment
+import com.aynama.prayertimes.ui.theme.ParchmentMuted
 import com.aynama.prayertimes.ui.theme.Saffron
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(onNavigateToNotifications: () -> Unit = {}) {
@@ -237,12 +245,26 @@ private fun ProfileFormSheet(
     var locationLat by remember { mutableStateOf(initial?.latitude) }
     var locationLng by remember { mutableStateOf(initial?.longitude) }
     var locationLabel by remember { mutableStateOf("") }
+    var locationTimezone by remember { mutableStateOf(initial?.timezone ?: "") }
+    var useLocationTimezone by remember { mutableStateOf(initial?.useLocationTimezone ?: true) }
 
     LaunchedEffect(Unit) {
         if (initial != null) {
-            locationLabel = withContext(Dispatchers.IO) {
-                reverseGeocode(context, initial.latitude, initial.longitude)
-            } ?: "${initial.latitude.formatCoord()}, ${initial.longitude.formatCoord()}"
+            withContext(Dispatchers.IO) {
+                val address = reverseGeocodeAddress(context, initial.latitude, initial.longitude)
+                val label = address?.let { buildCityLabel(it) }
+                    ?: "${initial.latitude.formatCoord()}, ${initial.longitude.formatCoord()}"
+                val tz = when {
+                    initial.timezone.isNotBlank() -> initial.timezone
+                    initial.isGps -> ZoneId.systemDefault().id
+                    address != null -> detectTimezoneForLocation(address.countryCode, initial.longitude)
+                    else -> ""
+                }
+                label to tz
+            }.also { (label, tz) ->
+                locationLabel = label
+                if (locationTimezone.isBlank()) locationTimezone = tz
+            }
         }
     }
 
@@ -274,10 +296,12 @@ private fun ProfileFormSheet(
             LocationSection(
                 label = locationLabel,
                 hasSelection = locationLat != null,
-                onLocationSelected = { lat, lng, label ->
+                onLocationSelected = { lat, lng, label, tz ->
                     locationLat = lat
                     locationLng = lng
                     locationLabel = label
+                    locationTimezone = tz
+                    if (tz.isBlank()) useLocationTimezone = false
                 },
                 onGpsRequested = {
                     scope.launch {
@@ -286,10 +310,20 @@ private fun ProfileFormSheet(
                             locationLat = result.first
                             locationLng = result.second
                             locationLabel = result.third
+                            locationTimezone = ZoneId.systemDefault().id
                         }
                     }
                 },
             )
+
+            if (locationTimezone.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                LocationTimezoneToggle(
+                    timezone = locationTimezone,
+                    checked = useLocationTimezone,
+                    onCheckedChange = { useLocationTimezone = it },
+                )
+            }
 
             Spacer(Modifier.height(12.dp))
 
@@ -318,6 +352,8 @@ private fun ProfileFormSheet(
                         longitude = locationLng!!,
                         calculationMethod = method,
                         asrMadhab = madhab,
+                        timezone = locationTimezone,
+                        useLocationTimezone = useLocationTimezone,
                     ))
                 },
                 enabled = valid,
@@ -345,7 +381,7 @@ private fun ProfileFormSheet(
 private fun LocationSection(
     label: String,
     hasSelection: Boolean,
-    onLocationSelected: (Double, Double, String) -> Unit,
+    onLocationSelected: (Double, Double, String, String) -> Unit,
     onGpsRequested: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -411,7 +447,8 @@ private fun LocationSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                onLocationSelected(address.latitude, address.longitude, cityLabel)
+                                val tz = detectTimezoneForLocation(address.countryCode, address.longitude)
+                                onLocationSelected(address.latitude, address.longitude, cityLabel, tz)
                                 isSearching = false
                                 query = ""
                                 suggestions = emptyList()
@@ -520,6 +557,57 @@ private fun AsrMadhabSelector(
     }
 }
 
+@Composable
+private fun LocationTimezoneToggle(
+    timezone: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val displayName = remember(timezone) {
+        runCatching { ZoneId.of(timezone).getDisplayName(TextStyle.FULL, Locale.getDefault()) }
+            .getOrDefault(timezone)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Use location time zone", style = MaterialTheme.typography.bodyMedium)
+            Text(displayName, style = MaterialTheme.typography.bodySmall, color = InkMuted)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = Saffron,
+                checkedThumbColor = Parchment,
+                uncheckedTrackColor = ParchmentMuted,
+                uncheckedThumbColor = Parchment,
+            ),
+        )
+    }
+}
+
+private fun detectTimezoneForLocation(countryCode: String?, longitude: Double): String {
+    if (countryCode.isNullOrBlank()) return ""
+    return try {
+        val ids = android.icu.util.TimeZone.getAvailableIDs(countryCode)
+        if (ids.isEmpty()) return ""
+        if (ids.size == 1) return ids[0]
+        // Longitude gives an approximate raw UTC offset. Within the country's timezone list
+        // this is accurate enough to resolve the correct zone for nearly all major cities.
+        val approxOffsetMs = (longitude / 15.0 * 3_600_000).toInt()
+        ids.minByOrNull { id ->
+            kotlin.math.abs(android.icu.util.TimeZone.getTimeZone(id).rawOffset - approxOffsetMs)
+        } ?: ids[0]
+    } catch (_: Exception) {
+        ""
+    }
+}
+
 private fun buildCityLabel(address: Address): String {
     val city = address.locality ?: address.subAdminArea ?: address.adminArea
     val country = address.countryName
@@ -529,11 +617,11 @@ private fun buildCityLabel(address: Address): String {
 }
 
 @Suppress("DEPRECATION")
-private fun reverseGeocode(context: android.content.Context, lat: Double, lng: Double): String? {
+private fun reverseGeocodeAddress(context: android.content.Context, lat: Double, lng: Double): Address? {
     if (!Geocoder.isPresent()) return null
     return try {
         val geocoder = Geocoder(context)
-        val result = if (Build.VERSION.SDK_INT >= 33) {
+        if (Build.VERSION.SDK_INT >= 33) {
             val latch = java.util.concurrent.CountDownLatch(1)
             var addr: Address? = null
             geocoder.getFromLocation(lat, lng, 1) { list ->
@@ -544,12 +632,14 @@ private fun reverseGeocode(context: android.content.Context, lat: Double, lng: D
             addr
         } else {
             geocoder.getFromLocation(lat, lng, 1)?.firstOrNull()
-        } ?: return null
-        buildCityLabel(result)
+        }
     } catch (_: Exception) {
         null
     }
 }
+
+private fun reverseGeocode(context: android.content.Context, lat: Double, lng: Double): String? =
+    reverseGeocodeAddress(context, lat, lng)?.let { buildCityLabel(it) }
 
 @Suppress("DEPRECATION")
 private fun searchCity(context: android.content.Context, query: String): List<Address> {

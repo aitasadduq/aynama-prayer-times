@@ -7,10 +7,12 @@ import androidx.lifecycle.viewModelScope
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.shared.AdhanWrapper
+import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
@@ -78,7 +80,16 @@ class HomeViewModel(
 ) : ViewModel() {
 
     private val adhan = AdhanWrapper()
-    private val prayerTimesCache = mutableMapOf<Long, Pair<LocalDate, PrayerTimesResult>>()
+
+    private data class PrayerCacheKey(
+        val profileId: Long,
+        val date: LocalDate,
+        val latitude: Double,
+        val longitude: Double,
+        val method: CalculationMethodKey,
+        val timezone: String,
+    )
+    private val prayerTimesCache = mutableMapOf<PrayerCacheKey, PrayerTimesResult>()
     private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -129,17 +140,17 @@ class HomeViewModel(
     }
 
     private fun cachedPrayerTimes(profile: Profile, today: LocalDate): PrayerTimesResult {
-        val cached = prayerTimesCache[profile.id]
-        if (cached != null && cached.first == today) return cached.second
-        val result = adhan.getPrayerTimes(
-            latitude = profile.latitude,
-            longitude = profile.longitude,
-            date = today,
-            timezone = ZoneId.systemDefault(),
-            method = profile.calculationMethod,
-        )
-        prayerTimesCache[profile.id] = today to result
-        return result
+        val zone = profile.effectiveZoneId()
+        val key = PrayerCacheKey(profile.id, today, profile.latitude, profile.longitude, profile.calculationMethod, zone.id)
+        return prayerTimesCache.getOrPut(key) {
+            adhan.getPrayerTimes(
+                latitude = profile.latitude,
+                longitude = profile.longitude,
+                date = today,
+                timezone = zone,
+                method = profile.calculationMethod,
+            )
+        }
     }
 
     private fun buildProfileUiState(
@@ -151,14 +162,18 @@ class HomeViewModel(
         hijriYear: Int,
         dismissedYear: Int,
     ): ProfileUiState {
+        val effectiveNow = if (profile.useLocationTimezone && profile.timezone.isNotBlank())
+            LocalTime.now(profile.effectiveZoneId())
+        else
+            now
         val ramadan = RamadanDetector.isRamadan(today)
         return ProfileUiState(
             profile = profile,
-            ribbonRows = deriveRibbonRows(times, profile.asrMadhab, now, ramadan, timeFormatter),
-            countdownText = deriveCountdown(times, profile.asrMadhab, now),
-            nextPrayerName = deriveNextPrayerName(times, profile.asrMadhab, now),
-            nextPrayerTime = deriveNextPrayerTime(times, profile.asrMadhab, now, timeFormatter),
-            currentPhase = derivePhase(times, profile.asrMadhab, now),
+            ribbonRows = deriveRibbonRows(times, profile.asrMadhab, effectiveNow, ramadan, timeFormatter),
+            countdownText = deriveCountdown(times, profile.asrMadhab, effectiveNow),
+            nextPrayerName = deriveNextPrayerName(times, profile.asrMadhab, effectiveNow),
+            nextPrayerTime = deriveNextPrayerTime(times, profile.asrMadhab, effectiveNow, timeFormatter),
+            currentPhase = derivePhase(times, profile.asrMadhab, effectiveNow),
             isRamadan = ramadan,
             showRamadanBanner = ramadan && dismissedYear != hijriYear,
             outstandingQazaCount = qazaCount,

@@ -6,15 +6,18 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.notifications.AlarmScheduler
+import com.aynama.prayertimes.notifications.NotificationPreferences
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class SettingsViewModel(
     private val repo: ProfileRepository,
+    private val notifPrefs: NotificationPreferences,
     private val context: Context,
 ) : ViewModel() {
 
@@ -25,19 +28,23 @@ class SettingsViewModel(
         viewModelScope.launch {
             if (profile.id == 0L) {
                 val sortOrder = profiles.value.size
-                val newId = repo.insert(profile.copy(sortOrder = sortOrder))
-                AlarmScheduler.scheduleForProfile(context, profile.copy(id = newId, sortOrder = sortOrder))
+                repo.insert(profile.copy(sortOrder = sortOrder))
             } else {
                 repo.update(profile)
-                AlarmScheduler.scheduleForProfile(context, profile)
             }
+            val allProfiles = repo.observeAll().first()
+            AlarmScheduler.scheduleAll(context, allProfiles)
         }
     }
 
     fun delete(profile: Profile) {
         viewModelScope.launch {
             repo.delete(profile)
-            AlarmScheduler.cancelForProfile(context, profile.id)
+            if (notifPrefs.notificationProfileId == profile.id) {
+                notifPrefs.notificationProfileId = -1L
+            }
+            val allProfiles = repo.observeAll().first()
+            AlarmScheduler.scheduleAll(context, allProfiles)
         }
     }
 
@@ -46,7 +53,7 @@ class SettingsViewModel(
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    SettingsViewModel(app.profileRepository, app) as T
+                    SettingsViewModel(app.profileRepository, app.notificationPreferences, app) as T
             }
     }
 }

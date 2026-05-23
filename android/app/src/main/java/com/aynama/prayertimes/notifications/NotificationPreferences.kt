@@ -11,6 +11,8 @@ enum class AdhanVoice(val displayName: String, val caption: String = "") {
     NONE("None", "Silent — no audio"),
 }
 
+enum class AlertTimeMode { OFFSET, FIXED }
+
 enum class VibrationMode(val displayName: String) {
     ALWAYS("Always"),
     WITH_SOUND("With sound"),
@@ -19,6 +21,12 @@ enum class VibrationMode(val displayName: String) {
 
 class NotificationPreferences(private val prefs: SharedPreferences) {
 
+    // -1L means "use first profile by sortOrder"
+    var notificationProfileId: Long
+        get() = prefs.getLong(KEY_NOTIFICATION_PROFILE, -1L)
+        set(value) = prefs.edit().putLong(KEY_NOTIFICATION_PROFILE, value).apply()
+
+    // Global (not profile-scoped)
     var masterEnabled: Boolean
         get() = prefs.getBoolean(KEY_MASTER, true)
         set(value) = prefs.edit().putBoolean(KEY_MASTER, value).apply()
@@ -37,30 +45,70 @@ class NotificationPreferences(private val prefs: SharedPreferences) {
             ?: VibrationMode.WITH_SOUND
         set(value) = prefs.edit().putString(KEY_VIBRATION, value.name).apply()
 
-    fun isPrayerEnabled(prayerIndex: Int): Boolean =
-        prefs.getBoolean(prayerKey(prayerIndex), true)
+    // Per-prayer, profile-scoped
+    fun isPrayerEnabled(profileId: Long, prayerIndex: Int): Boolean =
+        prefs.getBoolean(prayerKey(profileId, prayerIndex), true)
 
-    fun setPrayerEnabled(prayerIndex: Int, enabled: Boolean) =
-        prefs.edit().putBoolean(prayerKey(prayerIndex), enabled).apply()
+    fun setPrayerEnabled(profileId: Long, prayerIndex: Int, enabled: Boolean) =
+        prefs.edit().putBoolean(prayerKey(profileId, prayerIndex), enabled).apply()
 
-    private fun prayerKey(index: Int): String = when (index) {
-        PRAYER_INDEX_FAJR -> KEY_FAJR
-        PRAYER_INDEX_DHUHR -> KEY_DHUHR
-        PRAYER_INDEX_ASR -> KEY_ASR
-        PRAYER_INDEX_MAGHRIB -> KEY_MAGHRIB
-        PRAYER_INDEX_ISHA -> KEY_ISHA
-        else -> "notif_prayer_$index"
+    fun getPrayerOffset(profileId: Long, prayerIndex: Int): Int =
+        prefs.getInt(offsetKey(profileId, prayerIndex), 0)
+
+    fun setPrayerOffset(profileId: Long, prayerIndex: Int, minutes: Int) =
+        prefs.edit().putInt(offsetKey(profileId, prayerIndex), minutes).apply()
+
+    fun getPrayerEarlyReminder(profileId: Long, prayerIndex: Int): Int =
+        prefs.getInt(earlyReminderKey(profileId, prayerIndex), 0)
+
+    fun setPrayerEarlyReminder(profileId: Long, prayerIndex: Int, minutes: Int) =
+        prefs.edit().putInt(earlyReminderKey(profileId, prayerIndex), minutes).apply()
+
+    fun getAlertMode(profileId: Long, prayerIndex: Int): AlertTimeMode {
+        val name = prefs.getString(alertModeKey(profileId, prayerIndex), null)
+        return AlertTimeMode.entries.find { it.name == name } ?: AlertTimeMode.OFFSET
     }
 
+    fun setAlertMode(profileId: Long, prayerIndex: Int, mode: AlertTimeMode) =
+        prefs.edit().putString(alertModeKey(profileId, prayerIndex), mode.name).apply()
+
+    fun getFixedTimeMinutes(profileId: Long, prayerIndex: Int): Int =
+        prefs.getInt(fixedTimeKey(profileId, prayerIndex), -1)
+
+    fun setFixedTimeMinutes(profileId: Long, prayerIndex: Int, minutesOfDay: Int) =
+        prefs.edit().putInt(fixedTimeKey(profileId, prayerIndex), minutesOfDay).apply()
+
+    fun migrateFromV1(profileId: Long) {
+        if (prefs.getBoolean(KEY_V1_MIGRATED, false)) return
+        val oldKeys = mapOf(
+            0 to "notif_fajr_enabled",
+            1 to "notif_dhuhr_enabled",
+            2 to "notif_asr_enabled",
+            3 to "notif_maghrib_enabled",
+            4 to "notif_isha_enabled",
+        )
+        val edit = prefs.edit()
+        oldKeys.forEach { (index, oldKey) ->
+            if (prefs.contains(oldKey)) {
+                edit.putBoolean(prayerKey(profileId, index), prefs.getBoolean(oldKey, true))
+                edit.remove(oldKey)
+            }
+        }
+        edit.putBoolean(KEY_V1_MIGRATED, true).apply()
+    }
+
+    private fun prayerKey(profileId: Long, index: Int): String = "notif_prayer_${profileId}_$index"
+    private fun offsetKey(profileId: Long, index: Int): String = "notif_offset_${profileId}_$index"
+    private fun earlyReminderKey(profileId: Long, index: Int): String = "notif_early_${profileId}_$index"
+    private fun alertModeKey(profileId: Long, index: Int): String = "notif_alert_mode_${profileId}_$index"
+    private fun fixedTimeKey(profileId: Long, index: Int): String = "notif_fixed_time_${profileId}_$index"
+
     companion object {
+        private const val KEY_NOTIFICATION_PROFILE = "notif_profile_id"
         private const val KEY_MASTER = "notif_master_enabled"
-        private const val KEY_FAJR = "notif_fajr_enabled"
-        private const val KEY_DHUHR = "notif_dhuhr_enabled"
-        private const val KEY_ASR = "notif_asr_enabled"
-        private const val KEY_MAGHRIB = "notif_maghrib_enabled"
-        private const val KEY_ISHA = "notif_isha_enabled"
         private const val KEY_IMSAK = "notif_imsak_enabled"
         private const val KEY_ADHAN_VOICE = "notif_adhan_voice"
         private const val KEY_VIBRATION = "notif_vibration"
+        private const val KEY_V1_MIGRATED = "notif_v1_migrated"
     }
 }
