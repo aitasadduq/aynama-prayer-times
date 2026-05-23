@@ -9,6 +9,7 @@ import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -90,7 +91,7 @@ object AlarmScheduler {
             latitude = profile.latitude,
             longitude = profile.longitude,
             date = date,
-            timezone = ZoneId.systemDefault(),
+            timezone = profile.effectiveZoneId(),
             method = profile.calculationMethod,
         )
         val isRamadan = RamadanDetector.isRamadan(date)
@@ -100,6 +101,7 @@ object AlarmScheduler {
             date = date,
             isRamadan = isRamadan,
             times = times,
+            zone = profile.effectiveZoneId(),
             masterEnabled = notifPrefs.masterEnabled,
             prayerEnabled = { index -> notifPrefs.isPrayerEnabled(pid, index) },
             imsakEnabled = notifPrefs.imsakEnabled,
@@ -177,6 +179,7 @@ fun buildAlarmSchedule(
     date: LocalDate,
     isRamadan: Boolean,
     times: PrayerTimesResult,
+    zone: ZoneId = ZoneId.systemDefault(),
     masterEnabled: Boolean = true,
     prayerEnabled: (Int) -> Boolean = { true },
     imsakEnabled: Boolean = true,
@@ -207,7 +210,7 @@ fun buildAlarmSchedule(
             }
             add(ScheduledAlarm(
                 requestCode = (profile.id * REQUEST_CODE_MULTIPLIER + index).toInt(),
-                triggerEpochMs = localTimeToEpochMs(effectiveTime, date),
+                triggerEpochMs = localTimeToEpochMs(effectiveTime, date, zone),
                 prayerName = PRAYER_NAMES[index]!!,
             ))
             val earlyMinutes = earlyReminderMinutes(index)
@@ -215,7 +218,7 @@ fun buildAlarmSchedule(
                 val earlyTime = effectiveTime.minusMinutes(earlyMinutes.toLong())
                 add(ScheduledAlarm(
                     requestCode = (profile.id * REQUEST_CODE_MULTIPLIER + index + EARLY_REMINDER_BASE_INDEX).toInt(),
-                    triggerEpochMs = localTimeToEpochMs(earlyTime, date),
+                    triggerEpochMs = localTimeToEpochMs(earlyTime, date, zone),
                     prayerName = PRAYER_NAMES[index]!!,
                     isEarlyReminder = true,
                 ))
@@ -225,12 +228,12 @@ fun buildAlarmSchedule(
             val imsak = times.fajr.minusMinutes(10)
             add(ScheduledAlarm(
                 requestCode = (profile.id * REQUEST_CODE_MULTIPLIER + PRAYER_INDEX_IMSAK).toInt(),
-                triggerEpochMs = localTimeToEpochMs(imsak, date),
+                triggerEpochMs = localTimeToEpochMs(imsak, date, zone),
                 prayerName = "Imsak",
             ))
         }
     }
 }
 
-internal fun localTimeToEpochMs(time: LocalTime, date: LocalDate): Long =
-    date.atTime(time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+internal fun localTimeToEpochMs(time: LocalTime, date: LocalDate, zone: ZoneId = ZoneId.systemDefault()): Long =
+    date.atTime(time).atZone(zone).toInstant().toEpochMilli()

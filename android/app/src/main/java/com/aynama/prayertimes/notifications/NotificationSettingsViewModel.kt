@@ -9,6 +9,7 @@ import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -193,7 +194,7 @@ class NotificationSettingsViewModel(
                 latitude = notificationProfile.latitude,
                 longitude = notificationProfile.longitude,
                 date = date,
-                timezone = ZoneId.systemDefault(),
+                timezone = notificationProfile.effectiveZoneId(),
                 method = notificationProfile.calculationMethod,
             )
             val asr = if (notificationProfile.asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii

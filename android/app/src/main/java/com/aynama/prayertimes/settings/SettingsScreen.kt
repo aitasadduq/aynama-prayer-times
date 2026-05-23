@@ -42,6 +42,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -66,11 +68,17 @@ import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.ui.theme.Ink
+import com.aynama.prayertimes.ui.theme.InkMuted
+import com.aynama.prayertimes.ui.theme.Parchment
+import com.aynama.prayertimes.ui.theme.ParchmentMuted
 import com.aynama.prayertimes.ui.theme.Saffron
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(onNavigateToNotifications: () -> Unit = {}) {
@@ -237,6 +245,8 @@ private fun ProfileFormSheet(
     var locationLat by remember { mutableStateOf(initial?.latitude) }
     var locationLng by remember { mutableStateOf(initial?.longitude) }
     var locationLabel by remember { mutableStateOf("") }
+    var locationTimezone by remember { mutableStateOf(initial?.timezone ?: "") }
+    var useLocationTimezone by remember { mutableStateOf(initial?.useLocationTimezone ?: false) }
 
     LaunchedEffect(Unit) {
         if (initial != null) {
@@ -274,10 +284,12 @@ private fun ProfileFormSheet(
             LocationSection(
                 label = locationLabel,
                 hasSelection = locationLat != null,
-                onLocationSelected = { lat, lng, label ->
+                onLocationSelected = { lat, lng, label, tz ->
                     locationLat = lat
                     locationLng = lng
                     locationLabel = label
+                    locationTimezone = tz
+                    if (tz.isBlank()) useLocationTimezone = false
                 },
                 onGpsRequested = {
                     scope.launch {
@@ -286,10 +298,20 @@ private fun ProfileFormSheet(
                             locationLat = result.first
                             locationLng = result.second
                             locationLabel = result.third
+                            locationTimezone = ZoneId.systemDefault().id
                         }
                     }
                 },
             )
+
+            if (locationTimezone.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                LocationTimezoneToggle(
+                    timezone = locationTimezone,
+                    checked = useLocationTimezone,
+                    onCheckedChange = { useLocationTimezone = it },
+                )
+            }
 
             Spacer(Modifier.height(12.dp))
 
@@ -318,6 +340,8 @@ private fun ProfileFormSheet(
                         longitude = locationLng!!,
                         calculationMethod = method,
                         asrMadhab = madhab,
+                        timezone = locationTimezone,
+                        useLocationTimezone = useLocationTimezone,
                     ))
                 },
                 enabled = valid,
@@ -345,7 +369,7 @@ private fun ProfileFormSheet(
 private fun LocationSection(
     label: String,
     hasSelection: Boolean,
-    onLocationSelected: (Double, Double, String) -> Unit,
+    onLocationSelected: (Double, Double, String, String) -> Unit,
     onGpsRequested: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -411,7 +435,8 @@ private fun LocationSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                onLocationSelected(address.latitude, address.longitude, cityLabel)
+                                val tz = detectTimezoneForCountry(address.countryCode)
+                                onLocationSelected(address.latitude, address.longitude, cityLabel, tz)
                                 isSearching = false
                                 query = ""
                                 suggestions = emptyList()
@@ -517,6 +542,50 @@ private fun AsrMadhabSelector(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LocationTimezoneToggle(
+    timezone: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    val displayName = remember(timezone) {
+        runCatching { ZoneId.of(timezone).getDisplayName(TextStyle.FULL, Locale.getDefault()) }
+            .getOrDefault(timezone)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Use location time zone", style = MaterialTheme.typography.bodyMedium)
+            Text(displayName, style = MaterialTheme.typography.bodySmall, color = InkMuted)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = Saffron,
+                checkedThumbColor = Parchment,
+                uncheckedTrackColor = ParchmentMuted,
+                uncheckedThumbColor = Parchment,
+            ),
+        )
+    }
+}
+
+private fun detectTimezoneForCountry(countryCode: String?): String {
+    if (countryCode.isNullOrBlank()) return ""
+    return try {
+        val ids = android.icu.util.TimeZone.getAvailableIDs(countryCode)
+        if (ids.size == 1) ids[0] else ""
+    } catch (_: Exception) {
+        ""
     }
 }
 

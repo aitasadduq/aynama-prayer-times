@@ -12,6 +12,7 @@ import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
@@ -86,6 +87,7 @@ class HomeViewModel(
         val latitude: Double,
         val longitude: Double,
         val method: CalculationMethodKey,
+        val timezone: String,
     )
     private val prayerTimesCache = mutableMapOf<PrayerCacheKey, PrayerTimesResult>()
     private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
@@ -138,13 +140,14 @@ class HomeViewModel(
     }
 
     private fun cachedPrayerTimes(profile: Profile, today: LocalDate): PrayerTimesResult {
-        val key = PrayerCacheKey(profile.id, today, profile.latitude, profile.longitude, profile.calculationMethod)
+        val zone = profile.effectiveZoneId()
+        val key = PrayerCacheKey(profile.id, today, profile.latitude, profile.longitude, profile.calculationMethod, zone.id)
         return prayerTimesCache.getOrPut(key) {
             adhan.getPrayerTimes(
                 latitude = profile.latitude,
                 longitude = profile.longitude,
                 date = today,
-                timezone = ZoneId.systemDefault(),
+                timezone = zone,
                 method = profile.calculationMethod,
             )
         }

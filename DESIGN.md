@@ -683,4 +683,48 @@ IBM Plex `body-sm`, ink-muted. Current week only. Not a streak counter — a des
 - No colored left-border on any row — including today (consistent with prayer ribbon list treatment).
 - No cards per row — flat list only.
 - No gamification copy. No "Great job!", "Keep it up!", or streak-reset warnings.
+
+---
+
+## 17. Profile Edit Sheet — Timezone Toggle
+
+### Context
+
+Each profile stores a location (GPS or city search). When a user travels and keeps a "London" profile, they may want to see London prayer times in London time — even while their device is on a different timezone. The timezone toggle addresses this.
+
+### Data model
+
+- `timezone: String` — IANA timezone ID auto-detected at profile creation (e.g. `"Europe/London"`). Blank when detection fails.
+- `useLocationTimezone: Boolean` — user-controlled toggle; `false` by default (device timezone).
+
+**Auto-detection rules:**
+- GPS profile: `ZoneId.systemDefault().id` (device is physically at the location).
+- City search: use `android.icu.util.TimeZone.getAvailableIDs(countryCode)` on the Geocoder result. Store the timezone only when exactly one ID is returned (single-timezone country). Leave blank otherwise — do not guess for multi-zone countries (US, RU, AU, CA, etc.).
+
+### Profile edit sheet placement
+
+The toggle appears in the profile edit/create bottom sheet, below the location row and above the calculation method picker. Only rendered when `timezone` is non-blank.
+
+```
+Location        London, UK          ›
+Use location time zone              [toggle]
+Calculation method  MWL             ›
+Asr school          Shafi'i         ›
+```
+
+- Row label: IBM Plex `body`, ink. "Use location time zone"
+- Sub-label (below row label, IBM Plex `body-sm`, ink-muted): the timezone ID in abbreviated human form, e.g. `"London time (GMT+1)"`. Derive from `ZoneId.of(timezone).getDisplayName(TextStyle.FULL, Locale.getDefault())`.
+- Toggle: platform-native. Enabled state: saffron track, parchment thumb. Disabled state: parchment-muted track.
+- When `timezone` is blank: do not render this row at all.
+
+### Disabled / unavailable state
+
+When timezone auto-detection failed (blank `timezone`), the row is hidden entirely. No ghost row, no "unknown" label. Silence is clearer than a disabled toggle with an unexplained subtitle.
+
+### Behavior
+
+- Default: toggle off — device timezone applies.
+- Toggle on: prayer times and alarm scheduling use `ZoneId.of(profile.timezone)`.
+- Toggle off: prayer times and alarm scheduling use `ZoneId.systemDefault()`.
+- The home screen ribbon, countdown, and alarm triggers all use the same resolved timezone (`profile.effectiveZoneId()`), so they stay consistent.
 - Sunrise is not a tracked prayer. Five indicators per row, not six.
