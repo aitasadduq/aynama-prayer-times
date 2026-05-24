@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aynama.prayertimes.AynamaApplication
+import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
 import com.aynama.prayertimes.tracker.MarkPrayerSheet
@@ -175,11 +176,22 @@ private fun ProfilePage(
     ) {
         Spacer(Modifier.height(16.dp))
 
-        Text(
-            text = "Home · ${profileState.profile.name}",
-            style = MaterialTheme.typography.bodySmall,
-            color = LocalContentColor.current.copy(alpha = 0.7f),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "${profileState.profile.name} · ${profileState.profile.calculationMethod.taqweemName()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
+            )
+            Text(
+                text = profileState.hijriDateText,
+                style = MaterialTheme.typography.bodySmall,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
+            )
+        }
 
         Spacer(Modifier.height(24.dp))
 
@@ -538,4 +550,17 @@ private fun Prayer.displayName(): String = when (this) {
     Prayer.ASR -> "Asr"
     Prayer.MAGHRIB -> "Maghrib"
     Prayer.ISHA -> "Isha"
+}
+
+private fun CalculationMethodKey.taqweemName(): String = when (this) {
+    CalculationMethodKey.MWL -> "MWL"
+    CalculationMethodKey.ISNA -> "ISNA"
+    CalculationMethodKey.UMM_AL_QURA -> "Umm al-Qurā"
+    CalculationMethodKey.EGYPTIAN -> "Egyptian"
+    CalculationMethodKey.KARACHI -> "Karachi"
+    CalculationMethodKey.DUBAI -> "Dubai"
+    CalculationMethodKey.MOON_SIGHTING_COMMITTEE -> "MSC"
+    CalculationMethodKey.KUWAIT -> "Kuwait"
+    CalculationMethodKey.QATAR -> "Qatar"
+    CalculationMethodKey.SINGAPORE -> "Singapore"
 }

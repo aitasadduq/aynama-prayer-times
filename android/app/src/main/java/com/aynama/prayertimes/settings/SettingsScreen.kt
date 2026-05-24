@@ -175,6 +175,34 @@ fun SettingsScreen(onNavigateToNotifications: () -> Unit = {}) {
 }
 
 @Composable
+private fun RamadanOffsetSelector(selected: Int, onSelect: (Int) -> Unit) {
+    val options = listOf(0 to "Calculated", 1 to "+1 day", 2 to "+2 days")
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        options.forEach { (value, label) ->
+            if (value == selected) {
+                Button(
+                    onClick = {},
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = Ink),
+                ) {
+                    Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { onSelect(value) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun NotificationsEntryRow(onClick: () -> Unit) {
     Row(
         modifier = Modifier
@@ -241,6 +269,7 @@ private fun ProfileFormSheet(
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var method by remember { mutableStateOf(initial?.calculationMethod ?: CalculationMethodKey.MWL) }
     var madhab by remember { mutableStateOf(initial?.asrMadhab ?: AsrMadhab.SHAFII) }
+    var ramadanOffset by remember { mutableStateOf(initial?.ramadanOffset ?: 0) }
 
     var locationLat by remember { mutableStateOf(initial?.latitude) }
     var locationLng by remember { mutableStateOf(initial?.longitude) }
@@ -333,6 +362,16 @@ private fun ProfileFormSheet(
 
             AsrMadhabSelector(selected = madhab, onSelect = { madhab = it })
 
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = "Ramadan start",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+
+            RamadanOffsetSelector(selected = ramadanOffset, onSelect = { ramadanOffset = it })
+
             Spacer(Modifier.height(24.dp))
 
             Button(
@@ -354,6 +393,7 @@ private fun ProfileFormSheet(
                         asrMadhab = madhab,
                         timezone = locationTimezone,
                         useLocationTimezone = useLocationTimezone,
+                        ramadanOffset = ramadanOffset,
                     ))
                 },
                 enabled = valid,

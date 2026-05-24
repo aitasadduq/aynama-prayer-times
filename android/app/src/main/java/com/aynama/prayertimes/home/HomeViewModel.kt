@@ -64,6 +64,7 @@ data class ProfileUiState(
     val isRamadan: Boolean,
     val showRamadanBanner: Boolean,
     val outstandingQazaCount: Int,
+    val hijriDateText: String,
 )
 
 sealed interface HomeUiState {
@@ -162,11 +163,10 @@ class HomeViewModel(
         hijriYear: Int,
         dismissedYear: Int,
     ): ProfileUiState {
-        val effectiveNow = if (profile.useLocationTimezone && profile.timezone.isNotBlank())
-            LocalTime.now(profile.effectiveZoneId())
-        else
-            now
-        val ramadan = RamadanDetector.isRamadan(today)
+        val effectiveZone = if (profile.useLocationTimezone && profile.timezone.isNotBlank()) profile.effectiveZoneId() else null
+        val effectiveNow = if (effectiveZone != null) LocalTime.now(effectiveZone) else now
+        val effectiveToday = if (effectiveZone != null) LocalDate.now(effectiveZone) else today
+        val ramadan = RamadanDetector.isRamadanWithOffset(effectiveToday, profile.ramadanOffset)
         return ProfileUiState(
             profile = profile,
             ribbonRows = deriveRibbonRows(times, profile.asrMadhab, effectiveNow, ramadan, timeFormatter),
@@ -177,6 +177,7 @@ class HomeViewModel(
             isRamadan = ramadan,
             showRamadanBanner = ramadan && dismissedYear != hijriYear,
             outstandingQazaCount = qazaCount,
+            hijriDateText = RamadanDetector.hijriDateOf(effectiveToday),
         )
     }
 

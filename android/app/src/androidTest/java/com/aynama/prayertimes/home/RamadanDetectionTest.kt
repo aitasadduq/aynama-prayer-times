@@ -1,6 +1,7 @@
 package com.aynama.prayertimes.home
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.aynama.prayertimes.notifications.RamadanDetector
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,37 +14,85 @@ class RamadanDetectionTest {
     @Test
     fun midRamadan1445_returnsTrue() {
         // Ramadan 1445 ran approximately March 11 – April 9, 2024
-        assertTrue(isRamadan(LocalDate.of(2024, 3, 20)))
+        assertTrue(RamadanDetector.isRamadan(LocalDate.of(2024, 3, 20)))
     }
 
     @Test
     fun firstDayRamadan1445_returnsTrue() {
-        assertTrue(isRamadan(LocalDate.of(2024, 3, 11)))
+        assertTrue(RamadanDetector.isRamadan(LocalDate.of(2024, 3, 11)))
     }
 
     @Test
     fun lastDayRamadan1445_returnsTrue() {
-        assertTrue(isRamadan(LocalDate.of(2024, 4, 9)))
+        assertTrue(RamadanDetector.isRamadan(LocalDate.of(2024, 4, 9)))
     }
 
     @Test
     fun dayAfterRamadan1445_returnsFalse() {
-        assertFalse(isRamadan(LocalDate.of(2024, 4, 10)))
+        assertFalse(RamadanDetector.isRamadan(LocalDate.of(2024, 4, 10)))
     }
 
     @Test
     fun shawwal1445_returnsFalse() {
-        assertFalse(isRamadan(LocalDate.of(2024, 4, 15)))
+        assertFalse(RamadanDetector.isRamadan(LocalDate.of(2024, 4, 15)))
     }
 
     @Test
     fun nonRamadanDate_returnsFalse() {
-        assertFalse(isRamadan(LocalDate.of(2024, 1, 1)))
+        assertFalse(RamadanDetector.isRamadan(LocalDate.of(2024, 1, 1)))
     }
 
     @Test
     fun ramadan1446_returnsTrue() {
         // Ramadan 1446 started approximately March 1, 2025
-        assertTrue(isRamadan(LocalDate.of(2025, 3, 10)))
+        assertTrue(RamadanDetector.isRamadan(LocalDate.of(2025, 3, 10)))
+    }
+
+    // isRamadanWithOffset — Ramadan 1445: Mar 11 – Apr 9, 2024
+
+    @Test
+    fun offset0_firstDay_returnsTrue() {
+        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 11), 0))
+    }
+
+    @Test
+    fun offset0_dayBefore_returnsFalse() {
+        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 10), 0))
+    }
+
+    @Test
+    fun offset1_firstCalcDay_returnsFalse() {
+        // With offset=1, Ramadan effectively starts Mar 12; Mar 11 is pre-Ramadan
+        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 11), 1))
+    }
+
+    @Test
+    fun offset1_secondCalcDay_returnsTrue() {
+        // Mar 12 with offset=1: checks Mar 11 (first calc day) → Ramadan
+        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 12), 1))
+    }
+
+    @Test
+    fun offset1_dayAfterCalcEnd_returnsTrue() {
+        // Apr 10 with offset=1: checks Apr 9 (last calc day) → still Ramadan
+        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 4, 10), 1))
+    }
+
+    @Test
+    fun offset1_twoDaysAfterCalcEnd_returnsFalse() {
+        // Apr 11 with offset=1: checks Apr 10 (Shawwal) → not Ramadan
+        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 4, 11), 1))
+    }
+
+    @Test
+    fun offset2_secondCalcDay_returnsFalse() {
+        // Mar 12 with offset=2: checks Mar 10 (Shaban) → not Ramadan
+        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 12), 2))
+    }
+
+    @Test
+    fun offset2_thirdCalcDay_returnsTrue() {
+        // Mar 13 with offset=2: checks Mar 11 (first calc day) → Ramadan
+        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 13), 2))
     }
 }

@@ -19,6 +19,7 @@ data class Profile(
     val sortOrder: Int,
     val timezone: String = "",
     val useLocationTimezone: Boolean = false,
+    val ramadanOffset: Int = 0,
 )
 
 fun Profile.effectiveZoneId(): ZoneId =

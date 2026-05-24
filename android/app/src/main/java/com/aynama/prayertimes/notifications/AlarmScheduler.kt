@@ -94,7 +94,7 @@ object AlarmScheduler {
             timezone = profile.effectiveZoneId(),
             method = profile.calculationMethod,
         )
-        val isRamadan = RamadanDetector.isRamadan(date)
+        val isRamadan = RamadanDetector.isRamadanWithOffset(date, profile.ramadanOffset)
         val pid = profile.id
         val alarms = buildAlarmSchedule(
             profile = profile,
