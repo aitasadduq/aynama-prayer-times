@@ -91,6 +91,8 @@ class HomeViewModel(
         val timezone: String,
     )
     private val prayerTimesCache = mutableMapOf<PrayerCacheKey, PrayerTimesResult>()
+    private val hijriCache = mutableMapOf<Pair<LocalDate, String>, String>()
+    private val ramadanCache = mutableMapOf<Triple<LocalDate, Int, String>, Boolean>()
     private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
@@ -154,6 +156,14 @@ class HomeViewModel(
         }
     }
 
+    private fun cachedHijri(date: LocalDate, zone: ZoneId): String =
+        hijriCache.getOrPut(date to zone.id) { RamadanDetector.hijriDateOf(date, zone) }
+
+    private fun cachedIsRamadan(date: LocalDate, offset: Int, zone: ZoneId): Boolean =
+        ramadanCache.getOrPut(Triple(date, offset, zone.id)) {
+            RamadanDetector.isRamadanWithOffset(date, offset, zone)
+        }
+
     private fun buildProfileUiState(
         profile: Profile,
         times: PrayerTimesResult,
@@ -163,10 +173,11 @@ class HomeViewModel(
         hijriYear: Int,
         dismissedYear: Int,
     ): ProfileUiState {
-        val effectiveZone = if (profile.useLocationTimezone && profile.timezone.isNotBlank()) profile.effectiveZoneId() else null
-        val effectiveNow = if (effectiveZone != null) LocalTime.now(effectiveZone) else now
-        val effectiveToday = if (effectiveZone != null) LocalDate.now(effectiveZone) else today
-        val ramadan = RamadanDetector.isRamadanWithOffset(effectiveToday, profile.ramadanOffset)
+        val effectiveZone = profile.effectiveZoneId()
+        val hasLocationZone = profile.useLocationTimezone && profile.timezone.isNotBlank()
+        val effectiveNow = if (hasLocationZone) LocalTime.now(effectiveZone) else now
+        val effectiveToday = if (hasLocationZone) LocalDate.now(effectiveZone) else today
+        val ramadan = cachedIsRamadan(effectiveToday, profile.ramadanOffset, effectiveZone)
         return ProfileUiState(
             profile = profile,
             ribbonRows = deriveRibbonRows(times, profile.asrMadhab, effectiveNow, ramadan, timeFormatter),
@@ -177,7 +188,7 @@ class HomeViewModel(
             isRamadan = ramadan,
             showRamadanBanner = ramadan && dismissedYear != hijriYear,
             outstandingQazaCount = qazaCount,
-            hijriDateText = RamadanDetector.hijriDateOf(effectiveToday),
+            hijriDateText = cachedHijri(effectiveToday, effectiveZone),
         )
     }
 

@@ -2,11 +2,13 @@ package com.aynama.prayertimes.home
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.aynama.prayertimes.notifications.RamadanDetector
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.LocalDate
+import java.time.ZoneId
 
 @RunWith(AndroidJUnit4::class)
 class RamadanDetectionTest {
@@ -94,5 +96,38 @@ class RamadanDetectionTest {
     fun offset2_thirdCalcDay_returnsTrue() {
         // Mar 13 with offset=2: checks Mar 11 (first calc day) → Ramadan
         assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 13), 2))
+    }
+
+    // hijriDateOf — civil Islamic calendar maps Mar 11, 2024 → Ramaḍān 1445
+
+    @Test
+    fun hijriDateOf_firstDayRamadan1445_containsRamadanAndYear() {
+        val result = RamadanDetector.hijriDateOf(LocalDate.of(2024, 3, 11))
+        assertTrue("expected Ramaḍān in '$result'", result.contains("Ramaḍān"))
+        assertTrue("expected 1445 in '$result'", result.contains("1445"))
+    }
+
+    @Test
+    fun hijriDateOf_dayAfterRamadan1445_isShawwal() {
+        val result = RamadanDetector.hijriDateOf(LocalDate.of(2024, 4, 10))
+        assertTrue("expected Shawwāl in '$result'", result.contains("Shawwāl"))
+    }
+
+    @Test
+    fun hijriDateOf_zoneIndependentForFarApartZones_returnsSameDateLabel() {
+        // Mar 20, 2024 noon-local is mid-Ramadan in any zone — both should resolve to Ramaḍān 1445.
+        val utc = RamadanDetector.hijriDateOf(LocalDate.of(2024, 3, 20), ZoneId.of("UTC"))
+        val tokyo = RamadanDetector.hijriDateOf(LocalDate.of(2024, 3, 20), ZoneId.of("Asia/Tokyo"))
+        val la = RamadanDetector.hijriDateOf(LocalDate.of(2024, 3, 20), ZoneId.of("America/Los_Angeles"))
+        assertEquals(utc, tokyo)
+        assertEquals(utc, la)
+        assertTrue(utc.contains("Ramaḍān"))
+    }
+
+    @Test
+    fun hijriDateOf_format_isDayMonthYear() {
+        val result = RamadanDetector.hijriDateOf(LocalDate.of(2024, 3, 11))
+        // Expect "<digits> <month> <year>"
+        assertTrue("expected '<day> <month> <year>' format, got '$result'", result.matches(Regex("\\d{1,2} .+ \\d{4}")))
     }
 }

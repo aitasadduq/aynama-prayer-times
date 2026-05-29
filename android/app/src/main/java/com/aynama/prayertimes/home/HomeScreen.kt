@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -178,18 +179,23 @@ private fun ProfilePage(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "${profileState.profile.name} · ${profileState.profile.calculationMethod.taqweemName()}",
                 style = MaterialTheme.typography.bodySmall,
                 color = LocalContentColor.current.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
             )
             Text(
                 text = profileState.hijriDateText,
                 style = MaterialTheme.typography.bodySmall,
                 color = LocalContentColor.current.copy(alpha = 0.7f),
+                maxLines = 1,
             )
         }
 

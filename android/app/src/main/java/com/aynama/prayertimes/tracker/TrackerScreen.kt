@@ -329,6 +329,7 @@ private fun ExpandedPrayerRow(row: TrackerPrayerRow, onTap: () -> Unit) {
             color = InkMuted,
         )
     }
+
 }
 
 private val historyDateWidth = 130.dp
