@@ -204,14 +204,19 @@ private fun ProfilePage(
         Text(
             text = profileState.countdownText,
             style = MaterialTheme.typography.displayLarge.copy(fontFeatureSettings = "tnum"),
-            modifier = Modifier.semantics {
-                contentDescription = "Countdown to ${profileState.nextPrayerName}: ${profileState.countdownText}"
-            },
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    contentDescription = "Countdown to ${profileState.nextPrayerName}: ${profileState.countdownText}"
+                },
         )
 
         Text(
             text = "${profileState.nextPrayerName} · ${profileState.nextPrayerTime}",
             style = MaterialTheme.typography.displaySmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(Modifier.height(24.dp))
