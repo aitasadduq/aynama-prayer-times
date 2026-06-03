@@ -14,7 +14,7 @@ import com.aynama.prayertimes.shared.data.entity.QazaEntry
 
 @Database(
     entities = [Profile::class, QazaEntry::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -36,12 +36,18 @@ abstract class AynamaDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE profiles ADD COLUMN hijriOffsetMonthKey INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun buildInMemory(context: Context): AynamaDatabase =
             Room.inMemoryDatabaseBuilder(context, AynamaDatabase::class.java).build()
 
         fun build(context: Context): AynamaDatabase =
             Room.databaseBuilder(context, AynamaDatabase::class.java, "aynama.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

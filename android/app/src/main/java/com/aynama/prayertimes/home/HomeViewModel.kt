@@ -91,7 +91,7 @@ class HomeViewModel(
         val timezone: String,
     )
     private val prayerTimesCache = mutableMapOf<PrayerCacheKey, PrayerTimesResult>()
-    private val hijriCache = mutableMapOf<Pair<LocalDate, String>, String>()
+    private val hijriCache = mutableMapOf<Triple<LocalDate, Int, String>, String>()
     private val ramadanCache = mutableMapOf<Triple<LocalDate, Int, String>, Boolean>()
     private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 
@@ -156,8 +156,10 @@ class HomeViewModel(
         }
     }
 
-    private fun cachedHijri(date: LocalDate, zone: ZoneId): String =
-        hijriCache.getOrPut(date to zone.id) { RamadanDetector.hijriDateOf(date, zone) }
+    private fun cachedHijri(date: LocalDate, offset: Int, zone: ZoneId): String =
+        hijriCache.getOrPut(Triple(date, offset, zone.id)) {
+            RamadanDetector.hijriDateWithOffset(date, offset, zone)
+        }
 
     private fun cachedIsRamadan(date: LocalDate, offset: Int, zone: ZoneId): Boolean =
         ramadanCache.getOrPut(Triple(date, offset, zone.id)) {
@@ -177,7 +179,10 @@ class HomeViewModel(
         val hasLocationZone = profile.useLocationTimezone && profile.timezone.isNotBlank()
         val effectiveNow = if (hasLocationZone) LocalTime.now(effectiveZone) else now
         val effectiveToday = if (hasLocationZone) LocalDate.now(effectiveZone) else today
-        val ramadan = cachedIsRamadan(effectiveToday, profile.ramadanOffset, effectiveZone)
+        val offset = RamadanDetector.effectiveHijriOffset(
+            profile.hijriOffset, profile.hijriOffsetMonthKey, effectiveToday, effectiveZone,
+        )
+        val ramadan = cachedIsRamadan(effectiveToday, offset, effectiveZone)
         return ProfileUiState(
             profile = profile,
             ribbonRows = deriveRibbonRows(times, profile.asrMadhab, effectiveNow, ramadan, timeFormatter),
@@ -188,7 +193,7 @@ class HomeViewModel(
             isRamadan = ramadan,
             showRamadanBanner = ramadan && dismissedYear != hijriYear,
             outstandingQazaCount = qazaCount,
-            hijriDateText = cachedHijri(effectiveToday, effectiveZone),
+            hijriDateText = cachedHijri(effectiveToday, offset, effectiveZone),
         )
     }
 

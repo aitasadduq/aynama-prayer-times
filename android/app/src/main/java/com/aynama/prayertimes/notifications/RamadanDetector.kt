@@ -18,12 +18,29 @@ object RamadanDetector {
     fun isRamadan(date: LocalDate, zone: ZoneId = ZoneId.systemDefault()): Boolean =
         isRamadan(islamicMonthOf(date, zone))
 
+    // A positive offset advances the Hijri calendar (the month starts earlier, e.g. moon
+    // sighted the night before the calculated date); a negative offset delays it.
     fun isRamadanWithOffset(date: LocalDate, offsetDays: Int, zone: ZoneId = ZoneId.systemDefault()): Boolean =
-        isRamadan(date.minusDays(offsetDays.toLong()), zone)
+        isRamadan(date.plusDays(offsetDays.toLong()), zone)
 
     internal fun isRamadan(month: Int): Boolean = month == RAMADAN_MONTH
 
     fun currentHijriYear(): Int = IslamicCalendar().get(Calendar.YEAR)
+
+    // Stable identifier for a Hijri month (year * 12 + month) on the given civil date.
+    fun hijriMonthKey(date: LocalDate, zone: ZoneId = ZoneId.systemDefault()): Int {
+        val cal = calendarFor(date, zone)
+        return cal.get(Calendar.YEAR) * 12 + cal.get(Calendar.MONTH)
+    }
+
+    // The offset only applies while the adjusted (perceived) Hijri month still matches the month
+    // it was set for; once a new month begins it auto-expires to 0. Evaluated with the stored
+    // offset constant so the month comparison is independent of the result.
+    fun effectiveHijriOffset(offset: Int, monthKey: Int, date: LocalDate, zone: ZoneId = ZoneId.systemDefault()): Int =
+        if (offset != 0 && hijriMonthKey(date.plusDays(offset.toLong()), zone) == monthKey) offset else 0
+
+    fun hijriDateWithOffset(date: LocalDate, offsetDays: Int, zone: ZoneId = ZoneId.systemDefault()): String =
+        hijriDateOf(date.plusDays(offsetDays.toLong()), zone)
 
     fun hijriDateOf(date: LocalDate, zone: ZoneId = ZoneId.systemDefault()): String {
         val cal = calendarFor(date, zone)

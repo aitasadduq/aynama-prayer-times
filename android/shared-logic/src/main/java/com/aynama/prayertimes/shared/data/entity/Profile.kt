@@ -1,5 +1,6 @@
 package com.aynama.prayertimes.shared.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.aynama.prayertimes.shared.CalculationMethodKey
@@ -19,7 +20,10 @@ data class Profile(
     val sortOrder: Int,
     val timezone: String = "",
     val useLocationTimezone: Boolean = false,
-    val ramadanOffset: Int = 0,
+    @ColumnInfo(name = "ramadanOffset") val hijriOffset: Int = 0,
+    // Adjusted-calendar Hijri month (year*12+month) the offset was set for; offset auto-expires
+    // once the perceived month changes. 0 = none.
+    val hijriOffsetMonthKey: Int = 0,
 )
 
 fun Profile.effectiveZoneId(): ZoneId =

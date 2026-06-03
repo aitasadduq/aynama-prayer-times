@@ -62,40 +62,44 @@ class RamadanDetectionTest {
         assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 10), 0))
     }
 
+    // Positive offset pulls Ramadan earlier (moon sighted the night before calc).
+
     @Test
-    fun offset1_firstCalcDay_returnsFalse() {
-        // With offset=1, Ramadan effectively starts Mar 12; Mar 11 is pre-Ramadan
-        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 11), 1))
+    fun offset1_dayBeforeCalcStart_returnsTrue() {
+        // Mar 10 with offset=+1: checks Mar 11 (first calc day) → Ramadan
+        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 10), 1))
     }
 
     @Test
-    fun offset1_secondCalcDay_returnsTrue() {
-        // Mar 12 with offset=1: checks Mar 11 (first calc day) → Ramadan
-        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 12), 1))
+    fun offset1_twoDaysBeforeCalcStart_returnsFalse() {
+        // Mar 9 with offset=+1: checks Mar 10 (Shaban) → not Ramadan
+        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 9), 1))
     }
 
     @Test
-    fun offset1_dayAfterCalcEnd_returnsTrue() {
-        // Apr 10 with offset=1: checks Apr 9 (last calc day) → still Ramadan
-        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 4, 10), 1))
+    fun offset1_lastCalcDay_returnsFalse() {
+        // Apr 9 with offset=+1: checks Apr 10 (Shawwal) → window also ends a day earlier
+        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 4, 9), 1))
     }
 
     @Test
-    fun offset1_twoDaysAfterCalcEnd_returnsFalse() {
-        // Apr 11 with offset=1: checks Apr 10 (Shawwal) → not Ramadan
-        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 4, 11), 1))
+    fun offset2_twoDaysBeforeCalcStart_returnsTrue() {
+        // Mar 9 with offset=+2: checks Mar 11 (first calc day) → Ramadan
+        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 9), 2))
+    }
+
+    // Negative offset delays Ramadan (moon sighted the night after calc).
+
+    @Test
+    fun offsetMinus1_firstCalcDay_returnsFalse() {
+        // Mar 11 with offset=-1: checks Mar 10 (Shaban) → not yet Ramadan
+        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 11), -1))
     }
 
     @Test
-    fun offset2_secondCalcDay_returnsFalse() {
-        // Mar 12 with offset=2: checks Mar 10 (Shaban) → not Ramadan
-        assertFalse(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 12), 2))
-    }
-
-    @Test
-    fun offset2_thirdCalcDay_returnsTrue() {
-        // Mar 13 with offset=2: checks Mar 11 (first calc day) → Ramadan
-        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 13), 2))
+    fun offsetMinus1_secondCalcDay_returnsTrue() {
+        // Mar 12 with offset=-1: checks Mar 11 (first calc day) → Ramadan
+        assertTrue(RamadanDetector.isRamadanWithOffset(LocalDate.of(2024, 3, 12), -1))
     }
 
     // hijriDateOf — civil Islamic calendar maps Mar 11, 2024 → Ramaḍān 1445
@@ -129,5 +133,76 @@ class RamadanDetectionTest {
         val result = RamadanDetector.hijriDateOf(LocalDate.of(2024, 3, 11))
         // Expect "<digits> <month> <year>"
         assertTrue("expected '<day> <month> <year>' format, got '$result'", result.matches(Regex("\\d{1,2} .+ \\d{4}")))
+    }
+
+    // hijriDateWithOffset — offset shifts the displayed Hijri date across all months.
+
+    @Test
+    fun hijriDateWithOffset_positive_matchesLaterCivilDate() {
+        // Mar 10 with offset=+1 resolves to Mar 11 → 1 Ramaḍān 1445
+        val shifted = RamadanDetector.hijriDateWithOffset(LocalDate.of(2024, 3, 10), 1)
+        assertEquals(RamadanDetector.hijriDateOf(LocalDate.of(2024, 3, 11)), shifted)
+        assertTrue("expected Ramaḍān in '$shifted'", shifted.contains("Ramaḍān"))
+    }
+
+    @Test
+    fun hijriDateWithOffset_negative_matchesEarlierCivilDate() {
+        // Mar 11 with offset=-1 resolves to Mar 10 → late Shaʻbān 1445 (pre-Ramadan)
+        val shifted = RamadanDetector.hijriDateWithOffset(LocalDate.of(2024, 3, 11), -1)
+        assertEquals(RamadanDetector.hijriDateOf(LocalDate.of(2024, 3, 10)), shifted)
+        assertFalse("expected pre-Ramadan date in '$shifted'", shifted.contains("Ramaḍān"))
+    }
+
+    // effectiveHijriOffset — offset auto-expires once the perceived Hijri month changes.
+    // Ramadan 1445 (calc): Mar 11 – Apr 9, 2024; Shawwāl 1445 begins Apr 10.
+
+    private val utc = ZoneId.of("UTC")
+    private val ramadan1445Key get() = RamadanDetector.hijriMonthKey(LocalDate.of(2024, 3, 20), utc)
+
+    @Test
+    fun hijriMonthKey_consecutiveMonths_differByOne() {
+        val ramadan = RamadanDetector.hijriMonthKey(LocalDate.of(2024, 3, 20), utc)
+        val shawwal = RamadanDetector.hijriMonthKey(LocalDate.of(2024, 4, 20), utc)
+        assertEquals(1, shawwal - ramadan)
+    }
+
+    @Test
+    fun effectiveOffset_midMonth_appliesOffset() {
+        // Mar 19 with offset=+1 → adjusted Mar 20 is Ramadan → offset stands
+        assertEquals(1, RamadanDetector.effectiveHijriOffset(1, ramadan1445Key, LocalDate.of(2024, 3, 19), utc))
+    }
+
+    @Test
+    fun effectiveOffset_firstPerceivedDay_appliesOffset() {
+        // Mar 10 (calc 30 Shaʻbān) with offset=+1 → adjusted Mar 11 is Ramadan → Imsak active on day 1
+        assertEquals(1, RamadanDetector.effectiveHijriOffset(1, ramadan1445Key, LocalDate.of(2024, 3, 10), utc))
+    }
+
+    @Test
+    fun effectiveOffset_beforePerceivedStart_returnsZero() {
+        // Mar 9 with offset=+1 → adjusted Mar 10 still Shaʻbān → not yet active
+        assertEquals(0, RamadanDetector.effectiveHijriOffset(1, ramadan1445Key, LocalDate.of(2024, 3, 9), utc))
+    }
+
+    @Test
+    fun effectiveOffset_newPerceivedMonth_resetsToZero() {
+        // Apr 9 with offset=+1 is the user's perceived 1 Shawwāl (Eid); adjusted Apr 10 is Shawwāl,
+        // no longer the Ramadan it was set for, so the offset auto-resets to 0.
+        assertEquals(0, RamadanDetector.effectiveHijriOffset(1, ramadan1445Key, LocalDate.of(2024, 4, 9), utc))
+    }
+
+    @Test
+    fun effectiveOffset_negative_appliesThroughPerceivedMonthThenResets() {
+        // -1 set in Ramadan keeps the same month key. Apr 10 (calc 1 Shawwāl) is the user's
+        // perceived 30 Ramadan → still active; Apr 11 is their 1 Shawwāl → resets.
+        assertEquals(-1, RamadanDetector.effectiveHijriOffset(-1, ramadan1445Key, LocalDate.of(2024, 4, 10), utc))
+        assertEquals(0, RamadanDetector.effectiveHijriOffset(-1, ramadan1445Key, LocalDate.of(2024, 4, 11), utc))
+    }
+
+    @Test
+    fun effectiveOffset_zeroOffsetOrNoAnchor_returnsZero() {
+        assertEquals(0, RamadanDetector.effectiveHijriOffset(0, ramadan1445Key, LocalDate.of(2024, 3, 19), utc))
+        // monthKey 0 = none (e.g. legacy/pre-anchor value) → treated as expired
+        assertEquals(0, RamadanDetector.effectiveHijriOffset(1, 0, LocalDate.of(2024, 3, 19), utc))
     }
 }

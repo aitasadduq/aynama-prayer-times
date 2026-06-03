@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -64,9 +65,11 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aynama.prayertimes.AynamaApplication
+import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.aynama.prayertimes.ui.theme.Ink
 import com.aynama.prayertimes.ui.theme.InkMuted
 import com.aynama.prayertimes.ui.theme.Parchment
@@ -76,6 +79,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
@@ -175,17 +179,24 @@ fun SettingsScreen(onNavigateToNotifications: () -> Unit = {}) {
 }
 
 @Composable
-private fun RamadanOffsetSelector(selected: Int, onSelect: (Int) -> Unit) {
-    val options = listOf(0 to "Calculated", 1 to "+1 day", 2 to "+2 days")
+private fun HijriOffsetSelector(selected: Int, onSelect: (Int) -> Unit) {
+    val options = (-2..2).map { value ->
+        value to when {
+            value > 0 -> "+$value"
+            value < 0 -> "−${-value}"
+            else -> "0"
+        }
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         options.forEach { (value, label) ->
             if (value == selected) {
                 Button(
                     onClick = {},
                     modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 0.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Saffron, contentColor = Ink),
                 ) {
                     Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
@@ -194,6 +205,7 @@ private fun RamadanOffsetSelector(selected: Int, onSelect: (Int) -> Unit) {
                 OutlinedButton(
                     onClick = { onSelect(value) },
                     modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 0.dp),
                 ) {
                     Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
@@ -269,7 +281,13 @@ private fun ProfileFormSheet(
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var method by remember { mutableStateOf(initial?.calculationMethod ?: CalculationMethodKey.MWL) }
     var madhab by remember { mutableStateOf(initial?.asrMadhab ?: AsrMadhab.SHAFII) }
-    var ramadanOffset by remember { mutableStateOf(initial?.ramadanOffset ?: 0) }
+    var hijriOffset by remember {
+        val effective = initial?.let {
+            val zone = it.effectiveZoneId()
+            RamadanDetector.effectiveHijriOffset(it.hijriOffset, it.hijriOffsetMonthKey, LocalDate.now(zone), zone)
+        } ?: 0
+        mutableStateOf(effective)
+    }
 
     var locationLat by remember { mutableStateOf(initial?.latitude) }
     var locationLng by remember { mutableStateOf(initial?.longitude) }
@@ -365,12 +383,19 @@ private fun ProfileFormSheet(
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = "Ramadan start",
+                text = "Hijri date adjustment",
                 style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 2.dp),
+            )
+
+            Text(
+                text = "Shifts the Hijri date and Ramadan for local moon sighting. 0 keeps the calculated date; + starts the month earlier, − later.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
 
-            RamadanOffsetSelector(selected = ramadanOffset, onSelect = { ramadanOffset = it })
+            HijriOffsetSelector(selected = hijriOffset, onSelect = { hijriOffset = it })
 
             Spacer(Modifier.height(24.dp))
 
@@ -385,7 +410,7 @@ private fun ProfileFormSheet(
                         isGps = false,
                         sortOrder = 0,
                     )
-                    onSave(base.copy(
+                    val saved = base.copy(
                         name = name.trim(),
                         latitude = locationLat!!,
                         longitude = locationLng!!,
@@ -393,8 +418,12 @@ private fun ProfileFormSheet(
                         asrMadhab = madhab,
                         timezone = locationTimezone,
                         useLocationTimezone = useLocationTimezone,
-                        ramadanOffset = ramadanOffset,
-                    ))
+                        hijriOffset = hijriOffset,
+                    )
+                    val zone = saved.effectiveZoneId()
+                    val monthKey = if (hijriOffset == 0) 0
+                        else RamadanDetector.hijriMonthKey(LocalDate.now(zone).plusDays(hijriOffset.toLong()), zone)
+                    onSave(saved.copy(hijriOffsetMonthKey = monthKey))
                 },
                 enabled = valid,
                 modifier = Modifier.fillMaxWidth(),
