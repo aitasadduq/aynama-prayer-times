@@ -41,10 +41,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aynama.prayertimes.AynamaApplication
+import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
 import com.aynama.prayertimes.tracker.MarkPrayerSheet
@@ -175,25 +177,46 @@ private fun ProfilePage(
     ) {
         Spacer(Modifier.height(16.dp))
 
-        Text(
-            text = "Home · ${profileState.profile.name}",
-            style = MaterialTheme.typography.bodySmall,
-            color = LocalContentColor.current.copy(alpha = 0.7f),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "${profileState.profile.name} · ${profileState.profile.calculationMethod.taqweemName()}",
+                style = MaterialTheme.typography.bodySmall,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
+            )
+            Text(
+                text = profileState.hijriDateText,
+                style = MaterialTheme.typography.bodySmall,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
+                maxLines = 1,
+            )
+        }
 
         Spacer(Modifier.height(24.dp))
 
         Text(
             text = profileState.countdownText,
             style = MaterialTheme.typography.displayLarge.copy(fontFeatureSettings = "tnum"),
-            modifier = Modifier.semantics {
-                contentDescription = "Countdown to ${profileState.nextPrayerName}: ${profileState.countdownText}"
-            },
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .semantics {
+                    contentDescription = "Countdown to ${profileState.nextPrayerName}: ${profileState.countdownText}"
+                },
         )
 
         Text(
             text = "${profileState.nextPrayerName} · ${profileState.nextPrayerTime}",
             style = MaterialTheme.typography.displaySmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
 
         Spacer(Modifier.height(24.dp))
@@ -538,4 +561,17 @@ private fun Prayer.displayName(): String = when (this) {
     Prayer.ASR -> "Asr"
     Prayer.MAGHRIB -> "Maghrib"
     Prayer.ISHA -> "Isha"
+}
+
+private fun CalculationMethodKey.taqweemName(): String = when (this) {
+    CalculationMethodKey.MWL -> "MWL"
+    CalculationMethodKey.ISNA -> "ISNA"
+    CalculationMethodKey.UMM_AL_QURA -> "Umm al-Qurā"
+    CalculationMethodKey.EGYPTIAN -> "Egyptian"
+    CalculationMethodKey.KARACHI -> "Karachi"
+    CalculationMethodKey.DUBAI -> "Dubai"
+    CalculationMethodKey.MOON_SIGHTING_COMMITTEE -> "MSC"
+    CalculationMethodKey.KUWAIT -> "Kuwait"
+    CalculationMethodKey.QATAR -> "Qatar"
+    CalculationMethodKey.SINGAPORE -> "Singapore"
 }

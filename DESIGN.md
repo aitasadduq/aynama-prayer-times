@@ -727,4 +727,44 @@ When timezone auto-detection failed (blank `timezone`), the row is hidden entire
 - Toggle on: prayer times and alarm scheduling use `ZoneId.of(profile.timezone)`.
 - Toggle off: prayer times and alarm scheduling use `ZoneId.systemDefault()`.
 - The home screen ribbon, countdown, and alarm triggers all use the same resolved timezone (`profile.effectiveZoneId()`), so they stay consistent.
+
+---
+
+## 18. Hijri Settings — Ramadan Start Offset
+
+### Context
+
+Islamic communities differ on when Ramadan begins. Some follow the astronomical calculation; others wait for physical moon sighting, beginning Ramadan 1 or 2 days later. This setting lets users align the app to their community's practice.
+
+### Placement
+
+Inside the profile edit/create bottom sheet, below the Asr school selector and above the Save button. This is per-profile — each profile independently controls when its Ramadan window begins.
+
+### Control
+
+A 3-option segmented row: **Calculated · +1 day · +2 days**
+
+- Layout: `Row` with even-weight buttons, same pattern as the Asr school selector in the profile edit sheet.
+- Selected option: filled `Button` with saffron background, parchment text.
+- Unselected options: `OutlinedButton` with ink-muted border, ink text.
+- Row label above: "Ramadan start" (IBM Plex `body`, ink).
+
+```
+Calculation method  MWL             ›
+Asr school          Shafi'i         ›
+Ramadan start
+[ Calculated ]  [ +1 day ]  [ +2 days ]
+```
+
+### Semantics
+
+- **Calculated (0)**: Ramadan detection uses the astronomical Hijri calendar directly.
+- **+1 day (1)**: Ramadan is treated as starting 1 day after the calculated start (i.e., `isRamadan(date - 1)`).
+- **+2 days (2)**: Same, shifted 2 days later.
+
+The offset applies globally (not per-profile): Imsak display, Ramadan banner, and Imsak alarm scheduling all use the same resolved value.
+
+### Persistence
+
+Stored as `ramadanOffset: Int` on the `Profile` entity (Room column, default `0`). Applied independently per profile.
 - Sunrise is not a tracked prayer. Five indicators per row, not six.

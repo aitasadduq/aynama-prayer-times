@@ -190,7 +190,10 @@ class NotificationSettingsViewModel(
             val notificationProfile = resolveNotificationProfile(prefs.notificationProfileId, profiles) ?: return@launch
             prefs.migrateFromV1(notificationProfile.id)
             val date = LocalDate.now()
-            val isRamadan = RamadanDetector.isRamadan(date)
+            val offset = RamadanDetector.effectiveHijriOffset(
+                notificationProfile.hijriOffset, notificationProfile.hijriOffsetMonthKey, date, notificationProfile.effectiveZoneId(),
+            )
+            val isRamadan = RamadanDetector.isRamadanWithOffset(date, offset, notificationProfile.effectiveZoneId())
             val times = AdhanWrapper().getPrayerTimes(
                 latitude = notificationProfile.latitude,
                 longitude = notificationProfile.longitude,
