@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -176,12 +177,14 @@ private fun TodayPrayerRow(
     onTap: () -> Unit,
 ) {
     val prayerName = row.prayer.displayName()
+    val a11y = if (row.tappable) "Mark $prayerName prayer" else "$prayerName prayer, not due yet"
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .clickable(onClick = onTap)
-            .semantics { contentDescription = "Mark $prayerName prayer" },
+            .alpha(if (row.tappable) 1f else 0.4f)
+            .clickable(enabled = row.tappable, onClick = onTap)
+            .semantics { contentDescription = a11y },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

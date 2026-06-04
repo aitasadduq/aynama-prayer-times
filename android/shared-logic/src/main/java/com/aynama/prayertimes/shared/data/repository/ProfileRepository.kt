@@ -5,10 +5,20 @@ import com.aynama.prayertimes.shared.data.dao.ProfileDao
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 class ProfileRepository(private val dao: ProfileDao) {
 
     fun observeAll(): Flow<List<Profile>> = dao.observeAll()
+
+    /**
+     * The single profile screens default to when they don't let the user pick one
+     * (Home pager and Notifications picker excluded). Prefers the GPS profile, otherwise
+     * the lowest sortOrder. Shared by Qibla and Tracker so they never disagree.
+     */
+    fun observeDefaultProfile(): Flow<Profile?> = observeAll().map { profiles ->
+        profiles.firstOrNull { it.isGps } ?: profiles.minByOrNull { it.sortOrder }
+    }
 
     suspend fun insert(profile: Profile): Long = dao.insert(profile)
 

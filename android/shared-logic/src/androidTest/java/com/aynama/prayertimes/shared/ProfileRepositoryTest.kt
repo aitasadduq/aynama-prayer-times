@@ -90,6 +90,28 @@ class ProfileRepositoryTest {
     }
 
     @Test
+    fun observeDefaultProfile_returns_null_when_empty() = runBlocking {
+        assertNull(repo.observeDefaultProfile().first())
+    }
+
+    @Test
+    fun observeDefaultProfile_prefers_gps_over_sort_order() = runBlocking {
+        repo.insert(profile("Manual", isGps = false, sortOrder = 0))
+        repo.insert(profile("GPS", isGps = true, sortOrder = 1))
+        val default = repo.observeDefaultProfile().first()
+        assertEquals("GPS", default?.name)
+    }
+
+    @Test
+    fun observeDefaultProfile_falls_back_to_lowest_sort_order_when_no_gps() = runBlocking {
+        repo.insert(profile("B", sortOrder = 2))
+        repo.insert(profile("A", sortOrder = 0))
+        repo.insert(profile("C", sortOrder = 5))
+        val default = repo.observeDefaultProfile().first()
+        assertEquals("A", default?.name)
+    }
+
+    @Test
     fun qaza_cascade_on_profile_delete() = runBlocking {
         val id = repo.insert(profile("Home"))
         qazaRepo.markPrayer(id, Prayer.FAJR, LocalDate.of(2026, 4, 25), QazaStatus.MISSED)
