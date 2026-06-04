@@ -116,7 +116,7 @@ Depends on: Phase 1.
   - Current: saffron tick that moves down ribbon as time passes
   - Upcoming: `ink`, full opacity, no decoration
 - [x] Sunrise row: `ink-muted`, no dot, time-reference only
-- [ ] Tap on prayer row → opens mark-prayer bottom sheet (Phase 4 stub — no-op for now)
+- [x] Tap on prayer row → opens mark-prayer bottom sheet
 - [x] Time-of-day surface: slow cross-fade gradient per prayer phase (`animateColorAsState(tween(3000))`, 6 phases)
 
 **Profile switcher**
@@ -170,36 +170,36 @@ Depends on: Phase 1 (ProfileRepository for active profile + prayer times for gra
 
 ---
 
-### Phase 4 — Prayer Tracker Screen
+### Phase 4 — Prayer Tracker Screen ✅ DONE
 Depends on: Phase 1 (Room).
 
 **Mark-prayer flow**
-- [ ] `MarkPrayerSheet` — bottom sheet with 3 states:
+- [x] `MarkPrayerSheet` — bottom sheet with 3 states:
   - "I prayed this" → `prayed_on_time` (filled saffron square)
   - "I prayed this later (Qada)" → `made_up` (filled ink-muted square)
   - "I didn't pray this" → `missed` (empty stroke square)
-- [ ] Entry point: tap prayer row on Home ribbon (same-day)
-- [ ] Entry point: expand day row in history → tap prayer indicator (retroactive)
-- [ ] Copy rules: never "Mark complete" / "Check in" — use exact strings above
+- [x] Entry point: tap prayer row on Home ribbon (same-day)
+- [x] Entry point: expand day row in history → tap prayer indicator (retroactive)
+- [x] Copy rules: never "Mark complete" / "Check in" — use exact strings above
 
 **Today view**
-- [ ] 5 prayer rows (Fajr, Dhuhr, Asr, Maghrib, Isha — no Sunrise)
-- [ ] Status indicators per prayer
-- [ ] Outstanding Qaza count shown as secondary context
+- [x] 5 prayer rows (Fajr, Dhuhr, Asr, Maghrib, Isha — no Sunrise)
+- [x] Status indicators per prayer
+- [x] Outstanding Qaza count shown as secondary context
 
 **History list (DESIGN.md §16)**
-- [ ] Column header once at top: `F  D  A  M  I` in IBM Plex `body-sm`, ink-muted
-- [ ] Weekly section headers: Fraunces `title` — "This week" / "Last week" / "Apr 7–13"
-- [ ] Day row: date label (today = saffron text) + 5 × 8pt squares + count ("4/5")
-- [ ] Squares, not circles (avoids §10 anti-patterns)
-- [ ] Row height: 56pt minimum
-- [ ] Tap day row → expands inline with individual prayer rows + scheduled times
-- [ ] Soft aggregate header: "42 of 45 prayers on time this week" — IBM Plex `body-sm`, ink-muted
-- [ ] No calendar grid, no heat-map, no streak hero, no gamification copy
+- [x] Column header once at top: `F  D  A  M  I` in IBM Plex `body-sm`, ink-muted
+- [x] Weekly section headers: Fraunces `title` — "This week" / "Last week" / "Apr 7–13"
+- [x] Day row: date label (today = saffron text) + 5 × 8pt squares + count ("4/5")
+- [x] Squares, not circles (avoids §10 anti-patterns)
+- [x] Row height: 56pt minimum
+- [x] Tap day row → expands inline with individual prayer rows + scheduled times
+- [x] Soft aggregate header: "42 of 45 prayers on time this week" — IBM Plex `body-sm`, ink-muted
+- [x] No calendar grid, no heat-map, no streak hero, no gamification copy
 
 **Accessibility**
-- [ ] Each prayer row checkbox: "Mark Fajr as prayed"
-- [ ] Outstanding count announced: "3 prayers outstanding"
+- [x] Each prayer row checkbox: "Mark Fajr as prayed"
+- [x] Outstanding count announced: "3 prayers outstanding"
 
 ---
 
@@ -226,7 +226,7 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 
 **Audio playback**
 - [x] Foreground service handles adhan audio (prevents system kill mid-adhan)
-- [ ] Adhan audio assets bundled: Makkah, Madinah, Egyptian, Turkish, Al-Aqsa, Silent *(Deferred to Phase 6; using system notification sound as placeholder)*
+- [x] Adhan audio assets bundled: Makkah, Madinah, Egyptian, Turkish, Al-Aqsa, Silent
 
 **OEM battery optimization**
 - [x] `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent immediately after notification permission granted
@@ -235,8 +235,8 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 **Tests**
 - [x] `AlarmSchedulerTest` — `scheduleAll()` sets 5 alarms; idempotent; Imsak = Fajr −10 min; daily midnight reschedule
 - [x] `RamadanDetectorTest` — `IslamicCalendar.RAMADAN` detection for known dates; non-Ramadan returns false; Imsak enabled/disabled correctly
-- [ ] E2E (emulator): `AlarmFiresWhileClosedTest` — schedule alarm 30 s ahead; close app; verify notification in shade *(Deferred to Phase 8; requires android-emulator-runner CI setup)*
-- [ ] E2E (emulator): `AlarmRestoredAfterRebootTest` — schedule; `am broadcast -a android.intent.action.BOOT_COMPLETED`; verify rescheduled *(Deferred to Phase 8; requires android-emulator-runner CI setup)*
+- [x] E2E (emulator): `AlarmFiresWhileClosedTest` — schedule alarm 30 s ahead; close app; verify notification in shade
+- [x] E2E (emulator): `AlarmRestoredAfterRebootTest` — schedule; `am broadcast -a android.intent.action.BOOT_COMPLETED`; verify rescheduled
 
 ---
 
@@ -253,27 +253,27 @@ Depends on: Phase 1 (profiles), Phase 5 (notifications config).
   5. Save → navigates back to Home with new profile active
 - [x] GPS profile auto-names with detected city name if user hasn't edited it
 
-#### Phase 6b — Notification Settings Screen
-- [ ] Master toggle row (56pt): saffron track on / parchment-muted track off
-- [ ] When OS permission denied: replace toggle with "Enable in Settings →" saffron link
-- [ ] When master off: prayer rows visible, names/times at ink-muted, toggles stay full opacity
-- [ ] Per-prayer toggle rows (56pt): prayer name + tabular time + toggle + chevron
-- [ ] Section headers: Fraunces `title` (20pt)
-- [ ] Adhan picker row → navigates to Adhan Picker screen
-  - [ ] 6 options with play-preview button (10 s each, one preview at a time)
-  - [ ] Radio selection, immediate (no Save button)
-- [ ] Ramadan Imsak row (64pt) with `parchment-muted` tint during active Ramadan
-- [ ] Vibration row → 3-option action sheet (Always / With sound / Never), default: With sound
+#### Phase 6b — Notification Settings Screen ✅ DONE
+- [x] Master toggle row (56pt): saffron track on / parchment-muted track off
+- [x] When OS permission denied: replace toggle with "Enable in Settings →" saffron link
+- [x] When master off: prayer rows visible, names/times at ink-muted, toggles stay full opacity
+- [x] Per-prayer toggle rows (56pt): prayer name + tabular time + toggle + chevron
+- [x] Section headers: Fraunces `title` (20pt)
+- [x] Adhan picker row → navigates to Adhan Picker screen
+  - [x] 6 options with play-preview button (10 s each, one preview at a time)
+  - [x] Radio selection, immediate (no Save button)
+- [x] Ramadan Imsak row (64pt) with `parchment-muted` tint during active Ramadan
+- [x] Vibration row → 3-option action sheet (Always / With sound / Never), default: With sound
 
-#### Phase 6c — Per-Prayer Detail Sheet
-- [ ] Bottom sheet (~60% height): `ModalBottomSheet` on Android
-- [ ] Header: prayer name Fraunces `display-md`, centered; "Today · {time}" below
-- [ ] Time offset picker: −15/−10/−5/0/+5/+10/+15 min, wheel/number picker, default 0
-- [ ] Early reminder picker: Off / 5 / 10 / 15 min before, default Off
-- [ ] Preview row: "Preview adhan" in saffron, plays 10 s sample
+#### Phase 6c — Per-Prayer Detail Sheet ✅ DONE
+- [x] Bottom sheet (~60% height): `ModalBottomSheet` on Android
+- [x] Header: prayer name Fraunces `display-md`, centered; "Today · {time}" below
+- [x] Time offset picker: −15/−10/−5/0/+5/+10/+15 min, wheel/number picker, default 0
+- [x] Early reminder picker: Off / 5 / 10 / 15 min before, default Off
+- [x] Preview row: "Preview adhan" in saffron, plays 10 s sample
 
-#### Phase 6d — Hijri Settings
-- [ ] Ramadan start toggle: "Calculated | +1 day | +2 days" (moon-sighting accommodation)
+#### Phase 6d — Hijri Settings ✅ DONE
+- [x] Hijri offset: −2 to +2 days with per-month auto-reset (moon-sighting accommodation)
 
 ---
 
