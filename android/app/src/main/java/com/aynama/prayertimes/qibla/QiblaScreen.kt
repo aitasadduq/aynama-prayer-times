@@ -1,7 +1,11 @@
 package com.aynama.prayertimes.qibla
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.VibrationEffect
 import android.os.Vibrator
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -49,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -82,6 +87,21 @@ fun QiblaScreen() {
     val app = LocalContext.current.applicationContext as AynamaApplication
     val vm: QiblaViewModel = viewModel(factory = QiblaViewModel.factory(app))
     val uiState by vm.uiState.collectAsStateWithLifecycle()
+
+    // Fine location lets the compass point from the user's current GPS position rather than a
+    // saved profile. On Android 12+ the system shows a Precise/Approximate picker — either
+    // answer is handled; if denied entirely, the screen still works from the active profile.
+    val locationPermissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { }
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            app,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
+            app,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -166,6 +186,9 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
 
     val numberFormat = remember { NumberFormat.getNumberInstance() }
     val formattedDistance = numberFormat.format(state.distanceKm.roundToInt())
+
+    // Round (not truncate) and wrap 360→0 for the headline degree readout.
+    val qiblaDeg = remember(state.qiblaBearing) { state.qiblaBearing.roundToInt() % 360 }
 
     val frauncesTitle = remember { frauncesFamily(32f) }
 
@@ -294,14 +317,14 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 BearingReadout(
-                    degrees = state.qiblaDegrees,
+                    degrees = qiblaDeg,
                     distanceLabel = "$formattedDistance km to the Kaaba",
                     boxBg = boxBg,
                     boxFg = boxFg,
                     boxFgMuted = boxFgMuted,
                 )
                 BearingChipsRow(
-                    qiblaDeg = state.qiblaDegrees,
+                    qiblaDeg = qiblaDeg,
                     boxBg = boxBg,
                     boxFg = boxFg,
                     boxFgQuiet = boxFgQuiet,

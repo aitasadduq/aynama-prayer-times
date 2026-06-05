@@ -23,8 +23,10 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
@@ -33,6 +35,7 @@ data class TrackerPrayerRow(
     val prayer: Prayer,
     val scheduledTime: String,
     val status: QazaStatus?,
+    val tappable: Boolean = true,
 )
 
 data class DayState(
@@ -65,6 +68,7 @@ sealed interface TrackerUiState {
 class TrackerViewModel(
     private val profileRepository: ProfileRepository,
     private val qazaRepository: QazaRepository,
+    private val clock: Clock = Clock.systemDefaultZone(),
 ) : ViewModel() {
 
     private val adhan = AdhanWrapper()
@@ -77,11 +81,10 @@ class TrackerViewModel(
     val uiState: StateFlow<TrackerUiState> = _uiState.asStateFlow()
 
     init {
-        profileRepository.observeAll()
-            .flatMapLatest { profiles ->
-                val profile = profiles.firstOrNull()
-                    ?: return@flatMapLatest flowOf(TrackerUiState.Empty)
-                val today = LocalDate.now()
+        profileRepository.observeDefaultProfile()
+            .flatMapLatest { profile ->
+                if (profile == null) return@flatMapLatest flowOf(TrackerUiState.Empty)
+                val today = LocalDate.now(clock)
                 val historyStart = today
                     .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
                     .minusWeeks(3)
@@ -121,15 +124,26 @@ class TrackerViewModel(
 
         val todayTimes = cachedPrayerTimes(profile, today)
         val todayEntries = byDate[today] ?: emptyMap()
+        val now = LocalTime.now(clock)
         val todayRows = Prayer.entries.map { prayer ->
+            val time = todayTimes.timeFor(prayer, profile.asrMadhab)
             TrackerPrayerRow(
                 prayer = prayer,
-                scheduledTime = todayTimes.timeFor(prayer, profile.asrMadhab).format(timeFormatter),
+                scheduledTime = time.format(timeFormatter),
                 status = todayEntries[prayer],
+                tappable = !time.isAfter(now),
             )
         }
 
-        val weeks = buildWeekSections(profile, today, historyStart, byDate, expandedDays)
+        // Today's already-due prayers count toward the current-week aggregate; not-yet-due
+        // prayers are excluded so the denominator doesn't inflate before their time comes.
+        val todayDuePrayers = todayRows.filter { it.tappable }
+        val todayOnTime = todayDuePrayers.count { it.status == QazaStatus.PRAYED_ON_TIME }
+        val todayDueTotal = todayDuePrayers.size
+
+        val weeks = buildWeekSections(
+            profile, today, historyStart, byDate, expandedDays, todayOnTime, todayDueTotal,
+        )
 
         return TrackerUiState.Loaded(
             profileId = profile.id,
@@ -146,31 +160,38 @@ class TrackerViewModel(
         historyStart: LocalDate,
         byDate: Map<LocalDate, Map<Prayer, QazaStatus>>,
         expandedDays: Set<LocalDate>,
+        todayOnTime: Int,
+        todayDueTotal: Int,
     ): List<WeekSection> {
-        val yesterday = today.minusDays(1)
-        if (yesterday < historyStart) return emptyList()
-
         val thisWeekMonday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val yesterday = today.minusDays(1)
 
-        val allHistoryDays = generateSequence(historyStart) { it.plusDays(1) }
-            .takeWhile { it <= yesterday }
-            .toList()
-            .reversed()
-
-        return allHistoryDays
+        val historyByWeek = generateSequence(historyStart) { it.plusDays(1) }
+            .takeWhile { it <= yesterday && it >= historyStart }
             .groupBy { it.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) }
-            .entries
-            .sortedByDescending { it.key }
-            .map { (weekMonday, days) ->
+
+        // Show a current-week section whenever the week has any countable prayers — either
+        // history days (Tue–Sun) or today's already-due prayers (covers Monday mornings).
+        val weekMondays = buildSet {
+            addAll(historyByWeek.keys)
+            if (todayDueTotal > 0) add(thisWeekMonday)
+        }
+        if (weekMondays.isEmpty()) return emptyList()
+
+        return weekMondays
+            .sortedDescending()
+            .map { weekMonday ->
                 val isCurrentWeek = weekMonday == thisWeekMonday
-                val dayStates = days.map { date ->
-                    buildDayState(profile, date, byDate[date] ?: emptyMap(), date in expandedDays)
-                }
-                val aggregate = if (isCurrentWeek) buildAggregate(dayStates) else null
+                val days = (historyByWeek[weekMonday] ?: emptyList())
+                    .sortedDescending()
+                    .map { date ->
+                        buildDayState(profile, date, byDate[date] ?: emptyMap(), date in expandedDays)
+                    }
+                val aggregate = if (isCurrentWeek) buildAggregate(days, todayOnTime, todayDueTotal) else null
                 WeekSection(
                     label = weekLabel(weekMonday, thisWeekMonday),
                     aggregate = aggregate,
-                    days = dayStates,
+                    days = days,
                 )
             }
     }
@@ -205,11 +226,11 @@ class TrackerViewModel(
         )
     }
 
-    private fun buildAggregate(days: List<DayState>): String {
+    private fun buildAggregate(days: List<DayState>, todayOnTime: Int, todayDueTotal: Int): String {
         val onTimeCount = days.sumOf { day ->
             day.prayers.values.count { it == QazaStatus.PRAYED_ON_TIME }
-        }
-        val total = days.size * 5
+        } + todayOnTime
+        val total = days.size * 5 + todayDueTotal
         return "$onTimeCount of $total prayers on time this week"
     }
 

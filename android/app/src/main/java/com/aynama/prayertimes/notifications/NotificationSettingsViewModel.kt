@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -56,6 +58,10 @@ class NotificationSettingsViewModel(
 
     private val _state = MutableStateFlow(NotificationSettingsUiState())
     val state: StateFlow<NotificationSettingsUiState> = _state
+
+    // Serializes reschedules so rapid toggles can't interleave a cancel from one
+    // coroutine with a submit from another (which would silently drop alarms).
+    private val rescheduleMutex = Mutex()
 
     init {
         loadPrefs()
@@ -241,8 +247,10 @@ class NotificationSettingsViewModel(
 
     private fun rescheduleAll() {
         viewModelScope.launch(Dispatchers.IO) {
-            val profiles = repo.observeAll().first()
-            AlarmScheduler.scheduleAll(context, profiles)
+            rescheduleMutex.withLock {
+                val profiles = repo.observeAll().first()
+                AlarmScheduler.scheduleAll(context, profiles)
+            }
         }
     }
 

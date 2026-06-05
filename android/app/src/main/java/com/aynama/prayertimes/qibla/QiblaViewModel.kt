@@ -11,6 +11,8 @@ import androidx.lifecycle.viewModelScope
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.home.PrayerPhase
 import com.aynama.prayertimes.home.derivePhase
+import com.aynama.prayertimes.location.AndroidCurrentLocationProvider
+import com.aynama.prayertimes.location.CurrentLocationProvider
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.QiblaCalculator
 import com.aynama.prayertimes.shared.QiblaSensorState
@@ -24,7 +26,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,7 +45,6 @@ sealed interface QiblaUiState {
         val pitch: Float,
         val roll: Float,
         val qiblaBearing: Float,
-        val qiblaDegrees: Int,
         val distanceKm: Double,
         val accuracy: SensorAccuracy,
         val phase: PrayerPhase,
@@ -54,6 +54,7 @@ sealed interface QiblaUiState {
 class QiblaViewModel(
     private val profileRepository: ProfileRepository,
     private val sensorManager: SensorManager,
+    private val locationProvider: CurrentLocationProvider = CurrentLocationProvider { null },
     private val adhan: AdhanWrapper = AdhanWrapper(),
     private val clock: Clock = Clock.systemDefaultZone(),
     private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -67,6 +68,9 @@ class QiblaViewModel(
     // sensor binder thread. @Volatile gives JMM visibility on ARM weak memory models.
     @Volatile private var activeProfile: Profile? = null
     @Volatile private var cachedTimes: Pair<LocalDate, com.aynama.prayertimes.shared.PrayerTimesResult>? = null
+    // Live device location wins over the profile's stored coordinates so the compass always
+    // points from where the user actually is. Null until a fix arrives (or permission denied).
+    @Volatile private var liveLocation: Pair<Double, Double>? = null
     @Volatile private var qiblaBearing = 0f
     @Volatile private var distanceKm = 0.0
     // ROTATION_VECTOR is a fused virtual sensor; some OEM stacks (Samsung, Huawei) never
@@ -110,8 +114,7 @@ class QiblaViewModel(
             _uiState.value = QiblaUiState.NoSensor
         }
 
-        profileRepository.observeAll()
-            .map { profiles -> profiles.firstOrNull { it.isGps } ?: profiles.minByOrNull { it.sortOrder } }
+        profileRepository.observeDefaultProfile()
             .onEach { profile ->
                 // Cancel any in-flight prayer-times fetch tied to the previous profile so
                 // it can't race the new profile's cache slot.
@@ -122,22 +125,7 @@ class QiblaViewModel(
                 if (profile == null) {
                     _uiState.value = QiblaUiState.NoProfile
                 } else {
-                    qiblaBearing = QiblaCalculator.bearingTo(profile.latitude, profile.longitude).toFloat()
-                    distanceKm = QiblaCalculator.distanceKm(profile.latitude, profile.longitude)
-                    // GeomagneticField throws when the bundled WMM model is past expiry
-                    // (e.g., WMM2020 expired 2025 on stale Android images). Falling back
-                    // to 0° declination is wrong by up to ~25° at extreme latitudes but
-                    // beats crashing the screen.
-                    magneticDeclination = try {
-                        GeomagneticField(
-                            profile.latitude.toFloat(),
-                            profile.longitude.toFloat(),
-                            0f,
-                            System.currentTimeMillis(),
-                        ).declination
-                    } catch (_: IllegalArgumentException) {
-                        0f
-                    }
+                    recomputeGeo()
                     if (sensor == null) {
                         _uiState.value = QiblaUiState.NoSensor
                     }
@@ -150,11 +138,42 @@ class QiblaViewModel(
             .launchIn(viewModelScope)
     }
 
+    /**
+     * Recomputes bearing/distance/declination from the effective location: the live GPS fix
+     * when available, otherwise the active profile's stored coordinates. Called on Main only
+     * (profile observer + location fetch), so the geo fields are written from a single thread.
+     */
+    private fun recomputeGeo() {
+        val (lat, lng) = liveLocation ?: activeProfile?.let { it.latitude to it.longitude } ?: return
+        qiblaBearing = QiblaCalculator.bearingTo(lat, lng).toFloat()
+        distanceKm = QiblaCalculator.distanceKm(lat, lng)
+        // GeomagneticField throws when the bundled WMM model is past expiry (e.g., WMM2020
+        // expired 2025 on stale Android images). Falling back to 0° declination is wrong by
+        // up to ~25° at extreme latitudes but beats crashing the screen.
+        magneticDeclination = try {
+            GeomagneticField(lat.toFloat(), lng.toFloat(), 0f, System.currentTimeMillis()).declination
+        } catch (_: IllegalArgumentException) {
+            0f
+        }
+    }
+
+    private fun fetchCurrentLocation() {
+        viewModelScope.launch {
+            val location = locationProvider.current() ?: return@launch
+            liveLocation = location
+            // Recompute from the fresh fix; the next sensor frame emits with the new bearing.
+            recomputeGeo()
+        }
+    }
+
     fun start() {
         sensor?.let {
             val ok = sensorManager.registerListener(sensorListener, it, SensorManager.SENSOR_DELAY_UI)
             if (!ok) _uiState.value = QiblaUiState.NoSensor
         }
+        // Refresh against the device's current location each time the screen resumes (also
+        // re-runs right after a permission grant, since that re-triggers ON_RESUME).
+        fetchCurrentLocation()
     }
 
     fun stop() {
@@ -222,7 +241,6 @@ class QiblaViewModel(
             pitch = pitch,
             roll = roll,
             qiblaBearing = qiblaBearing,
-            qiblaDegrees = qiblaBearing.toInt(),
             distanceKm = distanceKm,
             accuracy = accuracy,
             phase = phase,
@@ -237,6 +255,7 @@ class QiblaViewModel(
                     QiblaViewModel(
                         app.profileRepository,
                         app.getSystemService(android.content.Context.SENSOR_SERVICE) as SensorManager,
+                        AndroidCurrentLocationProvider(app),
                     ) as T
             }
     }

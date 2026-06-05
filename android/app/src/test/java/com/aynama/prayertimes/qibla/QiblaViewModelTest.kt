@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import com.aynama.prayertimes.location.CurrentLocationProvider
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.PrayerTimesResult
@@ -24,6 +25,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -70,6 +72,9 @@ class QiblaViewModelTest {
         every { sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) } returns sensor
         every { sensorManager.registerListener(any(), any<Sensor>(), any<Int>()) } returns true
         every { repo.observeAll() } returns profileFlow
+        every { repo.observeDefaultProfile() } returns profileFlow.map { profiles ->
+            profiles.firstOrNull { it.isGps } ?: profiles.minByOrNull { it.sortOrder }
+        }
 
         // Mock the static SensorManager helpers used inside onSensorChanged so we don't
         // have to construct real SensorEvents (its constructor is package-private).
@@ -115,10 +120,14 @@ class QiblaViewModelTest {
         sortOrder = 0,
     )
 
-    private fun newVm(computeDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher()) =
+    private fun newVm(
+        computeDispatcher: CoroutineDispatcher = UnconfinedTestDispatcher(),
+        locationProvider: CurrentLocationProvider = CurrentLocationProvider { null },
+    ) =
         QiblaViewModel(
             profileRepository = repo,
             sensorManager = sensorManager,
+            locationProvider = locationProvider,
             adhan = adhan,
             clock = fixedClock,
             computeDispatcher = computeDispatcher,
@@ -380,6 +389,52 @@ class QiblaViewModelTest {
         // And the distance updates too (NYC is much further from Mecca than London).
         assert(readyB.distanceKm in 10000.0..10600.0) {
             "expected distance for NYC ~10300km, got ${readyB.distanceKm}"
+        }
+    }
+
+    // ---------- Live GPS location overrides profile ----------
+
+    @Test
+    fun `live location overrides profile coordinates for bearing`() = runTest {
+        every { adhan.getPrayerTimes(any(), any(), any(), any(), any()) } returns fakeTimes
+        val captured = captureSensorListener()
+
+        // Profile is London, but the device is physically in NYC.
+        val nyc = CurrentLocationProvider { 40.7128 to -74.0060 }
+        val vm = newVm(locationProvider = nyc)
+        profileFlow.value = listOf(makeProfile(id = 1, latitude = 51.5074, longitude = -0.1278))
+        advanceUntilIdle()
+
+        vm.start() // triggers location fetch
+        advanceUntilIdle()
+        captured.captured.onSensorChanged(fakeSensorEvent())
+        advanceUntilIdle()
+
+        val ready = vm.uiState.value as QiblaUiState.Ready
+        // Should reflect NYC (~58°), not London (~119°).
+        assert(ready.qiblaBearing in 56f..60f) {
+            "expected NYC bearing ~58° from live location, got ${ready.qiblaBearing}"
+        }
+    }
+
+    @Test
+    fun `null live location falls back to profile coordinates`() = runTest {
+        every { adhan.getPrayerTimes(any(), any(), any(), any(), any()) } returns fakeTimes
+        val captured = captureSensorListener()
+
+        // Default provider returns null (denied / no fix) → profile location is used.
+        val vm = newVm()
+        profileFlow.value = listOf(makeProfile(id = 1, latitude = 51.5074, longitude = -0.1278))
+        advanceUntilIdle()
+
+        vm.start()
+        advanceUntilIdle()
+        captured.captured.onSensorChanged(fakeSensorEvent())
+        advanceUntilIdle()
+
+        val ready = vm.uiState.value as QiblaUiState.Ready
+        assert(ready.qiblaBearing in 117f..121f) {
+            "expected London bearing ~119° fallback, got ${ready.qiblaBearing}"
         }
     }
 
