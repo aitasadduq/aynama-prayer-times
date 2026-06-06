@@ -2,6 +2,7 @@ package com.aynama.prayertimes
 
 import android.app.Application
 import android.content.SharedPreferences
+import androidx.glance.appwidget.updateAll
 import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.notifications.NotificationHelper
 import com.aynama.prayertimes.shared.CalculationMethodKey
@@ -9,6 +10,7 @@ import com.aynama.prayertimes.shared.data.db.AynamaDatabase
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
+import com.aynama.prayertimes.widgets.PrayerGlanceWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,6 +36,7 @@ class AynamaApplication : Application() {
             if (BuildConfig.DEBUG) seedDebugProfilesIfEmpty()
             val profiles = profileRepository.observeAll().first()
             AlarmScheduler.scheduleAll(this@AynamaApplication, profiles)
+            PrayerGlanceWidget().updateAll(this@AynamaApplication)
         }
     }
 

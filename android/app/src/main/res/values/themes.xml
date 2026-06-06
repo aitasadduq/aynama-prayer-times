@@ -1,4 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Aynama" parent="android:Theme.Material.NoActionBar" />
+
+    <style name="WidgetScheduleName">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:layout_columnWeight">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">@font/ibm_plex_sans</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/aynama_ink_muted</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="WidgetScheduleTime">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">24dp</item>
+        <item name="android:layout_columnWeight">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">@font/ibm_plex_sans</item>
+        <item name="android:gravity">center_vertical|end</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/aynama_ink</item>
+        <item name="android:textSize">12sp</item>
+    </style>
 </resources>

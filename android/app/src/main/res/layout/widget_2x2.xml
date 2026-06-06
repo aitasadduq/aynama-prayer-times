@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/widget_next_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:fontFamily="@font/fraunces"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="@color/aynama_saffron"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <Chronometer
+        android:id="@+id/widget_countdown"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:fontFamily="@font/fraunces"
+        android:includeFontPadding="false"
+        android:textColor="@color/aynama_ink"
+        android:textSize="34sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_profile"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:ellipsize="end"
+        android:fontFamily="@font/ibm_plex_sans"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="@color/aynama_ink_muted"
+        android:textSize="13sp" />
+</LinearLayout>
