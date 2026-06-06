@@ -5,6 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.aynama.prayertimes.AynamaApplication
+import com.aynama.prayertimes.widget.WidgetUpdater
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class PrayerAlarmReceiver : BroadcastReceiver() {
 
@@ -40,6 +45,16 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
             context.startForegroundService(serviceIntent)
         } else {
             context.startService(serviceIntent)
+        }
+
+        // This prayer has passed — advance the widget to the next prayer.
+        val pendingResult = goAsync()
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                WidgetUpdater.updateAll(context.applicationContext)
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 }

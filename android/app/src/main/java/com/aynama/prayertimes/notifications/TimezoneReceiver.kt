@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.aynama.prayertimes.AynamaApplication
+import com.aynama.prayertimes.widget.WidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +21,7 @@ class TimezoneReceiver : BroadcastReceiver() {
                 val app = context.applicationContext as AynamaApplication
                 val profiles = app.profileRepository.observeAll().first()
                 AlarmScheduler.scheduleAll(context, profiles)
+                WidgetUpdater.updateAll(context)
             } finally {
                 pendingResult.finish()
             }

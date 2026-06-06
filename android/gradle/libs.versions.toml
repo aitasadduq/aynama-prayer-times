@@ -8,6 +8,7 @@ activityCompose = "1.13.0"
 composeBom = "2026.04.01"
 navigationCompose = "2.9.8"
 room = "2.8.4"
+glance = "1.1.1"
 adhan = "1.2.1"
 junit = "4.13.2"
 androidxTestJunit = "1.2.1"
@@ -36,6 +37,8 @@ compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4
 room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
+androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 
 adhan = { group = "com.batoulapps.adhan", name = "adhan", version.ref = "adhan" }
 

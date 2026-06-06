@@ -277,24 +277,28 @@ Depends on: Phase 1 (profiles), Phase 5 (notifications config).
 
 ---
 
-### Phase 7 — Home Screen Widgets (Android Glance)
+### Phase 7 — Home Screen Widgets (Android Glance) ✅ DONE (branch android-phase7-widgets)
 Depends on: Phase 1 (profiles), Phase 2 (prayer time calc).
 
 **Setup**
-- [ ] Add `glance-appwidget` dependency to `app/build.gradle.kts`
-- [ ] `GlanceAppWidget` base class + `GlanceAppWidgetReceiver`
-- [ ] Widget metadata XML (sizes, preview, description)
+- [x] Add `glance-appwidget` dependency to `app/build.gradle.kts`
+- [x] `GlanceAppWidget` base class + `GlanceAppWidgetReceiver`
+- [x] Widget metadata XML (sizes, preview, description)
 
 **Three widget sizes (DESIGN.md / architecture-design.md)**
-- [ ] 1×1 — prayer abbreviation + time ("ASR 15:49"); max 3-char abbreviation
-- [ ] 2×2 — next prayer name + countdown ("2h 14m") + profile name; countdown dominates
-- [ ] 4×2 — countdown top + full 6-time schedule list below
-- [ ] All sizes: tap → opens app Home screen
+- [x] 1×1 — prayer abbreviation + time ("ASR 15:49"); max 3-char abbreviation
+- [x] 2×2 — next prayer name + countdown + profile name; countdown dominates. Format is live-ticking `H:MM:SS` (not `2h 14m` — see DESIGN.md §11 widget exceptions)
+- [x] 4×2 — countdown top + full 6-time schedule list below
+- [x] All sizes: tap → opens app Home screen
+
+**Profile & location**
+- [x] Widget selects the displayed profile via `ProfileRepository.observeDefaultProfile()` (GPS profile preferred, else lowest `sortOrder`) — same selector now used by Home/Qibla/Tracker
+- [x] Widget renders from the default profile's **stored** coordinates; no widget-side location fetch (foreground-only / F-Droid posture preserved)
 
 **Update strategy**
-- [ ] Live countdown via `RemoteViews.setChronometerCountDown()` (system-native tick, no WorkManager)
-- [ ] Widget update triggered only on prayer change (~5×/day)
-- [ ] Widget reschedules update alarm alongside `AlarmScheduler` (Phase 5)
+- [x] Live countdown via `RemoteViews.setChronometerCountDown()` embedded in Glance via `AndroidRemoteViews` (system-native tick, no WorkManager)
+- [x] Widget update triggered only on prayer change (~5×/day) via `WidgetUpdater.updateAll`
+- [x] Widget re-pushed from existing prayer-change edges: `PrayerAlarmReceiver`, `BootReceiver` (boot + midnight), `TimezoneReceiver`, `MainActivity.onResume`
 
 ---
 
@@ -329,6 +333,11 @@ Run before Play Store submission.
 - [ ] Update `architecture-design.md` golden values table (still has PrayTimes.py values; correct to Adhan 1.2.1)
 - [ ] T5: Add `tags: List<String>` or `context: ProfileContext` to `Profile` entity schema
 - [ ] T8: Write Play Console `FOREGROUND_SERVICE_SPECIAL_USE` justification text
+
+**Location permission (new — app now requests `ACCESS_FINE_LOCATION` for live-GPS Qibla)**
+- [ ] Play Console Data Safety form: declare foreground location collection; justify as device-local only (no transmission, no sharing). Add prominent-disclosure / privacy-policy line covering location use.
+- [ ] Confirm **no** `ACCESS_BACKGROUND_LOCATION` is requested (live GPS is foreground-only via `CurrentLocationProvider`) — avoids the Play background-location review track.
+- [ ] F-Droid: confirm FINE location triggers no anti-feature (no proprietary location deps — `play-services` absent); document foreground-only use in the F-Droid description / fastlane metadata.
 
 **Play Store prep**
 - [ ] Declare `USE_EXACT_ALARM` alarm/clock category in Play Console

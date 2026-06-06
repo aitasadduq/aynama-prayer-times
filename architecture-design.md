@@ -188,13 +188,17 @@ Today is always the default view. History is accessible but not the default foca
 
 ### Widget Specs (Android Glance — v1)
 
-Three sizes, each with a specific job:
+Three **discrete, non-resizable** widgets (separate `appwidget-provider` entries, `resizeMode="none"`), each with a specific job. The user picks the size in the launcher's widget tray; there is no resize-to-adapt:
 
 | Size | Content | Primary element |
 |---|---|---|
 | 1×1 | Prayer abbreviation + time ("ASR 15:49") | Prayer abbreviation, max 3 chars |
-| 2×2 | Next prayer name + countdown + profile name | Countdown ("2h 14m") dominates |
+| 2×2 | Next prayer name + countdown + profile name | Countdown (`H:MM:SS`) dominates |
 | 4×2 | Next prayer countdown + full 6-time schedule | Countdown top, schedule list below |
+
+Next-prayer countdown targets all six schedule rows including Sunrise (matches the in-app Home ribbon).
+
+Countdown format note: the live tick renders `H:MM:SS` (system `Chronometer`), not `2h 14m`. A Chronometer cannot be reformatted, and a `2h 14m` string can only refresh on prayer change (frozen for hours, not a countdown). See DESIGN.md §11 → Android home-screen widgets.
 
 All widget sizes: tap opens app Home screen. No prayer-row taps within widget (widget interaction is launch-only in v1).
 

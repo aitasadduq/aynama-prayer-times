@@ -55,6 +55,7 @@ dependencies {
     implementation(project(":shared-logic"))
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.androidx.glance.appwidget)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

@@ -317,6 +317,12 @@ Hard rules. A PR that violates any of these gets blocked at review.
 - Material Symbols on utilitarian chrome.
 - Edge-to-edge by default. Status bar matches current surface.
 
+### Android home-screen widgets
+Two documented widget-runtime exceptions to the in-app rules (Glance/RemoteViews cannot honour them):
+- **Live countdown shows `H:MM:SS` (ticking), not the in-app `2h 14m`.** The countdown is system-rendered by `RemoteViews.setChronometerCountDown()` (Reviewer Concern #4) so it ticks every second with no WorkManager. A Chronometer cannot be reformatted to `2h 14m`, and a `2h 14m` string can only refresh on prayer change (frozen for hours). The live tick wins.
+- **Widget text uses the system font, not Fraunces/IBM Plex.** Glance/RemoteViews `Text`/`Chronometer` cannot load bundled `.ttf` assets. The "no system-default sans" rule (§10) is in-app scope; widgets fall back by platform necessity. Tabular alignment is preserved by the monospaced `H:MM:SS` tick.
+- Palette tokens still apply: parchment/ink surface (day/night), saffron countdown accent. No rings, no Material You extract.
+
 ### watchOS
 - Complication families: `.circularSmall`, `.graphicCircular`, `.graphicRectangular`, `.graphicCorner`. Spec each per §7.
 - Always-On state: same render as active, OLED-safe ink field.
