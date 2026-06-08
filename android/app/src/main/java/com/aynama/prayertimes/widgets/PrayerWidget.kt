@@ -1,6 +1,7 @@
 package com.aynama.prayertimes.widgets
 
 import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
@@ -20,8 +21,12 @@ import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.getAppWidgetState
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.state.PreferencesGlanceStateDefinition
+import androidx.datastore.preferences.core.longPreferencesKey
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.MainActivity
 import com.aynama.prayertimes.R
@@ -33,7 +38,9 @@ import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
@@ -41,41 +48,77 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-// --- Base receiver ----------------------------------------------------------
-// Cleans up per-widget profile preference when a widget instance is deleted.
+// --- Per-widget profile state ----------------------------------------------
+// The chosen profile is stored in each widget's own Glance state, keyed by GlanceId.
+// This is read directly in provideGlance(id) — no appWidgetId reverse-lookup — so a
+// freshly placed widget always renders with the profile the configure screen wrote.
+// Glance clears this state automatically when the widget is removed.
 
-abstract class PrayerWidgetReceiverBase : GlanceAppWidgetReceiver() {
-    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-        super.onDeleted(context, appWidgetIds)
-        val prefs = (context.applicationContext as AynamaApplication).prefs
-        appWidgetIds.forEach { WidgetProfilePreferences.clear(prefs, it) }
+private val WIDGET_PROFILE_KEY = longPreferencesKey("widget_profile_id")
+private const val NO_PROFILE = -1L
+
+/** Read the profile chosen for a specific widget instance, or NO_PROFILE if unset. */
+private suspend fun widgetProfileId(context: Context, id: GlanceId): Long =
+    getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[WIDGET_PROFILE_KEY] ?: NO_PROFILE
+
+/**
+ * Persist the chosen profile for [appWidgetId] and render it immediately.
+ *
+ * The render is a direct AppWidgetManager.updateAppWidget pushed on the MAIN thread. Glance's
+ * updateAll() does not reliably re-render on some OEM launchers (the widget only refreshes later
+ * when the process restarts) — a main-thread direct push, applied as the final write, is reliable.
+ * The Glance state is also written so later system-initiated renders stay correct.
+ */
+suspend fun setWidgetProfile(context: Context, appWidgetId: Int, profileId: Long) {
+    val glanceId = GlanceAppWidgetManager(context).getGlanceIdBy(appWidgetId)
+    updateAppWidgetState(context, glanceId) { prefs ->
+        prefs[WIDGET_PROFILE_KEY] = profileId
+    }
+    val className = AppWidgetManager.getInstance(context)
+        .getAppWidgetInfo(appWidgetId)?.provider?.className
+    val state = loadPrayerWidgetState(context, profileId)
+    val rv = when (className) {
+        NextPrayerWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews.nextPrayer(context, state)
+        NextPrayerDatedWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews.nextPrayerDated(context, state)
+        ScheduleWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews.schedule(context, state)
+        FullWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews.full(context, state)
+        else -> null
+    } ?: return
+    withContext(Dispatchers.Main) {
+        AppWidgetManager.getInstance(context).updateAppWidget(appWidgetId, rv)
     }
 }
+
+/** Read the currently chosen profile for [appWidgetId] (for the configure screen), or NO_PROFILE. */
+suspend fun widgetProfileIdFor(context: Context, appWidgetId: Int): Long =
+    runCatching {
+        val glanceId = GlanceAppWidgetManager(context).getGlanceIdBy(appWidgetId)
+        widgetProfileId(context, glanceId)
+    }.getOrDefault(NO_PROFILE)
 
 // --- Glance widgets ---------------------------------------------------------
 // Four independent widgets; SizeMode.Single so the layout only stretches.
 
-class NextPrayerWidgetReceiver : PrayerWidgetReceiverBase() {
+class NextPrayerWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = NextPrayerGlanceWidget()
 }
 
-class NextPrayerDatedWidgetReceiver : PrayerWidgetReceiverBase() {
+class NextPrayerDatedWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = NextPrayerDatedGlanceWidget()
 }
 
-class ScheduleWidgetReceiver : PrayerWidgetReceiverBase() {
+class ScheduleWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = ScheduleGlanceWidget()
 }
 
-class FullWidgetReceiver : PrayerWidgetReceiverBase() {
+class FullWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = FullGlanceWidget()
 }
 
 class NextPrayerGlanceWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Single
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val state = loadPrayerWidgetState(context, appWidgetId)
+        val state = loadPrayerWidgetState(context, widgetProfileId(context, id))
         provideContent { RemoteViewsContent(PrayerWidgetRemoteViews.nextPrayer(context, state)) }
     }
 }
@@ -83,8 +126,7 @@ class NextPrayerGlanceWidget : GlanceAppWidget() {
 class NextPrayerDatedGlanceWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Single
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val state = loadPrayerWidgetState(context, appWidgetId)
+        val state = loadPrayerWidgetState(context, widgetProfileId(context, id))
         provideContent { RemoteViewsContent(PrayerWidgetRemoteViews.nextPrayerDated(context, state)) }
     }
 }
@@ -92,8 +134,7 @@ class NextPrayerDatedGlanceWidget : GlanceAppWidget() {
 class ScheduleGlanceWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Single
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val state = loadPrayerWidgetState(context, appWidgetId)
+        val state = loadPrayerWidgetState(context, widgetProfileId(context, id))
         provideContent { RemoteViewsContent(PrayerWidgetRemoteViews.schedule(context, state)) }
     }
 }
@@ -101,8 +142,7 @@ class ScheduleGlanceWidget : GlanceAppWidget() {
 class FullGlanceWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Single
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val state = loadPrayerWidgetState(context, appWidgetId)
+        val state = loadPrayerWidgetState(context, widgetProfileId(context, id))
         provideContent { RemoteViewsContent(PrayerWidgetRemoteViews.full(context, state)) }
     }
 }
@@ -123,18 +163,14 @@ private fun RemoteViewsContent(remoteViews: RemoteViews) {
 
 // --- State loading ----------------------------------------------------------
 
-private suspend fun loadPrayerWidgetState(context: Context, appWidgetId: Int): PrayerWidgetState {
+private suspend fun loadPrayerWidgetState(context: Context, profileId: Long): PrayerWidgetState {
     val app = context.applicationContext as AynamaApplication
     val profiles = app.profileRepository.observeAll().first()
 
-    // Per-widget profile takes priority; fall back to the global notification profile.
-    val widgetProfileId = WidgetProfilePreferences.getProfileId(app.prefs, appWidgetId)
-    val profile = if (widgetProfileId != -1L) {
-        profiles.find { it.id == widgetProfileId }
-    } else {
-        val prefs = NotificationPreferences(app.prefs)
-        resolveNotificationProfile(prefs.notificationProfileId, profiles)
-    } ?: return PrayerWidgetState.empty()
+    // The widget's chosen profile takes priority; fall back to the global notification profile.
+    val profile = profiles.find { profileId != NO_PROFILE && it.id == profileId }
+        ?: resolveNotificationProfile(NotificationPreferences(app.prefs).notificationProfileId, profiles)
+        ?: return PrayerWidgetState.empty()
 
     val zone = profile.effectiveZoneId()
     val now = ZonedDateTime.now(zone)

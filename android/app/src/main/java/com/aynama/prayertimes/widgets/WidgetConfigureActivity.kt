@@ -36,8 +36,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.R
 import com.aynama.prayertimes.shared.data.entity.Profile
@@ -64,46 +66,50 @@ class WidgetConfigureActivity : ComponentActivity() {
             return
         }
 
+
         val app = applicationContext as AynamaApplication
-        val currentProfileId = WidgetProfilePreferences.getProfileId(app.prefs, appWidgetId)
 
         enableEdgeToEdge()
         setContent {
             AynamaTheme {
                 WidgetConfigureScreen(
                     app = app,
-                    currentProfileId = currentProfileId,
-                    onProfileSelected = { profile -> saveAndFinish(app, profile) },
+                    appWidgetId = appWidgetId,
+                    onProfileSelected = { profile -> saveAndFinish(profile) },
                     onCancel = { finish() },
                 )
             }
         }
     }
 
-    private fun saveAndFinish(app: AynamaApplication, profile: Profile) {
-        WidgetProfilePreferences.setProfileId(app.prefs, appWidgetId, profile.id)
-        // Update all widget instances so the selection is reflected immediately.
-        // Use app scope so the update survives activity teardown.
-        app.appScope.launch {
-            updateAllPrayerWidgets(applicationContext)
+    private fun saveAndFinish(profile: Profile) {
+        val app = application as AynamaApplication
+        val id = appWidgetId
+        // Run the persist+render on the app scope so it completes even if the launcher tears this
+        // activity down; join it before returning OK so the state is durable before the launcher
+        // binds/renders the (possibly new) widget. This avoids the place/edit races.
+        lifecycleScope.launch {
+            app.appScope.launch { setWidgetProfile(applicationContext, id, profile.id) }.join()
+            setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id))
+            finish()
         }
-        val resultIntent = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-        setResult(RESULT_OK, resultIntent)
-        finish()
     }
 }
 
 @Composable
 private fun WidgetConfigureScreen(
     app: AynamaApplication,
-    currentProfileId: Long,
+    appWidgetId: Int,
     onProfileSelected: (Profile) -> Unit,
     onCancel: () -> Unit,
 ) {
+    val context = LocalContext.current
     var profiles by remember { mutableStateOf<List<Profile>>(emptyList()) }
+    var currentProfileId by remember { mutableStateOf(-1L) }
 
     LaunchedEffect(Unit) {
         profiles = app.profileRepository.observeAll().first()
+        currentProfileId = widgetProfileIdFor(context, appWidgetId)
     }
 
     Surface(
