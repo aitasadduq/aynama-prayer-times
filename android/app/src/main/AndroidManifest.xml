@@ -51,19 +51,65 @@
         </receiver>
 
         <receiver
-            android:name=".widgets.PrayerWidgetReceiver"
-            android:exported="true">
+            android:name=".widgets.NextPrayerWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_next_prayer_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/prayer_widget_info" />
+                android:resource="@xml/widget_next_prayer_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.NextPrayerDatedWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_next_prayer_dated_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_next_prayer_dated_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.ScheduleWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_schedule_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_schedule_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widgets.FullWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_full_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_full_info" />
         </receiver>
 
         <receiver
             android:name=".widgets.PrayerWidgetUpdateReceiver"
             android:exported="false" />
+
+        <activity
+            android:name=".widgets.WidgetConfigureActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Aynama">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".notifications.AdhanService"

@@ -1,8 +1,8 @@
 package com.aynama.prayertimes.widgets
 
-import androidx.compose.ui.unit.dp
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.CalculationMethodKey
+import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import org.junit.Assert.assertEquals
@@ -13,6 +13,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class PrayerWidgetTest {
     private val zone = ZoneId.of("Europe/London")
@@ -55,6 +56,7 @@ class PrayerWidgetTest {
         )
 
         assertEquals("ASR", state.nextPrayerAbbreviation)
+        assertEquals("Asr", state.nextPrayerName)
         assertEquals(todayTimes.asrShafii.format(widgetTimeFormatter), state.nextPrayerDisplayTime)
     }
 
@@ -72,6 +74,69 @@ class PrayerWidgetTest {
     }
 
     @Test
+    fun `widget state exposes dates and sunrise`() {
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = todayTimes,
+            tomorrowTimes = tomorrowTimes,
+            now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
+            elapsedRealtime = 1_000L,
+            hijriDateText = "19 Dhu al-Ḥijjah 1446",
+        )
+
+        assertEquals(todayTimes.sunrise.format(widgetTimeFormatter), state.sunriseDisplayTime)
+        assertEquals(
+            date.format(DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())),
+            state.gregorianDateText,
+        )
+        assertEquals("19 Dhu al-Ḥijjah 1446", state.hijriDateText)
+    }
+
+    @Test
+    fun `next and current are derived chronologically even when clock order is scrambled`() {
+        // Times as they appear for a London profile rendered in a far-off device timezone:
+        // not in canonical clock order. Sunrise (22:45) is the only event still ahead at 21:14.
+        val scrambled = PrayerTimesResult(
+            fajr = LocalTime.of(19, 0),
+            sunrise = LocalTime.of(22, 45),
+            dhuhr = LocalTime.of(7, 0),
+            asrShafii = LocalTime.of(11, 21),
+            asrHanafi = LocalTime.of(11, 21),
+            maghrib = LocalTime.of(15, 14),
+            isha = LocalTime.of(18, 59),
+        )
+
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = scrambled,
+            tomorrowTimes = scrambled,
+            now = ZonedDateTime.of(date, LocalTime.of(21, 14), zone),
+            elapsedRealtime = 0L,
+        )
+
+        // Next is Sunrise (the soonest upcoming event), not tomorrow's Isha.
+        assertEquals("Sunrise", state.nextPrayerName)
+        assertEquals("SUN", state.nextPrayerAbbreviation)
+        // Countdown ~1h31m to 22:45, not ~21h.
+        assertTrue(state.countdownBaseElapsedRealtime in 1_000L * 60 * 80..1_000L * 60 * 100)
+        // The most recently started obligatory prayer is Fajr (19:00).
+        assertEquals("Fajr", state.currentPrayerName)
+    }
+
+    @Test
+    fun `widget hijri date defaults to empty`() {
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = todayTimes,
+            tomorrowTimes = tomorrowTimes,
+            now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertEquals("", state.hijriDateText)
+    }
+
+    @Test
     fun `widget update schedule only keeps future prayer changes`() {
         val allUpdates = buildWidgetUpdateSchedule(
             profile = profile,
@@ -85,12 +150,5 @@ class PrayerWidgetTest {
 
         assertTrue(updates.size < allUpdates.size)
         assertTrue(updates.all { it.triggerEpochMs > now })
-    }
-
-    @Test
-    fun `widget size picks requested layouts`() {
-        assertEquals(WidgetSize.SMALL, WidgetSize.from(androidx.compose.ui.unit.DpSize(80.dp, 80.dp)))
-        assertEquals(WidgetSize.MEDIUM, WidgetSize.from(androidx.compose.ui.unit.DpSize(160.dp, 160.dp)))
-        assertEquals(WidgetSize.LARGE, WidgetSize.from(androidx.compose.ui.unit.DpSize(320.dp, 160.dp)))
     }
 }

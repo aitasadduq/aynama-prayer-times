@@ -3,7 +3,6 @@ package com.aynama.prayertimes.widgets
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.glance.appwidget.updateAll
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.notifications.AlarmScheduler
 import kotlinx.coroutines.CoroutineScope
@@ -18,7 +17,7 @@ class PrayerWidgetUpdateReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                PrayerGlanceWidget().updateAll(context)
+                updateAllPrayerWidgets(context)
                 val app = context.applicationContext as AynamaApplication
                 val profiles = app.profileRepository.observeAll().first()
                 AlarmScheduler.scheduleAll(context, profiles)

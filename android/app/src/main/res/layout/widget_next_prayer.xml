@@ -1,45 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Sample text below is placeholder for the drawer previewLayout; overwritten at runtime. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
-    android:gravity="center_vertical"
+    android:gravity="center"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="10dp"
+    tools:ignore="HardcodedText">
 
     <TextView
         android:id="@+id/widget_next_name"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:ellipsize="end"
         android:fontFamily="@font/fraunces"
         android:includeFontPadding="false"
         android:maxLines="1"
+        android:text="Asr"
         android:textColor="@color/aynama_saffron"
-        android:textSize="22sp"
+        android:textSize="18sp"
         android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/widget_next_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:fontFamily="@font/ibm_plex_sans"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:text="15:33"
+        android:textColor="@color/aynama_ink"
+        android:textSize="14sp" />
 
     <Chronometer
         android:id="@+id/widget_countdown"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="6dp"
         android:fontFamily="@font/fraunces"
         android:includeFontPadding="false"
+        android:text="1:24:00"
         android:textColor="@color/aynama_ink"
-        android:textSize="34sp"
+        android:textSize="22sp"
         android:textStyle="bold" />
 
     <TextView
         android:id="@+id/widget_profile"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="6dp"
         android:ellipsize="end"
         android:fontFamily="@font/ibm_plex_sans"
         android:includeFontPadding="false"
         android:maxLines="1"
+        android:text="Home"
         android:textColor="@color/aynama_ink_muted"
-        android:textSize="13sp" />
+        android:textSize="11sp" />
 </LinearLayout>

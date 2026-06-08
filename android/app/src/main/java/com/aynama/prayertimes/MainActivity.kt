@@ -13,11 +13,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
-import androidx.glance.appwidget.updateAll
 import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.navigation.NavGraph
 import com.aynama.prayertimes.ui.theme.AynamaTheme
-import com.aynama.prayertimes.widgets.PrayerGlanceWidget
+import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -51,7 +50,7 @@ class MainActivity : ComponentActivity() {
         app.appScope.launch {
             val profiles = app.profileRepository.observeAll().first()
             AlarmScheduler.scheduleAll(this@MainActivity, profiles)
-            PrayerGlanceWidget().updateAll(this@MainActivity)
+            updateAllPrayerWidgets(this@MainActivity)
         }
     }
 

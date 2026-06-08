@@ -2,29 +2,90 @@
 <resources>
     <style name="Theme.Aynama" parent="android:Theme.Material.NoActionBar" />
 
-    <style name="WidgetScheduleName">
-        <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">24dp</item>
-        <item name="android:layout_columnWeight">1</item>
+    <!-- Date header lines (shared by dated / schedule / full widgets) -->
+    <style name="WidgetDatePrimary">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
         <item name="android:ellipsize">end</item>
         <item name="android:fontFamily">@font/ibm_plex_sans</item>
-        <item name="android:gravity">center_vertical</item>
-        <item name="android:includeFontPadding">false</item>
-        <item name="android:maxLines">1</item>
-        <item name="android:textColor">@color/aynama_ink_muted</item>
-        <item name="android:textSize">12sp</item>
-    </style>
-
-    <style name="WidgetScheduleTime">
-        <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">24dp</item>
-        <item name="android:layout_columnWeight">1</item>
-        <item name="android:ellipsize">end</item>
-        <item name="android:fontFamily">@font/ibm_plex_sans</item>
-        <item name="android:gravity">center_vertical|end</item>
         <item name="android:includeFontPadding">false</item>
         <item name="android:maxLines">1</item>
         <item name="android:textColor">@color/aynama_ink</item>
-        <item name="android:textSize">12sp</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="WidgetDateSecondary">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">@font/ibm_plex_sans</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/aynama_ink_muted</item>
+        <item name="android:textSize">11sp</item>
+    </style>
+
+    <!-- Vertical schedule list (schedule widget): one weighted row per prayer -->
+    <style name="WidgetListRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:orientation">horizontal</item>
+    </style>
+
+    <style name="WidgetListName">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">@font/fraunces</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/aynama_ink</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="WidgetListTime">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">@font/ibm_plex_sans</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/aynama_ink</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <!-- Horizontal prayer columns (full widget): one weighted column per prayer -->
+    <style name="WidgetColumn">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="WidgetColumnName">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">@font/fraunces</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/aynama_ink</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="WidgetColumnTime">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:fontFamily">@font/ibm_plex_sans</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/aynama_ink_muted</item>
+        <item name="android:textSize">14sp</item>
     </style>
 </resources>
