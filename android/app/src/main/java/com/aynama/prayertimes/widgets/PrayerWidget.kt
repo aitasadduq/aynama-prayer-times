@@ -2,6 +2,7 @@ package com.aynama.prayertimes.widgets
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
@@ -23,7 +24,6 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
 import androidx.glance.appwidget.state.updateAppWidgetState
-import androidx.glance.appwidget.updateAll
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -147,12 +147,34 @@ class FullGlanceWidget : GlanceAppWidget() {
     }
 }
 
-/** Refresh every widget category. */
+/**
+ * Refresh every placed widget by pushing fresh RemoteViews directly (on the main thread).
+ * Glance's updateAll() is unreliable on some OEM launchers; a direct updateAppWidget() is not, and
+ * each widget keeps showing its own per-instance profile because the state is read per appWidgetId.
+ */
 suspend fun updateAllPrayerWidgets(context: Context) {
-    NextPrayerGlanceWidget().updateAll(context)
-    NextPrayerDatedGlanceWidget().updateAll(context)
-    ScheduleGlanceWidget().updateAll(context)
-    FullGlanceWidget().updateAll(context)
+    val mgr = AppWidgetManager.getInstance(context)
+    pushProvider(context, mgr, NextPrayerWidgetReceiver::class.java, PrayerWidgetRemoteViews::nextPrayer)
+    pushProvider(context, mgr, NextPrayerDatedWidgetReceiver::class.java, PrayerWidgetRemoteViews::nextPrayerDated)
+    pushProvider(context, mgr, ScheduleWidgetReceiver::class.java, PrayerWidgetRemoteViews::schedule)
+    pushProvider(context, mgr, FullWidgetReceiver::class.java, PrayerWidgetRemoteViews::full)
+}
+
+private suspend fun pushProvider(
+    context: Context,
+    mgr: AppWidgetManager,
+    receiver: Class<*>,
+    build: (Context, PrayerWidgetState) -> RemoteViews,
+) {
+    val ids = mgr.getAppWidgetIds(ComponentName(context, receiver))
+    if (ids.isEmpty()) return
+    val updates = ids.map { id ->
+        val profileId = widgetProfileId(context, GlanceAppWidgetManager(context).getGlanceIdBy(id))
+        id to build(context, loadPrayerWidgetState(context, profileId))
+    }
+    withContext(Dispatchers.Main) {
+        updates.forEach { (id, rv) -> mgr.updateAppWidget(id, rv) }
+    }
 }
 
 @OptIn(ExperimentalGlanceRemoteViewsApi::class)
