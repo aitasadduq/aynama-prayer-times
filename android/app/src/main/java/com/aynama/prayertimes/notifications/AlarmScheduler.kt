@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import com.aynama.prayertimes.widgets.PrayerWidgetScheduler
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
@@ -71,6 +72,7 @@ object AlarmScheduler {
         )
         // Cancel all profiles first, then schedule only the notification profile
         profiles.forEach { cancelForProfile(context, it.id) }
+        PrayerWidgetScheduler.cancel(context)
         val profile = resolveNotificationProfile(notifPrefs.notificationProfileId, profiles)
         if (profile != null) {
             scheduleForProfile(context, profile, LocalDate.now(), notifPrefs)
@@ -94,6 +96,7 @@ object AlarmScheduler {
             timezone = profile.effectiveZoneId(),
             method = profile.calculationMethod,
         )
+        PrayerWidgetScheduler.scheduleForProfile(context, profile, date, times)
         val offset = RamadanDetector.effectiveHijriOffset(
             profile.hijriOffset, profile.hijriOffsetMonthKey, date, profile.effectiveZoneId(),
         )

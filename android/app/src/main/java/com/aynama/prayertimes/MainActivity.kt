@@ -16,6 +16,7 @@ import androidx.activity.result.contract.ActivityResultContracts.RequestPermissi
 import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.navigation.NavGraph
 import com.aynama.prayertimes.ui.theme.AynamaTheme
+import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -49,6 +50,7 @@ class MainActivity : ComponentActivity() {
         app.appScope.launch {
             val profiles = app.profileRepository.observeAll().first()
             AlarmScheduler.scheduleAll(this@MainActivity, profiles)
+            updateAllPrayerWidgets(this@MainActivity)
         }
     }
 

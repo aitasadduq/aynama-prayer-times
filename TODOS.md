@@ -281,20 +281,20 @@ Depends on: Phase 1 (profiles), Phase 5 (notifications config).
 Depends on: Phase 1 (profiles), Phase 2 (prayer time calc).
 
 **Setup**
-- [ ] Add `glance-appwidget` dependency to `app/build.gradle.kts`
-- [ ] `GlanceAppWidget` base class + `GlanceAppWidgetReceiver`
-- [ ] Widget metadata XML (sizes, preview, description)
+- [x] Add `glance-appwidget` dependency to `app/build.gradle.kts`
+- [x] `GlanceAppWidget` base class + `GlanceAppWidgetReceiver`
+- [x] Widget metadata XML (sizes, preview, description)
 
 **Three widget sizes (DESIGN.md / architecture-design.md)**
-- [ ] 1×1 — prayer abbreviation + time ("ASR 15:49"); max 3-char abbreviation
-- [ ] 2×2 — next prayer name + countdown ("2h 14m") + profile name; countdown dominates
-- [ ] 4×2 — countdown top + full 6-time schedule list below
-- [ ] All sizes: tap → opens app Home screen
+- [x] 1×1 — prayer abbreviation + time ("ASR 15:49"); max 3-char abbreviation
+- [x] 2×2 — next prayer name + countdown ("2h 14m") + profile name; countdown dominates
+- [x] 4×2 — countdown top + full 6-time schedule list below
+- [x] All sizes: tap → opens app Home screen
 
 **Update strategy**
-- [ ] Live countdown via `RemoteViews.setChronometerCountDown()` (system-native tick, no WorkManager)
-- [ ] Widget update triggered only on prayer change (~5×/day)
-- [ ] Widget reschedules update alarm alongside `AlarmScheduler` (Phase 5)
+- [x] Live countdown via `RemoteViews.setChronometerCountDown()` (system-native tick, no WorkManager)
+- [x] Widget update triggered only on prayer change (~5×/day)
+- [x] Widget reschedules update alarm alongside `AlarmScheduler` (Phase 5)
 
 ---
 
