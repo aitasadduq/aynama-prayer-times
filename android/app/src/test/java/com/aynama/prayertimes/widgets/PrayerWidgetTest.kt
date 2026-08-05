@@ -5,6 +5,7 @@ import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -262,6 +263,152 @@ class PrayerWidgetTest {
 
         assertEquals(listOf(tomorrowFajr + WIDGET_UPDATE_GUARD_MS), updates.map { it.triggerEpochMs })
         assertEquals("Fajr", rolloverStateAt(Instant.ofEpochMilli(afterIsha)).nextPrayerName)
+    }
+
+    @Test
+    fun `isha after midnight is armed on the following calendar day`() {
+        // Isha (00:35) falls after midnight, so in clock order it precedes Fajr. Every
+        // other schedule fixture has Isha in the evening, so this branch is otherwise dead.
+        val pastMidnight = PrayerTimesResult(
+            fajr = LocalTime.of(3, 40),
+            sunrise = LocalTime.of(5, 12),
+            dhuhr = LocalTime.of(13, 8),
+            asrShafii = LocalTime.of(17, 30),
+            asrHanafi = LocalTime.of(18, 40),
+            maghrib = LocalTime.of(21, 20),
+            isha = LocalTime.of(0, 35),
+        )
+        val day = LocalDate.of(2026, 6, 21)
+        val at2300 = day.atTime(23, 0).atZone(rZone).toInstant().toEpochMilli()
+
+        val updates = buildWidgetUpdateSchedule(
+            profile = rProfile,
+            date = day,
+            times = pastMidnight,
+            tomorrowTimes = pastMidnight,
+            zone = rZone,
+            nowEpochMs = at2300,
+        )
+
+        val isha = updates.single { it.requestCode == WIDGET_UPDATE_REQUEST_CODE_BASE + 5 }
+        assertEquals(
+            day.plusDays(1).atTime(pastMidnight.isha).atZone(rZone).toInstant().toEpochMilli()
+                + WIDGET_UPDATE_GUARD_MS,
+            isha.triggerEpochMs,
+        )
+        assertTrue("Isha rollover must still be pending at 23:00", isha.triggerEpochMs > at2300)
+    }
+
+    @Test
+    fun `each bound profile gets its own chain with no request-code collisions`() {
+        // Widgets carry per-instance profiles. One shared chain would leave every widget
+        // not on the notification profile with no alarm at its own boundaries.
+        val anchorage = rProfile.copy(
+            id = 2L,
+            name = "Anchorage",
+            latitude = 61.2181,
+            longitude = -149.9003,
+            timezone = "America/Anchorage",
+            useLocationTimezone = true,
+        )
+        val nowMs = rDate.atStartOfDay(rZone).toInstant().toEpochMilli()
+
+        val chains = listOf(rProfile, anchorage).mapIndexed { slot, p ->
+            val zone = p.effectiveZoneId()
+            val day = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
+            fun times(d: LocalDate) =
+                adhan.getPrayerTimes(p.latitude, p.longitude, d, zone, p.calculationMethod)
+            buildWidgetUpdateSchedule(p, day, times(day), times(day.plusDays(1)), zone, nowMs, slot)
+        }
+
+        // Both profiles have rollovers pending; the exact count differs because one
+        // global "now" lands at a different local time in each zone.
+        chains.forEachIndexed { slot, chain ->
+            assertTrue("slot $slot has no rollover armed", chain.isNotEmpty())
+            val block = WIDGET_UPDATE_REQUEST_CODE_BASE + slot * WIDGET_UPDATE_SLOT_COUNT
+            assertTrue(
+                "slot $slot escaped its own request-code block",
+                chain.all { it.requestCode in block until block + WIDGET_UPDATE_SLOT_COUNT },
+            )
+        }
+        // The whole point: arming one profile's chain must not cancel another's.
+        val codes = chains.flatten().map { it.requestCode }
+        assertEquals("chains must not share request codes", codes.size, codes.distinct().size)
+        assertTrue(
+            "every code must stay inside the reserved widget range",
+            codes.all {
+                it in WIDGET_UPDATE_REQUEST_CODE_BASE until
+                    WIDGET_UPDATE_REQUEST_CODE_BASE + WIDGET_UPDATE_MAX_PROFILES * WIDGET_UPDATE_SLOT_COUNT
+            },
+        )
+    }
+
+    @Test
+    fun `alarm chain survives DST transitions`() {
+        // Riyadh has no DST and the London fixture is mid-June, so nothing else here
+        // crosses a 23h or 25h day where atZone silently shifts a nonexistent wall time.
+        val dstZone = ZoneId.of("Europe/London")
+        val dstProfile = rProfile.copy(
+            name = "London", latitude = 51.5074, longitude = -0.1278,
+            timezone = "Europe/London", useLocationTimezone = true,
+        )
+        fun times(d: LocalDate) = adhan.getPrayerTimes(
+            dstProfile.latitude, dstProfile.longitude, d, dstZone, dstProfile.calculationMethod,
+        )
+
+        for (day in listOf(LocalDate.of(2026, 3, 29), LocalDate.of(2026, 10, 25))) {
+            var nowMs = day.atStartOfDay(dstZone).toInstant().toEpochMilli()
+            val armed = buildWidgetUpdateSchedule(
+                dstProfile, day, times(day), times(day.plusDays(1)), dstZone, nowMs,
+            )
+            assertEquals("$day", WIDGET_UPDATE_SLOT_COUNT, armed.size)
+
+            repeat(WIDGET_UPDATE_SLOT_COUNT) {
+                val d = Instant.ofEpochMilli(nowMs).atZone(dstZone).toLocalDate()
+                val next = buildWidgetUpdateSchedule(
+                    dstProfile, d, times(d), times(d.plusDays(1)), dstZone, nowMs,
+                ).minByOrNull { it.triggerEpochMs }
+                assertNotNull("$day: no rollover pending at ${Instant.ofEpochMilli(nowMs)}", next)
+
+                nowMs = next!!.triggerEpochMs + 250L
+                val at = Instant.ofEpochMilli(nowMs).atZone(dstZone)
+                val state = buildPrayerWidgetState(
+                    profile = dstProfile,
+                    todayTimes = times(at.toLocalDate()),
+                    tomorrowTimes = times(at.toLocalDate().plusDays(1)),
+                    now = at,
+                    elapsedRealtime = ROLLOVER_ELAPSED,
+                )
+                assertTrue(
+                    "$day: countdown ran past zero at $at",
+                    state.countdownBaseElapsedRealtime - ROLLOVER_ELAPSED > 0,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `current prayer name always matches a schedule row and columns drop only sunrise`() {
+        // The 4x2 widget drops the sunrise row and highlights the active prayer by string
+        // equality across two separately hardcoded name lists (scheduleRows vs
+        // timelineEvents). Renaming in one place silently breaks columns or highlighting.
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = todayTimes,
+            tomorrowTimes = tomorrowTimes,
+            now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertTrue(
+            "currentPrayerName '${state.currentPrayerName}' matches no schedule row — " +
+                "the full widget highlights by string equality and would highlight nothing",
+            state.schedule.any { it.name == state.currentPrayerName },
+        )
+        assertEquals(
+            listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"),
+            state.schedule.filter { it.name != "Sunrise" }.map { it.name },
+        )
     }
 
     private companion object {

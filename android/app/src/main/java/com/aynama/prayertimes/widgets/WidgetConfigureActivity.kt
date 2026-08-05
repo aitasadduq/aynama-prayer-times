@@ -56,10 +56,16 @@ class WidgetConfigureActivity : ComponentActivity() {
         // Default to CANCELED — back-press must not add the widget
         setResult(RESULT_CANCELED)
 
-        appWidgetId = intent?.extras?.getInt(
-            AppWidgetManager.EXTRA_APPWIDGET_ID,
-            AppWidgetManager.INVALID_APPWIDGET_ID,
-        ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
+        // This activity is exported (APPWIDGET_CONFIGURE requires it), so the extras are
+        // attacker-controllable. Reading them unparcels the whole Bundle, which throws
+        // BadParcelableException if it carries a Parcelable class we cannot load — before any
+        // of the id validation below gets a chance to run.
+        appWidgetId = runCatching {
+            intent?.extras?.getInt(
+                AppWidgetManager.EXTRA_APPWIDGET_ID,
+                AppWidgetManager.INVALID_APPWIDGET_ID,
+            ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
+        }.getOrDefault(AppWidgetManager.INVALID_APPWIDGET_ID)
 
         if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
             finish()

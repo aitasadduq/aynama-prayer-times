@@ -11,6 +11,7 @@ import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -52,6 +53,14 @@ data class ScheduledAlarm(
 )
 
 // Pure function — tested without Android runtime.
+// The scheduling day must be resolved in the PROFILE's zone, not the device's.
+// buildAlarmSchedule and buildWidgetUpdateSchedule both resolve this date against
+// profile.effectiveZoneId(), so a device-zone date pairs a wall time with the wrong
+// calendar day whenever the two zones straddle midnight — every alarm lands a day off.
+internal fun schedulingDate(profile: Profile, instant: Instant = Instant.now()): LocalDate =
+    instant.atZone(profile.effectiveZoneId()).toLocalDate()
+
+// Pure function — tested without Android runtime.
 // savedProfileId: value of NotificationPreferences.notificationProfileId (-1 = unset).
 fun resolveNotificationProfile(savedProfileId: Long, profiles: List<Profile>): Profile? {
     if (profiles.isEmpty()) return null
@@ -66,24 +75,29 @@ object AlarmScheduler {
 
     private val adhan = AdhanWrapper()
 
-    fun scheduleAll(context: Context, profiles: List<Profile>) {
+    suspend fun scheduleAll(context: Context, profiles: List<Profile>) {
         val notifPrefs = NotificationPreferences(
             context.getSharedPreferences("aynama_prefs", android.content.Context.MODE_PRIVATE)
         )
         // Cancel all profiles first, then schedule only the notification profile
         profiles.forEach { cancelForProfile(context, it.id) }
-        PrayerWidgetScheduler.cancel(context)
+        // Widget rollovers are scheduled separately, per profile that a placed widget is
+        // actually bound to — a widget can render a profile that never gets notifications.
+        PrayerWidgetScheduler.scheduleForBoundProfiles(context, profiles)
         val profile = resolveNotificationProfile(notifPrefs.notificationProfileId, profiles)
         if (profile != null) {
-            scheduleForProfile(context, profile, LocalDate.now(), notifPrefs)
+            scheduleForProfile(context, profile, schedulingDate(profile), notifPrefs)
         }
         scheduleMidnightReschedule(context)
     }
 
-    fun scheduleForProfile(
+    // Private on purpose: this arms notification alarms only. Callers that reach for it
+    // instead of scheduleAll silently skip widget rollovers, which is exactly how widgets
+    // bound to a non-notification profile ended up with no alarms at their own boundaries.
+    private fun scheduleForProfile(
         context: Context,
         profile: Profile,
-        date: LocalDate = LocalDate.now(),
+        date: LocalDate = schedulingDate(profile),
         notifPrefs: NotificationPreferences = NotificationPreferences(
             context.getSharedPreferences("aynama_prefs", android.content.Context.MODE_PRIVATE)
         ),
@@ -96,7 +110,6 @@ object AlarmScheduler {
             timezone = profile.effectiveZoneId(),
             method = profile.calculationMethod,
         )
-        PrayerWidgetScheduler.scheduleForProfile(context, profile, date, times)
         val offset = RamadanDetector.effectiveHijriOffset(
             profile.hijriOffset, profile.hijriOffsetMonthKey, date, profile.effectiveZoneId(),
         )

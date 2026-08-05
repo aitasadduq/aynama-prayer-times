@@ -70,23 +70,66 @@ private suspend fun widgetProfileId(context: Context, id: GlanceId): Long =
  * The Glance state is also written so later system-initiated renders stay correct.
  */
 suspend fun setWidgetProfile(context: Context, appWidgetId: Int, profileId: Long) {
+    // Resolve the provider first. This activity is exported (APPWIDGET_CONFIGURE requires it),
+    // so any app can launch it with an appWidgetId we do not own — and getGlanceIdBy throws on
+    // those. Matching the provider up front rejects foreign ids before anything can throw into
+    // appScope, where nothing catches it.
+    val className = AppWidgetManager.getInstance(context)
+        .getAppWidgetInfo(appWidgetId)?.provider?.className
+    val build: (Context, PrayerWidgetState) -> RemoteViews = when (className) {
+        NextPrayerWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews::nextPrayer
+        NextPrayerDatedWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews::nextPrayerDated
+        ScheduleWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews::schedule
+        FullWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews::full
+        else -> return
+    }
+
     val glanceId = GlanceAppWidgetManager(context).getGlanceIdBy(appWidgetId)
     updateAppWidgetState(context, glanceId) { prefs ->
         prefs[WIDGET_PROFILE_KEY] = profileId
     }
-    val className = AppWidgetManager.getInstance(context)
-        .getAppWidgetInfo(appWidgetId)?.provider?.className
-    val state = loadPrayerWidgetState(context, profileId)
-    val rv = when (className) {
-        NextPrayerWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews.nextPrayer(context, state)
-        NextPrayerDatedWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews.nextPrayerDated(context, state)
-        ScheduleWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews.schedule(context, state)
-        FullWidgetReceiver::class.java.name -> PrayerWidgetRemoteViews.full(context, state)
-        else -> null
-    } ?: return
+    val rv = build(context, loadPrayerWidgetState(context, profileId))
     withContext(Dispatchers.Main) {
         AppWidgetManager.getInstance(context).updateAppWidget(appWidgetId, rv)
     }
+
+    // This widget's profile just changed, so the armed rollover chains no longer match
+    // what is on screen. Re-arm before returning.
+    val app = context.applicationContext as AynamaApplication
+    PrayerWidgetScheduler.scheduleForBoundProfiles(context, app.profileRepository.observeAll().first())
+}
+
+private val WIDGET_RECEIVERS = listOf(
+    NextPrayerWidgetReceiver::class.java,
+    NextPrayerDatedWidgetReceiver::class.java,
+    ScheduleWidgetReceiver::class.java,
+    FullWidgetReceiver::class.java,
+)
+
+/**
+ * The distinct profiles that currently-placed widgets actually render.
+ *
+ * Mirrors loadPrayerWidgetState's resolution exactly, including its fallback to the
+ * global notification profile for widgets with no per-instance choice. Sorted by id so
+ * slot assignment is deterministic across calls. Empty when no widgets are placed.
+ */
+internal suspend fun boundWidgetProfiles(context: Context, profiles: List<Profile>): List<Profile> {
+    if (profiles.isEmpty()) return emptyList()
+    val mgr = AppWidgetManager.getInstance(context)
+    val ids = WIDGET_RECEIVERS.flatMap { mgr.getAppWidgetIds(ComponentName(context, it)).toList() }
+    if (ids.isEmpty()) return emptyList()
+
+    val app = context.applicationContext as AynamaApplication
+    val fallback = resolveNotificationProfile(NotificationPreferences(app.prefs).notificationProfileId, profiles)
+    val resolved = LinkedHashSet<Profile>()
+    for (id in ids) {
+        val glanceId = runCatching { GlanceAppWidgetManager(context).getGlanceIdBy(id) }.getOrNull()
+            ?: continue
+        val chosen = widgetProfileId(context, glanceId)
+        val profile = profiles.firstOrNull { chosen != NO_PROFILE && it.id == chosen } ?: fallback ?: continue
+        resolved += profile
+    }
+    return resolved.sortedBy { it.id }
 }
 
 /** Read the currently chosen profile for [appWidgetId] (for the configure screen), or NO_PROFILE. */
@@ -168,9 +211,16 @@ private suspend fun pushProvider(
 ) {
     val ids = mgr.getAppWidgetIds(ComponentName(context, receiver))
     if (ids.isEmpty()) return
-    val updates = ids.map { id ->
-        val profileId = widgetProfileId(context, GlanceAppWidgetManager(context).getGlanceIdBy(id))
-        id to build(context, loadPrayerWidgetState(context, profileId))
+    // getGlanceIdBy throws for ids Glance does not know, and there is a window between
+    // getAppWidgetIds and this lookup (widget removed, restored from backup, state not yet
+    // materialised). This runs from TimezoneReceiver and app startup on scopes with no
+    // exception handler, so one stale id would take the process down on every TIME_SET.
+    val updates = buildList {
+        for (id in ids) {
+            val glanceId = runCatching { GlanceAppWidgetManager(context).getGlanceIdBy(id) }
+                .getOrNull() ?: continue
+            add(id to build(context, loadPrayerWidgetState(context, widgetProfileId(context, glanceId))))
+        }
     }
     withContext(Dispatchers.Main) {
         updates.forEach { (id, rv) -> mgr.updateAppWidget(id, rv) }

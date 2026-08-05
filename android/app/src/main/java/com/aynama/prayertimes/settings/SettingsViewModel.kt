@@ -9,6 +9,7 @@ import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.notifications.NotificationPreferences
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -24,8 +25,10 @@ class SettingsViewModel(
     val profiles: StateFlow<List<Profile>> = repo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // scheduleAll does binder work for every reserved alarm slot and reads each placed
+    // widget's Glance state off disk, so it must not run on the main thread.
     fun save(profile: Profile) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             if (profile.id == 0L) {
                 val sortOrder = profiles.value.size
                 repo.insert(profile.copy(sortOrder = sortOrder))
@@ -38,7 +41,7 @@ class SettingsViewModel(
     }
 
     fun delete(profile: Profile) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             repo.delete(profile)
             if (notifPrefs.notificationProfileId == profile.id) {
                 notifPrefs.notificationProfileId = -1L
