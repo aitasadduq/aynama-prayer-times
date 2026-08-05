@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sample text below is placeholder for the drawer previewLayout; overwritten at runtime. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    tools:ignore="HardcodedText">
+
+    <!-- Top 2/5 : dates (left) + sunrise (right) — ink band -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="2"
+        android:background="@drawable/widget_section_top"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_gregorian"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/ibm_plex_sans"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="Sun, Jun 15"
+                android:textColor="@color/aynama_parchment"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/widget_hijri"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="@font/ibm_plex_sans"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="19 Dhu al-Ḥijjah 1446"
+                android:textColor="@color/aynama_parchment_muted"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/ibm_plex_sans"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="@string/widget_sunrise_label"
+                android:textColor="@color/aynama_parchment_muted"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/widget_sunrise_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/ibm_plex_sans"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="04:43"
+                android:textColor="@color/aynama_parchment"
+                android:textSize="17sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Middle 2/5 : five prayer times as evenly distributed columns — parchment -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="2"
+        android:baselineAligned="false"
+        android:orientation="horizontal"
+        android:paddingHorizontal="4dp">
+
+        <LinearLayout style="@style/WidgetColumn">
+            <TextView android:id="@+id/widget_col_1_name" style="@style/WidgetColumnName" android:text="Fajr" />
+            <TextView android:id="@+id/widget_col_1_time" style="@style/WidgetColumnTime" android:text="03:09" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/WidgetColumn">
+            <TextView android:id="@+id/widget_col_2_name" style="@style/WidgetColumnName" android:text="Dhuhr" />
+            <TextView android:id="@+id/widget_col_2_time" style="@style/WidgetColumnTime" android:text="13:01" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/WidgetColumn">
+            <TextView android:id="@+id/widget_col_3_name" style="@style/WidgetColumnName" android:text="Asr" />
+            <TextView android:id="@+id/widget_col_3_time" style="@style/WidgetColumnTime" android:text="17:14" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/WidgetColumn">
+            <TextView android:id="@+id/widget_col_4_name" style="@style/WidgetColumnName" android:text="Maghrib" />
+            <TextView android:id="@+id/widget_col_4_time" style="@style/WidgetColumnTime" android:text="21:18" />
+        </LinearLayout>
+
+        <LinearLayout style="@style/WidgetColumn">
+            <TextView android:id="@+id/widget_col_5_name" style="@style/WidgetColumnName" android:text="Isha" />
+            <TextView android:id="@+id/widget_col_5_time" style="@style/WidgetColumnTime" android:text="22:52" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Bottom 1/5 : countdown + profile — ink band, pinned to bottom -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/widget_section_bottom"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp">
+
+        <Chronometer
+            android:id="@+id/widget_countdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/fraunces"
+            android:includeFontPadding="false"
+            android:text="1:24:00"
+            android:textColor="@color/aynama_saffron"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_until"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/ibm_plex_sans"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="until Asr"
+            android:textColor="@color/aynama_parchment"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/widget_profile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/ibm_plex_sans"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Home"
+            android:textColor="@color/aynama_parchment_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

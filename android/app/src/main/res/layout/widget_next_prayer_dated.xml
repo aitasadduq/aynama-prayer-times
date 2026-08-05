@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sample text below is placeholder for the drawer previewLayout; overwritten at runtime. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:orientation="vertical"
+    tools:ignore="HardcodedText">
+
+    <!-- Top 1/4 : dates — ink band, text parchment, centered -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_section_top"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp">
+
+        <TextView
+            android:id="@+id/widget_gregorian"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="@font/ibm_plex_sans"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Sun, Jun 15"
+            android:textColor="@color/aynama_parchment"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/widget_hijri"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="@font/ibm_plex_sans"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="19 Dhu al-Ḥijjah 1446"
+            android:textColor="@color/aynama_parchment_muted"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Middle 3/4 : next prayer cluster — parchment background, centered -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="3"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:id="@+id/widget_next_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="@font/fraunces"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Asr"
+            android:textColor="@color/aynama_saffron"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <Chronometer
+            android:id="@+id/widget_countdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:fontFamily="@font/fraunces"
+            android:includeFontPadding="false"
+            android:text="1:24:00"
+            android:textColor="@color/aynama_ink"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_next_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:fontFamily="@font/ibm_plex_sans"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="15:33"
+            android:textColor="@color/aynama_ink"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!-- Bottom : profile — ink band, text parchment, centered, pinned to bottom -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/widget_section_bottom"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp">
+
+        <TextView
+            android:id="@+id/widget_profile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="@font/ibm_plex_sans"
+            android:includeFontPadding="false"
+            android:maxLines="1"
+            android:text="Home"
+            android:textColor="@color/aynama_parchment_muted"
+            android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

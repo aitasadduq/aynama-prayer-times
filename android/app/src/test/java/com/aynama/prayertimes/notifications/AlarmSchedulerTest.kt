@@ -4,6 +4,7 @@ import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -337,5 +338,68 @@ class AlarmSchedulerTest {
         val fajr = alarms.first { it.prayerName == "Fajr" && !it.isEarlyReminder }
         val fajrEarly = alarms.first { it.prayerName == "Fajr" && it.isEarlyReminder }
         assertEquals(fajr.triggerEpochMs - earlyMinutes * 60_000L, fajrEarly.triggerEpochMs)
+    }
+
+    // --- Scheduling day is resolved in the profile's zone, not the device's -------
+
+    private val auckland = profile.copy(
+        id = 2L,
+        name = "Auckland",
+        latitude = -36.8485,
+        longitude = 174.7633,
+        timezone = "Pacific/Auckland",
+        useLocationTimezone = true,
+    )
+
+    @Test
+    fun `scheduling date follows the profile zone, not the device zone`() {
+        val instant = java.time.Instant.parse("2026-03-20T21:00:00Z")
+        val deviceDate = instant.atZone(ZoneId.systemDefault()).toLocalDate()
+
+        // Zones on both sides of the date line at this instant: 2026-03-21 in Auckland,
+        // 2026-03-20 in Midway and London. Whatever zone the test machine runs in, it
+        // cannot match both, so at least one case is a real device-vs-profile mismatch
+        // and the assertion below is never vacuous.
+        val candidates = listOf("Pacific/Auckland", "Pacific/Midway", "Europe/London")
+            .map { profile.copy(timezone = it, useLocationTimezone = true) }
+
+        assertTrue(
+            "fixture went vacuous — no candidate zone differs from the device zone",
+            candidates.any { instant.atZone(it.effectiveZoneId()).toLocalDate() != deviceDate },
+        )
+        candidates.forEach { p ->
+            assertEquals(
+                "profile in ${p.timezone} must schedule against its own calendar day",
+                instant.atZone(p.effectiveZoneId()).toLocalDate(),
+                schedulingDate(p, instant),
+            )
+        }
+
+        // A profile without useLocationTimezone still follows the device, unchanged.
+        assertEquals(deviceDate, schedulingDate(profile, instant))
+    }
+
+    @Test
+    fun `pairing a device-zone date with profile-zone times shifts every alarm a full day`() {
+        val zone = ZoneId.of("Pacific/Auckland")
+        val correctDay = LocalDate.of(2026, 3, 21)
+        val aucklandTimes = AdhanWrapper().getPrayerTimes(
+            latitude = auckland.latitude,
+            longitude = auckland.longitude,
+            date = correctDay,
+            timezone = zone,
+            method = auckland.calculationMethod,
+        )
+
+        val correct = buildAlarmSchedule(auckland, correctDay, isRamadan = false, times = aucklandTimes, zone = zone)
+        val deviceZoneDay = buildAlarmSchedule(
+            auckland, correctDay.minusDays(1), isRamadan = false, times = aucklandTimes, zone = zone,
+        )
+
+        // The day-off is load-bearing: it is not a rounding error, it is a full 24h.
+        assertEquals(
+            86_400_000L,
+            correct.first().triggerEpochMs - deviceZoneDay.first().triggerEpochMs,
+        )
     }
 }

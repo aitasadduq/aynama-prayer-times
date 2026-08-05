@@ -281,20 +281,25 @@ Depends on: Phase 1 (profiles), Phase 5 (notifications config).
 Depends on: Phase 1 (profiles), Phase 2 (prayer time calc).
 
 **Setup**
-- [ ] Add `glance-appwidget` dependency to `app/build.gradle.kts`
-- [ ] `GlanceAppWidget` base class + `GlanceAppWidgetReceiver`
-- [ ] Widget metadata XML (sizes, preview, description)
+- [x] Add `glance-appwidget` dependency to `app/build.gradle.kts`
+- [x] `GlanceAppWidget` base class + `GlanceAppWidgetReceiver`
+- [x] Widget metadata XML (sizes, preview, description)
 
-**Three widget sizes (DESIGN.md / architecture-design.md)**
-- [ ] 1×1 — prayer abbreviation + time ("ASR 15:49"); max 3-char abbreviation
-- [ ] 2×2 — next prayer name + countdown ("2h 14m") + profile name; countdown dominates
-- [ ] 4×2 — countdown top + full 6-time schedule list below
-- [ ] All sizes: tap → opens app Home screen
+**Four widget categories (DESIGN.md / architecture-design.md)**
+Each is separately pickable in the widget drawer and only stretches on resize (`SizeMode.Single`).
+- [x] Next Prayer, 1×1 — prayer name + time + countdown + profile
+- [x] Next Prayer & Dates, 2×2 — dates band + next prayer cluster
+- [x] Prayer Schedule, 2×2 — dates band + six prayer times + profile
+- [x] Prayer Times, 4×2 — dates + sunrise, five prayers, countdown, current prayer highlighted
+- [x] All categories: tap → opens app Home screen
+- [x] Per-widget profile selection via `WidgetConfigureActivity` (stored in each instance's Glance state)
 
 **Update strategy**
-- [ ] Live countdown via `RemoteViews.setChronometerCountDown()` (system-native tick, no WorkManager)
-- [ ] Widget update triggered only on prayer change (~5×/day)
-- [ ] Widget reschedules update alarm alongside `AlarmScheduler` (Phase 5)
+- [x] Live countdown via `RemoteViews.setChronometerCountDown()` (system-native tick, no WorkManager)
+- [x] Widget update triggered on each prayer boundary, Sunrise included (~6×/day)
+- [x] Widget reschedules update alarm alongside `AlarmScheduler` (Phase 5)
+- [x] Rollover alarms fire 2s past the prayer instant, plus a tomorrow-Fajr slot so one is always pending
+- [x] `updatePeriodMillis` 30min backstop + `TIME_SET` refresh (Chronometer is elapsedRealtime-anchored)
 
 ---
 
