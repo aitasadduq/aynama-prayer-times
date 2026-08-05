@@ -32,6 +32,35 @@ class AdhanWrapperTest {
     @Test fun maghrib_matches_golden() = assertWithin(LocalTime.of(18, 32), result.maghrib)
     @Test fun isha_matches_golden() = assertWithin(LocalTime.of(19, 42), result.isha)
 
+    // adhan-java leaks the wall-clock millisecond of the call into every Date it
+    // returns. Anything that arms an alarm at one call's prayer instant and then
+    // recomputes when it fires depends on these being byte-identical.
+    @Test
+    fun repeated_calls_for_the_same_day_are_identical() {
+        val calls = (1..25).map {
+            Thread.sleep(3)
+            wrapper.getPrayerTimes(
+                latitude = 21.4225,
+                longitude = 39.8262,
+                date = LocalDate.of(2026, 3, 21),
+                timezone = ZoneId.of("Asia/Riyadh"),
+                method = CalculationMethodKey.MWL,
+            )
+        }
+
+        assertEquals(1, calls.distinct().size)
+    }
+
+    @Test
+    fun prayer_times_carry_no_sub_second_component() {
+        val all = listOf(
+            result.fajr, result.sunrise, result.dhuhr,
+            result.asrShafii, result.asrHanafi, result.maghrib, result.isha,
+        )
+
+        assertEquals(emptyList<Int>(), all.map { it.nano }.filter { it != 0 })
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejects_invalid_latitude() {
         wrapper.getPrayerTimes(91.0, 0.0, LocalDate.now(), ZoneId.of("UTC"), CalculationMethodKey.MWL)

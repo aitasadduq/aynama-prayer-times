@@ -8,6 +8,8 @@ import com.batoulapps.adhan.PrayerTimes
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.Date
 
 enum class CalculationMethodKey {
     MWL, ISNA, UMM_AL_QURA, EGYPTIAN, KARACHI,
@@ -47,15 +49,23 @@ class AdhanWrapper {
         val timesHanafi = PrayerTimes(coords, dateComponents, paramsHanafi)
 
         return PrayerTimesResult(
-            fajr = timesShafii.fajr.toInstant().atZone(timezone).toLocalTime(),
-            sunrise = timesShafii.sunrise.toInstant().atZone(timezone).toLocalTime(),
-            dhuhr = timesShafii.dhuhr.toInstant().atZone(timezone).toLocalTime(),
-            asrShafii = timesShafii.asr.toInstant().atZone(timezone).toLocalTime(),
-            asrHanafi = timesHanafi.asr.toInstant().atZone(timezone).toLocalTime(),
-            maghrib = timesShafii.maghrib.toInstant().atZone(timezone).toLocalTime(),
-            isha = timesShafii.isha.toInstant().atZone(timezone).toLocalTime(),
+            fajr = timesShafii.fajr.toLocalTime(timezone),
+            sunrise = timesShafii.sunrise.toLocalTime(timezone),
+            dhuhr = timesShafii.dhuhr.toLocalTime(timezone),
+            asrShafii = timesShafii.asr.toLocalTime(timezone),
+            asrHanafi = timesHanafi.asr.toLocalTime(timezone),
+            maghrib = timesShafii.maghrib.toLocalTime(timezone),
+            isha = timesShafii.isha.toLocalTime(timezone),
         )
     }
+
+    // adhan-java builds its Dates from Calendar.getInstance() and never clears the
+    // MILLISECOND field, so every result carries the wall-clock millisecond of the
+    // call. Two calls for the same day disagree by a few ms, which is enough to make
+    // an alarm armed at one call's prayer instant recompute to the *same* prayer when
+    // it fires. Seconds are always :00, so truncating drops only that noise.
+    private fun Date.toLocalTime(timezone: ZoneId): LocalTime =
+        toInstant().atZone(timezone).toLocalTime().truncatedTo(ChronoUnit.SECONDS)
 
     private fun mapMethod(key: CalculationMethodKey): CalculationMethod = when (key) {
         CalculationMethodKey.MWL -> CalculationMethod.MUSLIM_WORLD_LEAGUE

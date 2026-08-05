@@ -6,8 +6,10 @@ import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -138,17 +140,131 @@ class PrayerWidgetTest {
 
     @Test
     fun `widget update schedule only keeps future prayer changes`() {
-        val allUpdates = buildWidgetUpdateSchedule(
-            profile = profile,
-            date = date,
-            times = todayTimes,
-            zone = zone,
-            nowEpochMs = date.atStartOfDay(zone).toInstant().toEpochMilli(),
-        )
-        val now = date.atTime(todayTimes.asrShafii.plusMinutes(1)).atZone(zone).toInstant().toEpochMilli()
-        val updates = buildWidgetUpdateSchedule(profile, date, todayTimes, zone, now)
+        val allUpdates = rolloverScheduleAt(rDate.atStartOfDay(rZone).toInstant().toEpochMilli())
+        val now = rDate.atTime(rToday.asrShafii.plusMinutes(1)).atZone(rZone).toInstant().toEpochMilli()
+        val updates = rolloverScheduleAt(now)
 
         assertTrue(updates.size < allUpdates.size)
         assertTrue(updates.all { it.triggerEpochMs > now })
+    }
+
+    // --- Rollover: the countdown must never run past zero ------------------------
+    // Riyadh, not London: at 51°N in June adhan's high-latitude fallback collapses
+    // Isha onto Fajr, so the prayer sequence is degenerate to walk.
+
+    private val rZone = ZoneId.of("Asia/Riyadh")
+    private val rDate = LocalDate.of(2026, 8, 5)
+    private val rProfile = profile.copy(
+        name = "Riyadh",
+        latitude = 24.7136,
+        longitude = 46.6753,
+        calculationMethod = CalculationMethodKey.UMM_AL_QURA,
+    )
+    private val rToday get() = rTimesFor(rDate)
+
+    private fun rTimesFor(day: LocalDate) = adhan.getPrayerTimes(
+        latitude = rProfile.latitude,
+        longitude = rProfile.longitude,
+        date = day,
+        timezone = rZone,
+        method = rProfile.calculationMethod,
+    )
+
+    // Mirrors what the widget does on the device: recompute from whatever wall
+    // clock the alarm actually woke us at, using that instant's own day.
+    private fun rolloverStateAt(instant: Instant): PrayerWidgetState {
+        val now = instant.atZone(rZone)
+        return buildPrayerWidgetState(
+            profile = rProfile,
+            todayTimes = rTimesFor(now.toLocalDate()),
+            tomorrowTimes = rTimesFor(now.toLocalDate().plusDays(1)),
+            now = now,
+            elapsedRealtime = ROLLOVER_ELAPSED,
+        )
+    }
+
+    private fun rolloverScheduleAt(nowEpochMs: Long): List<ScheduledWidgetUpdate> {
+        val day = Instant.ofEpochMilli(nowEpochMs).atZone(rZone).toLocalDate()
+        return buildWidgetUpdateSchedule(
+            profile = rProfile,
+            date = day,
+            times = rTimesFor(day),
+            tomorrowTimes = rTimesFor(day.plusDays(1)),
+            zone = rZone,
+            nowEpochMs = nowEpochMs,
+        )
+    }
+
+    private fun remainingMs(state: PrayerWidgetState) = state.countdownBaseElapsedRealtime - ROLLOVER_ELAPSED
+
+    @Test
+    fun `recomputing exactly at a prayer instant moves on to the following prayer`() {
+        val dhuhr = rDate.atTime(rToday.dhuhr).atZone(rZone).toInstant()
+
+        assertEquals("Asr", rolloverStateAt(dhuhr).nextPrayerName)
+    }
+
+    @Test
+    fun `rollover alarms are armed after the prayer instant, never on it`() {
+        val dayStart = rDate.atStartOfDay(rZone).toInstant().toEpochMilli()
+        val fajr = rDate.atTime(rToday.fajr).atZone(rZone).toInstant().toEpochMilli()
+
+        assertEquals(fajr + WIDGET_UPDATE_GUARD_MS, rolloverScheduleAt(dayStart).first().triggerEpochMs)
+    }
+
+    @Test
+    fun `a rollover always leaves the countdown running forwards`() {
+        val updates = rolloverScheduleAt(rDate.atStartOfDay(rZone).toInstant().toEpochMilli())
+        assertEquals(WIDGET_UPDATE_SLOT_COUNT, updates.size)
+
+        // AlarmManager is allowed to be late, and on some OEM builds marginally
+        // early. Every delivery inside that band must still count down, not up.
+        val deliveryJitterMs = listOf(-WIDGET_UPDATE_GUARD_MS + 1, 0L, 250L, 5_000L, 60_000L)
+        for (update in updates) {
+            for (jitter in deliveryJitterMs) {
+                val firedAt = Instant.ofEpochMilli(update.triggerEpochMs + jitter)
+                val state = rolloverStateAt(firedAt)
+                assertTrue(
+                    "countdown ran past zero for alarm ${update.requestCode} fired at $firedAt " +
+                        "(jitter ${jitter}ms): ${remainingMs(state)}ms to ${state.nextPrayerName}",
+                    remainingMs(state) > 0,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `walking the alarm chain hands each prayer off to the next`() {
+        val deliveryLatencyMs = 250L
+        var nowMs = rDate.atStartOfDay(rZone).toInstant().toEpochMilli()
+        val handoffs = mutableListOf<String>()
+
+        repeat(WIDGET_UPDATE_SLOT_COUNT) {
+            val next = rolloverScheduleAt(nowMs).minByOrNull { it.triggerEpochMs }
+            assertNotNull("no rollover alarm pending at ${Instant.ofEpochMilli(nowMs)}", next)
+
+            nowMs = next!!.triggerEpochMs + deliveryLatencyMs
+            val state = rolloverStateAt(Instant.ofEpochMilli(nowMs))
+            assertTrue("countdown ran past zero at ${Instant.ofEpochMilli(nowMs)}", remainingMs(state) > 0)
+            handoffs += state.nextPrayerName
+        }
+
+        assertEquals(listOf("Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha", "Fajr", "Sunrise"), handoffs)
+    }
+
+    @Test
+    fun `the stretch after Isha still has a rollover armed`() {
+        val afterIsha = rDate.atTime(rToday.isha).atZone(rZone).toInstant().toEpochMilli() + 60_000L
+        val tomorrowFajr = rDate.plusDays(1).atTime(rTimesFor(rDate.plusDays(1)).fajr)
+            .atZone(rZone).toInstant().toEpochMilli()
+
+        val updates = rolloverScheduleAt(afterIsha)
+
+        assertEquals(listOf(tomorrowFajr + WIDGET_UPDATE_GUARD_MS), updates.map { it.triggerEpochMs })
+        assertEquals("Fajr", rolloverStateAt(Instant.ofEpochMilli(afterIsha)).nextPrayerName)
+    }
+
+    private companion object {
+        const val ROLLOVER_ELAPSED = 1_000L
     }
 }
