@@ -321,7 +321,6 @@ private data class TimelineEvent(
     val name: String,
     val abbreviation: String,
     val time: LocalTime,
-    val obligatory: Boolean,
 )
 
 private fun gregorianFormatter(): DateTimeFormatter =
@@ -351,12 +350,14 @@ internal fun buildPrayerWidgetState(
         .minByOrNull { it.second }!!
     val millisUntilNext = Duration.between(nowInstant, nextInstant).toMillis().coerceAtLeast(0L)
 
-    // Current (active) prayer = the most recently started obligatory prayer. Searched over yesterday
-    // and today (yesterday handles the pre-Fajr window where last night's Isha is still current).
-    val obligatory = timelineEvents(todayTimes, profile.asrMadhab).filter { it.obligatory }
+    // Current event = the most recently started timeline event, Sunrise included. Searched over
+    // yesterday and today (yesterday handles the pre-Fajr window where last night's Isha is still
+    // current). Between sunrise and Dhuhr the current event is Sunrise, so the 4x2 widget
+    // highlights its sunrise block rather than an already-finished Fajr.
+    val events = timelineEvents(todayTimes, profile.asrMadhab)
     val currentCandidates =
-        obligatory.map { it to instantOf(today.minusDays(1), it.time) } +
-            obligatory.map { it to instantOf(today, it.time) }
+        events.map { it to instantOf(today.minusDays(1), it.time) } +
+            events.map { it to instantOf(today, it.time) }
     val currentPrayerName = currentCandidates
         .filter { !it.second.isAfter(nowInstant) }
         .maxByOrNull { it.second }
@@ -392,17 +393,17 @@ internal fun scheduleRows(
     )
 }
 
-// The day's events in canonical order. Sunrise is included (it is a valid countdown target between
-// Fajr and sunrise) but flagged non-obligatory so it is never marked as the "current prayer".
+// The day's events in canonical order. Sunrise is included: it is a valid countdown target
+// between Fajr and sunrise, and the current event from sunrise until Dhuhr.
 private fun timelineEvents(times: PrayerTimesResult, asrMadhab: AsrMadhab): List<TimelineEvent> {
     val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
     return listOf(
-        TimelineEvent("Fajr", "FAJ", times.fajr, obligatory = true),
-        TimelineEvent("Sunrise", "SUN", times.sunrise, obligatory = false),
-        TimelineEvent("Dhuhr", "DHU", times.dhuhr, obligatory = true),
-        TimelineEvent("Asr", "ASR", asr, obligatory = true),
-        TimelineEvent("Maghrib", "MAG", times.maghrib, obligatory = true),
-        TimelineEvent("Isha", "ISH", times.isha, obligatory = true),
+        TimelineEvent("Fajr", "FAJ", times.fajr),
+        TimelineEvent("Sunrise", "SUN", times.sunrise),
+        TimelineEvent("Dhuhr", "DHU", times.dhuhr),
+        TimelineEvent("Asr", "ASR", asr),
+        TimelineEvent("Maghrib", "MAG", times.maghrib),
+        TimelineEvent("Isha", "ISH", times.isha),
     )
 }
 
@@ -461,11 +462,18 @@ private object PrayerWidgetRemoteViews {
     fun full(context: Context, state: PrayerWidgetState): RemoteViews =
         RemoteViews(context.packageName, R.layout.widget_full).apply {
             setDates(state)
-            setTextViewText(R.id.widget_sunrise_time, state.sunriseDisplayTime)
 
             val saffron = context.getColor(R.color.aynama_saffron)
             val ink = context.getColor(R.color.aynama_ink)
             val inkMuted = context.getColor(R.color.aynama_ink_muted)
+            val parchment = context.getColor(R.color.aynama_parchment)
+            val parchmentMuted = context.getColor(R.color.aynama_parchment_muted)
+
+            val sunriseHighlighted = state.currentPrayerName == "Sunrise"
+            setTextViewText(R.id.widget_sunrise_time, maybeBold(state.sunriseDisplayTime, sunriseHighlighted))
+            setTextColor(R.id.widget_sunrise_label, if (sunriseHighlighted) saffron else parchmentMuted)
+            setTextColor(R.id.widget_sunrise_time, if (sunriseHighlighted) saffron else parchment)
+
             val obligatory = state.schedule.filter { it.name != "Sunrise" }
             columnNameIds.indices.forEach { index ->
                 val row = obligatory.getOrNull(index)

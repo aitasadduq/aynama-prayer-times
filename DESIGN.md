@@ -63,7 +63,7 @@ Surfaces on Home, Countdown, and Qibla shift across the day. Transitions are slo
 | Phase | Top | Bottom | Notes |
 |---|---|---|---|
 | Fajr (predawn) | `#1C1A17` | `#3A3530` | Warm ink to predawn warmth. **NOT indigo. NOT cool blue.** |
-| Sunrise transition | `#3A3530` | `#E8C89A` | Brief (~15 min window). |
+| Sunrise transition | `#EDE1C5` | `#E8C89A` | Morning light: linen into honey. Stays legible with ink foreground (the phase runs sunrise → Dhuhr). |
 | Dhuhr (midday) | `#F2EAD8` | `#EDE1C5` | Flat linen parchment. Bright. |
 | Asr (afternoon) | `#E8C89A` | `#B87A2E` | Honey to saffron. |
 | Maghrib (sunset) | `#6B2E2A` | `#1C1A17` | Oxblood into ink. |
@@ -181,7 +181,7 @@ Watch scales defined separately in §7.
 - Single "N" reference glyph riding the top of the ring, counter-rotated to stay upright. North is a *whisper* — typographic anchor, not a cardinal-ring legend. No E/S/W siblings.
 - Whole rose (arrow + ring + N) rotates as the device rotates. The arrow's angle inside the rose is fixed at the Qibla bearing; the rose's rotation cancels the device heading. Result: the arrow points at the Kaaba in world space.
 - Above the rose: a small alignment hint in IBM Plex `caption` — "Turn right 12°" / "— Aligned —" (saffron when aligned).
-- Below the rose: degree readout in Fraunces `display-md` (e.g. `227°`) and distance in IBM Plex `body-sm` (e.g. `4,832 km to the Kaaba`). Optional secondary chip row shows "Qibla / North" reference pair.
+- Below the rose: degree readout in Fraunces `display-md` (e.g. `227°`) and distance in IBM Plex `body-sm` (e.g. `4,832 km to the Kaaba`). Optional secondary chip shows the Qibla bearing. No North bearing readout — North stays a whisper (the single "N" glyph on the ring), never a number.
 - Calibration banner (amber, persistent) at bottom when sensor accuracy < HIGH.
 - No cardinal N/E/S/W *ring*. No concentric circles. No 3D Kaaba render. No tick marks. No degree graduations on the ring.
 - Reads as a letterpress print with a single ruled circle, not a cockpit.

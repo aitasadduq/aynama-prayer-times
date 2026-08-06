@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
@@ -49,6 +51,7 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -317,85 +320,97 @@ private fun ProfileFormSheet(
 
     val valid = name.isNotBlank() && locationLat != null && locationLng != null
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // Open fully expanded so the whole form — Save button included — is visible at once,
+    // instead of the half-height sheet the user had to drag up. On screens too small for
+    // the full form, the fields scroll while Save (and Delete) stay pinned below them.
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 48.dp),
         ) {
-            Text(
-                text = if (initial == null) "New profile" else "Edit profile",
-                style = MaterialTheme.typography.displaySmall,
-                modifier = Modifier.padding(bottom = 24.dp),
-            )
-
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            LocationSection(
-                label = locationLabel,
-                hasSelection = locationLat != null,
-                onLocationSelected = { lat, lng, label, tz ->
-                    locationLat = lat
-                    locationLng = lng
-                    locationLabel = label
-                    locationTimezone = tz
-                    if (tz.isBlank()) useLocationTimezone = false
-                },
-                onGpsRequested = {
-                    scope.launch {
-                        val result = withContext(Dispatchers.IO) { getGpsLocation(context) }
-                        if (result != null) {
-                            locationLat = result.first
-                            locationLng = result.second
-                            locationLabel = result.third
-                            locationTimezone = ZoneId.systemDefault().id
-                        }
-                    }
-                },
-            )
-
-            if (locationTimezone.isNotBlank()) {
-                Spacer(Modifier.height(4.dp))
-                LocationTimezoneToggle(
-                    timezone = locationTimezone,
-                    checked = useLocationTimezone,
-                    onCheckedChange = { useLocationTimezone = it },
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text(
+                    text = if (initial == null) "New profile" else "Edit profile",
+                    style = MaterialTheme.typography.displaySmall,
+                    modifier = Modifier.padding(bottom = 24.dp),
                 )
+
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                LocationSection(
+                    label = locationLabel,
+                    hasSelection = locationLat != null,
+                    onLocationSelected = { lat, lng, label, tz ->
+                        locationLat = lat
+                        locationLng = lng
+                        locationLabel = label
+                        locationTimezone = tz
+                        if (tz.isBlank()) useLocationTimezone = false
+                    },
+                    onGpsRequested = {
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) { getGpsLocation(context) }
+                            if (result != null) {
+                                locationLat = result.first
+                                locationLng = result.second
+                                locationLabel = result.third
+                                locationTimezone = ZoneId.systemDefault().id
+                            }
+                        }
+                    },
+                )
+
+                if (locationTimezone.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    LocationTimezoneToggle(
+                        timezone = locationTimezone,
+                        checked = useLocationTimezone,
+                        onCheckedChange = { useLocationTimezone = it },
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                CalculationMethodPicker(selected = method, onSelect = { method = it })
+
+                Spacer(Modifier.height(12.dp))
+
+                AsrMadhabSelector(selected = madhab, onSelect = { madhab = it })
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = "Hijri date adjustment",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                )
+
+                Text(
+                    text = "Shifts the Hijri date and Ramadan for local moon sighting. 0 keeps the calculated date; + starts the month earlier, − later.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+
+                HijriOffsetSelector(selected = hijriOffset, onSelect = { hijriOffset = it })
             }
-
-            Spacer(Modifier.height(12.dp))
-
-            CalculationMethodPicker(selected = method, onSelect = { method = it })
-
-            Spacer(Modifier.height(12.dp))
-
-            AsrMadhabSelector(selected = madhab, onSelect = { madhab = it })
-
-            Spacer(Modifier.height(12.dp))
-
-            Text(
-                text = "Hijri date adjustment",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 2.dp),
-            )
-
-            Text(
-                text = "Shifts the Hijri date and Ramadan for local moon sighting. 0 keeps the calculated date; + starts the month earlier, − later.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-
-            HijriOffsetSelector(selected = hijriOffset, onSelect = { hijriOffset = it })
 
             Spacer(Modifier.height(24.dp))
 

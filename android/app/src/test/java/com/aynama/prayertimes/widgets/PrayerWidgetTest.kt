@@ -127,6 +127,34 @@ class PrayerWidgetTest {
     }
 
     @Test
+    fun `sunrise is the current event between sunrise and dhuhr`() {
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = todayTimes,
+            tomorrowTimes = tomorrowTimes,
+            now = ZonedDateTime.of(date, todayTimes.sunrise.plusMinutes(5), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertEquals("Sunrise", state.currentPrayerName)
+        assertEquals("Dhuhr", state.nextPrayerName)
+    }
+
+    @Test
+    fun `fajr is current before sunrise`() {
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = todayTimes,
+            tomorrowTimes = tomorrowTimes,
+            now = ZonedDateTime.of(date, todayTimes.sunrise.minusMinutes(5), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertEquals("Fajr", state.currentPrayerName)
+        assertEquals("Sunrise", state.nextPrayerName)
+    }
+
+    @Test
     fun `widget hijri date defaults to empty`() {
         val state = buildPrayerWidgetState(
             profile = profile,
