@@ -7,7 +7,9 @@ import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -122,7 +124,7 @@ class PrayerWidgetTest {
         assertEquals("SUN", state.nextPrayerAbbreviation)
         // Countdown ~1h31m to 22:45, not ~21h.
         assertTrue(state.countdownBaseElapsedRealtime in 1_000L * 60 * 80..1_000L * 60 * 100)
-        // The most recently started obligatory prayer is Fajr (19:00).
+        // The most recently started event is Fajr (19:00) — today's Sunrise (22:45) is still ahead.
         assertEquals("Fajr", state.currentPrayerName)
     }
 
@@ -152,6 +154,141 @@ class PrayerWidgetTest {
 
         assertEquals("Fajr", state.currentPrayerName)
         assertEquals("Sunrise", state.nextPrayerName)
+    }
+
+    // The handover is inclusive: an event becomes current ON its instant, not a tick later.
+    // The rollover alarm fires a couple of seconds after the boundary, so if these flipped
+    // exclusive the widget would render the previous event for that window.
+    @Test
+    fun `sunrise becomes current at the exact sunrise instant`() {
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = todayTimes,
+            tomorrowTimes = tomorrowTimes,
+            now = ZonedDateTime.of(date, todayTimes.sunrise, zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertEquals("Sunrise", state.currentPrayerName)
+    }
+
+    @Test
+    fun `dhuhr becomes current at the exact dhuhr instant`() {
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = todayTimes,
+            tomorrowTimes = tomorrowTimes,
+            now = ZonedDateTime.of(date, todayTimes.dhuhr, zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertEquals("Dhuhr", state.currentPrayerName)
+    }
+
+    // --- 4x2 render decisions ---------------------------------------------------
+    // full() builds RemoteViews and needs a Context, so the decisions it makes are
+    // asserted through the pure predicates it calls.
+
+    @Test
+    fun `sunrise block is highlighted and no prayer column is, between sunrise and dhuhr`() {
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = todayTimes,
+            tomorrowTimes = tomorrowTimes,
+            now = ZonedDateTime.of(date, todayTimes.sunrise.plusMinutes(5), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertTrue(isSunriseHighlighted(state))
+        assertNull(highlightedColumnIndex(state))
+    }
+
+    @Test
+    fun `dhuhr column is highlighted and the sunrise block is not, after dhuhr`() {
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = todayTimes,
+            tomorrowTimes = tomorrowTimes,
+            now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertFalse(isSunriseHighlighted(state))
+        assertEquals(listOf("Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"), columnRows(state).map { it.name })
+        assertEquals(1, highlightedColumnIndex(state))
+    }
+
+    @Test
+    fun `the sunrise block is never highlighted while today's sunrise is still ahead`() {
+        // The block always shows TODAY's sunrise, but the current-event search also considers
+        // yesterday-dated events. Where the day's events are not in canonical clock order those
+        // two can disagree, and the widget must not highlight a sunrise that has not happened.
+        val scrambled = PrayerTimesResult(
+            fajr = LocalTime.of(19, 0),
+            sunrise = LocalTime.of(22, 45),
+            dhuhr = LocalTime.of(7, 0),
+            asrShafii = LocalTime.of(11, 21),
+            asrHanafi = LocalTime.of(11, 21),
+            maghrib = LocalTime.of(15, 14),
+            isha = LocalTime.of(18, 59),
+        )
+        val state = buildPrayerWidgetState(
+            profile = profile,
+            todayTimes = scrambled,
+            tomorrowTimes = scrambled,
+            now = ZonedDateTime.of(date, LocalTime.of(0, 10), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertEquals("Sunrise", state.currentPrayerName)
+        assertFalse("today's sunrise (22:45) has not happened at 00:10", state.sunriseHasPassed)
+        assertFalse(isSunriseHighlighted(state))
+    }
+
+    @Test
+    fun `widget state stays coherent at high latitude in midsummer`() {
+        // 65°N in June: adhan's high-latitude fallback collapses Fajr and Isha onto the same
+        // instant (both 00:46), so the day's events are degenerate. Every other widget fixture
+        // is mid-latitude London, where that never happens.
+        //
+        // 65°N is deliberately just south of the Arctic Circle. At 66°N and above in midsummer
+        // adhan returns a null Fajr and AdhanWrapper.getPrayerTimes throws — a pre-existing crash
+        // that this suite cannot cover until that is handled. See REVIEW-FINDINGS.md.
+        val arcticZone = ZoneId.of("Europe/Oslo")
+        val arcticProfile = profile.copy(
+            name = "Arctic edge", latitude = 65.0, longitude = 18.9553,
+            timezone = "Europe/Oslo", useLocationTimezone = true,
+        )
+        val midsummer = LocalDate.of(2026, 6, 21)
+        fun times(day: LocalDate) = adhan.getPrayerTimes(
+            arcticProfile.latitude, arcticProfile.longitude, day, arcticZone, arcticProfile.calculationMethod,
+        )
+
+        for (hour in 0..23) {
+            val now = ZonedDateTime.of(midsummer, LocalTime.of(hour, 30), arcticZone)
+            val state = buildPrayerWidgetState(
+                profile = arcticProfile,
+                todayTimes = times(midsummer),
+                tomorrowTimes = times(midsummer.plusDays(1)),
+                now = now,
+                elapsedRealtime = ROLLOVER_ELAPSED,
+            )
+
+            assertTrue("countdown ran past zero at $now", state.countdownBaseElapsedRealtime > ROLLOVER_ELAPSED)
+            assertTrue(
+                "currentPrayerName '${state.currentPrayerName}' matches no schedule row at $now",
+                state.currentPrayerName.isEmpty() || state.schedule.any { it.name == state.currentPrayerName },
+            )
+            // The sunrise block must never be highlighted while it shows a future time.
+            if (isSunriseHighlighted(state)) {
+                assertTrue("sunrise highlighted before it happened at $now", state.sunriseHasPassed)
+            }
+            // At most one column can claim to be current.
+            val highlighted = highlightedColumnIndex(state)
+            if (highlighted != null) {
+                assertEquals(state.currentPrayerName, columnRows(state)[highlighted].name)
+            }
+        }
     }
 
     @Test

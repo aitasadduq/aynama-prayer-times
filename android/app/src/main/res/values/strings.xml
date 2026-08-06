@@ -8,6 +8,10 @@
     <string name="widget_sunrise_label">Sunrise</string>
     <string name="widget_until">until %1$s</string>
 
+    <!-- Colour and weight carry the current-prayer state visually; these carry it for TalkBack. -->
+    <string name="widget_a11y_prayer">%1$s, %2$s</string>
+    <string name="widget_a11y_prayer_current">%1$s, %2$s, current</string>
+
     <string name="widget_next_prayer_label">Next Prayer</string>
     <string name="widget_next_prayer_description">Next prayer name, time and countdown</string>
 

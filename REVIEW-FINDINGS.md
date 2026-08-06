@@ -236,6 +236,22 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ---
 
+## From PR #21 — Notion bug list fixes (`/review` 2026-08-06)
+
+### Correctness
+
+- [ ] **[C1]** `android/shared-logic/src/main/java/com/aynama/prayertimes/shared/AdhanWrapper.kt:52` — **Crashes above the Arctic Circle.** adhan-java returns `null` for Fajr (and other times) when the sun never reaches the required depression angle, and `getPrayerTimes` dereferences those platform types directly: `fajr = timesShafii.fajr.toLocalTime(timezone)` throws `NullPointerException: fajr must not be null`. Measured threshold with MWL: fails at **lat ≥ 66°N on 2026-06-21** and **≥ 69°N on 2026-12-21** (ok at 65°N/67°N respectively). Affects Tromsø 69.6°N, Murmansk 68.9°N, Bodø 67.3°N, Rovaniemi 66.5°N, Utqiaġvik 71.3°N, and southern-hemisphere equivalents. Every caller is affected — home screen, Qibla phase, widget render, and `PrayerWidgetScheduler`/`AlarmScheduler`, so the widget update receiver would crash on each alarm. Pre-existing (untouched by PR #21); surfaced by the new high-latitude widget test, which is pinned to 65°N to stay green. **Fix:** decide the product behaviour first — this is a fiqh convention choice, not just a null check. Options: (a) set an explicit `HighLatitudeRule` on `CalculationParameters` (note adhan's default still returns null here, so this alone may not suffice); (b) nearest-latitude (compute at 45°) or nearest-day fallback; (c) make `PrayerTimesResult` fields nullable and render "unavailable" for the undefined prayers. Then extend `PrayerWidgetTest.widget state stays coherent at high latitude in midsummer` to 69.65°N. *(Origin: PR #21, /review 2026-08-06)*
+
+### Design
+
+- [ ] **[D1]** `android/app/src/main/java/com/aynama/prayertimes/qibla/QiblaScreen.kt:135` — Qibla surface boxes use `Parchment` (#F2EAD8) as `boxBg` on all light phases, but the light-phase gradient tops are near-identical: DHUHR top is #F2EAD8 (1.00:1, pre-existing) and the SUNRISE_TRANSITION top became #EDE1C5 in this PR (1.08:1). Verified on emulator at 10:00: the panels remain **legible** because the vertical gradient darkens beneath them and the ink text on each box is unaffected — so this is a reduction in surface definition, not a legibility failure. But PR #21 extends the affected window from the Dhuhr block to sunrise→Dhuhr as well. **Fix:** derive `boxBg` per phase, or give light-phase boxes a hairline border/elevation independent of fill, so surfaces stay delineated whenever `gradTop ≈ Parchment`. Covers Dhuhr and sunrise in one change. *(Origin: PR #21, /review 2026-08-06)*
+
+### Maintainability
+
+- [ ] **[M12]** `android/app/src/main/java/com/aynama/prayertimes/widgets/PrayerWidget.kt` — Prayer identity is still a bare `String` shared between `scheduleRows()`, `timelineEvents()`, and the renderer. PR #21 introduced `SUNRISE_NAME` to stop the highlight logic drifting, but the other five names remain duplicated literals across the two builders. **Fix:** introduce a `PrayerId` enum (FAJR, SUNRISE, DHUHR, ASR, MAGHRIB, ISHA) carried by both `TimelineEvent` and `WidgetScheduleRow`, with display names resolved at render time; matching becomes compiler-checked and localisable. *(Origin: PR #21, /review 2026-08-06)*
+
+---
+
 ## Workflow
 
 - When you address a finding, **delete its line** rather than checking it off — keeps the file scoped to open work.
