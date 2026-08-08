@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import com.aynama.prayertimes.widgets.PrayerWidgetScheduler
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
@@ -35,6 +36,7 @@ const val EARLY_REMINDER_BASE_INDEX = 10
 internal const val REQUEST_CODE_MULTIPLIER = 20
 
 private const val MIDNIGHT_REQUEST_CODE = 9999
+private const val TAG = "AlarmScheduler"
 
 val PRAYER_NAMES = mapOf(
     PRAYER_INDEX_FAJR to "Fajr",
@@ -75,6 +77,16 @@ object AlarmScheduler {
 
     private val adhan = AdhanWrapper()
 
+    /**
+     * Arm every alarm the current profile set needs.
+     *
+     * A profile whose times cannot be computed (see [PrayerTimesUnavailableException]) is logged
+     * and skipped rather than allowed to propagate. This runs from `Application.onCreate`,
+     * `MainActivity.onResume`, and two broadcast receivers, all on scopes with no exception
+     * handler — an escaping throw there kills the process, and because onResume reschedules on
+     * every launch it would relaunch straight into the same crash. One unsupported profile must
+     * cost that profile its alarms, nothing more.
+     */
     suspend fun scheduleAll(context: Context, profiles: List<Profile>) {
         val notifPrefs = NotificationPreferences(
             context.getSharedPreferences("aynama_prefs", android.content.Context.MODE_PRIVATE)
@@ -83,10 +95,12 @@ object AlarmScheduler {
         profiles.forEach { cancelForProfile(context, it.id) }
         // Widget rollovers are scheduled separately, per profile that a placed widget is
         // actually bound to — a widget can render a profile that never gets notifications.
-        PrayerWidgetScheduler.scheduleForBoundProfiles(context, profiles)
+        runCatching { PrayerWidgetScheduler.scheduleForBoundProfiles(context, profiles) }
+            .onFailure { Log.w(TAG, "widget rollover scheduling failed", it) }
         val profile = resolveNotificationProfile(notifPrefs.notificationProfileId, profiles)
         if (profile != null) {
-            scheduleForProfile(context, profile, schedulingDate(profile), notifPrefs)
+            runCatching { scheduleForProfile(context, profile, schedulingDate(profile), notifPrefs) }
+                .onFailure { Log.w(TAG, "no alarms armed for profile ${profile.id} (${profile.name})", it) }
         }
         scheduleMidnightReschedule(context)
     }

@@ -86,10 +86,12 @@ private fun LoadedContent(
     onDismissRamadanBanner: () -> Unit,
     onMarkPrayer: (profileId: Long, prayer: Prayer, date: LocalDate, status: QazaStatus) -> Unit,
 ) {
-    val pageCount = state.profiles.size + 1
+    val pageCount = state.pages.size + 1
     val pagerState = rememberPagerState(pageCount = { pageCount })
     val activePage = pagerState.currentPage
-    val activeProfile = state.profiles.getOrNull(activePage)
+    // Only a Ready page carries a phase and a Ramadan banner. An unavailable page falls back to
+    // the same neutral surface the add-profile page uses.
+    val activeProfile = (state.pages.getOrNull(activePage) as? ProfilePage.Ready)?.state
 
     val currentPhase = activeProfile?.currentPhase ?: PrayerPhase.ISHA
     val (gradTop, gradBottom) = gradientColorsFor(currentPhase)
@@ -112,17 +114,19 @@ private fun LoadedContent(
                     state = pagerState,
                     modifier = Modifier.weight(1f),
                 ) { page ->
-                    if (page < state.profiles.size) {
-                        ProfilePage(
-                            profileState = state.profiles[page],
+                    when (val entry = state.pages.getOrNull(page)) {
+                        is ProfilePage.Ready -> ProfilePageContent(
+                            profileState = entry.state,
                             pageIndex = page,
-                            pageCount = state.profiles.size,
-                            onMarkPrayer = { prayer ->
-                                sheetPrayer = prayer to state.profiles[page]
-                            },
+                            pageCount = state.pages.size,
+                            onMarkPrayer = { prayer -> sheetPrayer = prayer to entry.state },
                         )
-                    } else {
-                        AddProfilePage(onNavigateToSettings = onNavigateToSettings)
+                        is ProfilePage.Unavailable -> UnavailableProfilePage(
+                            entry = entry,
+                            pageIndex = page,
+                            pageCount = state.pages.size,
+                        )
+                        null -> AddProfilePage(onNavigateToSettings = onNavigateToSettings)
                     }
                 }
 
@@ -160,7 +164,7 @@ private fun LoadedContent(
 }
 
 @Composable
-private fun ProfilePage(
+private fun ProfilePageContent(
     profileState: ProfileUiState,
     pageIndex: Int,
     pageCount: Int,
@@ -236,6 +240,62 @@ private fun ProfilePage(
                 style = MaterialTheme.typography.bodySmall,
                 color = LocalContentColor.current.copy(alpha = 0.6f),
                 modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+    }
+}
+
+/**
+ * A profile whose location has no calculable times today (midnight sun or polar night).
+ *
+ * Deliberately explains the astronomy rather than reporting a failure: nothing is broken, the
+ * day genuinely has no sunrise to measure from. It also says the other profiles still work, so
+ * a blank page here does not read as the whole app being down.
+ */
+@Composable
+private fun UnavailableProfilePage(
+    entry: ProfilePage.Unavailable,
+    pageIndex: Int,
+    pageCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp)
+            .semantics {
+                contentDescription =
+                    "Profile page ${pageIndex + 1} of $pageCount: ${entry.profile.name}. " +
+                        "Prayer times unavailable. ${entry.reason}"
+            },
+    ) {
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            text = entry.profile.name,
+            style = MaterialTheme.typography.bodySmall,
+            color = LocalContentColor.current.copy(alpha = 0.7f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = "No prayer times today",
+                style = MaterialTheme.typography.displaySmall,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = entry.reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
             )
         }
 

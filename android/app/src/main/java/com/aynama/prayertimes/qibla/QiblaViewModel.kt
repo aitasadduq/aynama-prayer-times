@@ -206,19 +206,25 @@ class QiblaViewModel(
 
         val capturedProfileId = profile.id
         timesJob = viewModelScope.launch {
+            // Times are only used to tint the surface by prayer phase — the Qibla bearing itself
+            // is pure geometry. Where they cannot be computed (midnight sun, polar night) the
+            // compass stays fully usable on a neutral surface. Letting this throw would take the
+            // process down: viewModelScope has no exception handler.
             val times = withContext(computeDispatcher) {
-                adhan.getPrayerTimes(
-                    latitude = profile.latitude,
-                    longitude = profile.longitude,
-                    date = today,
-                    timezone = ZoneId.systemDefault(),
-                    method = profile.calculationMethod,
-                )
+                runCatching {
+                    adhan.getPrayerTimes(
+                        latitude = profile.latitude,
+                        longitude = profile.longitude,
+                        date = today,
+                        timezone = ZoneId.systemDefault(),
+                        method = profile.calculationMethod,
+                    )
+                }.getOrNull()
             }
             // Profile may have changed while we were computing. Only write the cache if
             // we're still on the same profile.
             if (activeProfile?.id == capturedProfileId) {
-                cachedTimes = today to times
+                if (times != null) cachedTimes = today to times
                 emitReady(snapshotUnwrapped, smoothed, rawAzimuth, pitch, roll, times, profile)
             }
         }
@@ -230,10 +236,13 @@ class QiblaViewModel(
         rawAzimuth: Float,
         pitch: Float,
         roll: Float,
-        times: com.aynama.prayertimes.shared.PrayerTimesResult,
+        times: com.aynama.prayertimes.shared.PrayerTimesResult?,
         profile: Profile,
     ) {
-        val phase = derivePhase(times, profile.asrMadhab, LocalTime.now(clock))
+        // No times means no derivable phase; ISHA is the same neutral surface the home screen
+        // falls back to, so the two screens agree.
+        val phase = times?.let { derivePhase(it, profile.asrMadhab, LocalTime.now(clock)) }
+            ?: PrayerPhase.ISHA
         _uiState.value = QiblaUiState.Ready(
             unwrappedAzimuth = unwrapped,
             azimuth = smoothed,

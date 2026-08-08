@@ -11,6 +11,7 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.format.DateFormat
 import android.text.style.StyleSpan
+import android.util.Log
 import android.widget.RemoteViews
 import androidx.compose.runtime.Composable
 import androidx.glance.GlanceId
@@ -35,6 +36,7 @@ import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.notifications.resolveNotificationProfile
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
+import com.aynama.prayertimes.shared.PrayerTimesUnavailableException
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
@@ -248,20 +250,30 @@ private suspend fun loadPrayerWidgetState(context: Context, profileId: Long): Pr
     val now = ZonedDateTime.now(zone)
     val today = now.toLocalDate()
     val adhan = AdhanWrapper()
-    val todayTimes = adhan.getPrayerTimes(
-        latitude = profile.latitude,
-        longitude = profile.longitude,
-        date = today,
-        timezone = zone,
-        method = profile.calculationMethod,
-    )
-    val tomorrowTimes = adhan.getPrayerTimes(
-        latitude = profile.latitude,
-        longitude = profile.longitude,
-        date = today.plusDays(1),
-        timezone = zone,
-        method = profile.calculationMethod,
-    )
+    // A widget bound to a location with no computable times must render a message, not throw:
+    // this runs inside Glance's render and inside PrayerWidgetUpdateReceiver, and an escaping
+    // throw from the receiver kills the process on every rollover alarm.
+    val todayTimes: PrayerTimesResult
+    val tomorrowTimes: PrayerTimesResult
+    try {
+        todayTimes = adhan.getPrayerTimes(
+            latitude = profile.latitude,
+            longitude = profile.longitude,
+            date = today,
+            timezone = zone,
+            method = profile.calculationMethod,
+        )
+        tomorrowTimes = adhan.getPrayerTimes(
+            latitude = profile.latitude,
+            longitude = profile.longitude,
+            date = today.plusDays(1),
+            timezone = zone,
+            method = profile.calculationMethod,
+        )
+    } catch (e: PrayerTimesUnavailableException) {
+        Log.w("PrayerWidget", "no times for profile ${profile.id} (${profile.name})", e)
+        return PrayerWidgetState.unavailable(profile.name)
+    }
     val offset = RamadanDetector.effectiveHijriOffset(
         profile.hijriOffset, profile.hijriOffsetMonthKey, today, zone,
     )
@@ -312,6 +324,25 @@ internal data class PrayerWidgetState(
             countdownBaseElapsedRealtime = SystemClock.elapsedRealtime(),
             gregorianDateText = LocalDate.now().format(gregorianFormatter()),
             hijriDateText = "",
+            sunriseDisplayTime = "--:--",
+            sunriseHasPassed = false,
+            schedule = emptyList(),
+        )
+
+        /**
+         * Shown when the bound profile's location has no computable times for today.
+         * The countdown base is "now", so the Chronometer sits at zero instead of counting
+         * towards a prayer that was never resolved.
+         */
+        fun unavailable(profileName: String) = PrayerWidgetState(
+            profileName = profileName,
+            nextPrayerName = "No times here",
+            nextPrayerAbbreviation = "—",
+            nextPrayerDisplayTime = "--:--",
+            currentPrayerName = "",
+            countdownBaseElapsedRealtime = SystemClock.elapsedRealtime(),
+            gregorianDateText = LocalDate.now().format(gregorianFormatter()),
+            hijriDateText = "Midnight sun or polar night",
             sunriseDisplayTime = "--:--",
             sunriseHasPassed = false,
             schedule = emptyList(),

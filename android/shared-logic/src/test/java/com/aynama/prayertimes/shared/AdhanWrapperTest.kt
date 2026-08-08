@@ -1,6 +1,7 @@
 package com.aynama.prayertimes.shared
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime
@@ -31,6 +32,50 @@ class AdhanWrapperTest {
     @Test fun asr_hanafi_matches_golden() = assertWithin(LocalTime.of(16, 50), result.asrHanafi)
     @Test fun maghrib_matches_golden() = assertWithin(LocalTime.of(18, 32), result.maghrib)
     @Test fun isha_matches_golden() = assertWithin(LocalTime.of(19, 42), result.isha)
+
+    // --- Polar day / polar night ------------------------------------------------
+    // adhan returns null for every time when the sun does not both rise and set. Reading those
+    // straight through produced a bare "fajr must not be null" NPE that crashed callers on
+    // scopes with no exception handler. The contract is now a typed, catchable failure, and
+    // every caller (home pager, widget render, alarm schedulers) depends on that.
+
+    private fun timesAt(latitude: Double, date: LocalDate) = wrapper.getPrayerTimes(
+        latitude = latitude,
+        longitude = 18.9553,
+        date = date,
+        timezone = ZoneId.of("Europe/Oslo"),
+        method = CalculationMethodKey.MWL,
+    )
+
+    @Test(expected = PrayerTimesUnavailableException::class)
+    fun midnight_sun_reports_times_unavailable() {
+        timesAt(69.65, LocalDate.of(2026, 6, 21))
+    }
+
+    @Test(expected = PrayerTimesUnavailableException::class)
+    fun polar_night_reports_times_unavailable() {
+        timesAt(69.65, LocalDate.of(2026, 12, 21))
+    }
+
+    @Test
+    fun the_unavailable_failure_carries_the_location_and_date() {
+        val date = LocalDate.of(2026, 6, 21)
+        val thrown = runCatching { timesAt(69.65, date) }.exceptionOrNull()
+
+        assertTrue("expected PrayerTimesUnavailableException, got $thrown", thrown is PrayerTimesUnavailableException)
+        thrown as PrayerTimesUnavailableException
+        assertEquals(69.65, thrown.latitude, 0.0)
+        assertEquals(date, thrown.date)
+    }
+
+    @Test
+    fun just_south_of_the_midnight_sun_band_still_computes() {
+        // 65°N on the June solstice is degenerate (Fajr and Isha collapse together) but valid.
+        // Pins the boundary so a future high-latitude convention can be checked against it.
+        val times = timesAt(65.0, LocalDate.of(2026, 6, 21))
+
+        assertEquals(times.fajr, times.isha)
+    }
 
     // adhan-java leaks the wall-clock millisecond of the call into every Date it
     // returns. Anything that arms an alarm at one call's prayer instant and then
