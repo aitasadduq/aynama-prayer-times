@@ -13,9 +13,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
+import androidx.compose.runtime.mutableStateOf
 import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.navigation.NavGraph
 import com.aynama.prayertimes.ui.theme.AynamaTheme
+import com.aynama.prayertimes.widgets.EXTRA_WIDGET_PROFILE_ID
+import com.aynama.prayertimes.widgets.NO_WIDGET_PROFILE
 import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -23,6 +26,16 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
 
     private lateinit var notifPermLauncher: ActivityResultLauncher<String>
+
+    /**
+     * The profile a widget tap asked for, until the home pager has shown it.
+     *
+     * Held as Compose state rather than read from the intent at composition time: the launch
+     * intent sticks around for the life of the activity, so re-reading it would drag the user
+     * back to the widget's profile every recomposition, and after a rotation or a return from
+     * Settings.
+     */
+    private val requestedProfileId = mutableStateOf(NO_WIDGET_PROFILE)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,12 +50,29 @@ class MainActivity : ComponentActivity() {
             notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        requestedProfileId.value = widgetProfileFrom(intent)
+
         setContent {
             AynamaTheme {
-                NavGraph()
+                NavGraph(
+                    requestedProfileId = requestedProfileId.value,
+                    onProfileShown = { requestedProfileId.value = NO_WIDGET_PROFILE },
+                )
             }
         }
     }
+
+    // The widget's PendingIntent is FLAG_ACTIVITY_SINGLE_TOP, so tapping a widget while the app
+    // is already open arrives here rather than through onCreate. Without this, a second widget's
+    // profile would never be shown.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        requestedProfileId.value = widgetProfileFrom(intent)
+    }
+
+    private fun widgetProfileFrom(intent: Intent?): Long =
+        intent?.getLongExtra(EXTRA_WIDGET_PROFILE_ID, NO_WIDGET_PROFILE) ?: NO_WIDGET_PROFILE
 
     override fun onResume() {
         super.onResume()

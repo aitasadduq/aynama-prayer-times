@@ -12,6 +12,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -30,6 +31,7 @@ import com.aynama.prayertimes.notifications.NotificationSettingsScreen
 import com.aynama.prayertimes.qibla.QiblaScreen
 import com.aynama.prayertimes.settings.SettingsScreen
 import com.aynama.prayertimes.tracker.TrackerScreen
+import com.aynama.prayertimes.widgets.NO_WIDGET_PROFILE
 
 private enum class Screen(val route: String, val labelRes: Int, val icon: ImageVector) {
     HOME("home", R.string.nav_home, Icons.Default.Home),
@@ -39,10 +41,25 @@ private enum class Screen(val route: String, val labelRes: Int, val icon: ImageV
 }
 
 @Composable
-fun NavGraph() {
+fun NavGraph(
+    requestedProfileId: Long = NO_WIDGET_PROFILE,
+    onProfileShown: () -> Unit = {},
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+
+    // A widget tap has to land on Home even when the app was left on another tab. The activity
+    // is SINGLE_TOP, so nothing else resets the destination.
+    LaunchedEffect(requestedProfileId) {
+        if (requestedProfileId != NO_WIDGET_PROFILE && currentRoute != Screen.HOME.route) {
+            navController.navigate(Screen.HOME.route) {
+                popUpTo(Screen.HOME.route) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -78,12 +95,16 @@ fun NavGraph() {
             modifier = Modifier.padding(innerPadding),
         ) {
             composable(Screen.HOME.route) {
-                HomeScreen(onNavigateToSettings = {
-                    navController.navigate(Screen.SETTINGS.route) {
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                })
+                HomeScreen(
+                    requestedProfileId = requestedProfileId,
+                    onProfileShown = onProfileShown,
+                    onNavigateToSettings = {
+                        navController.navigate(Screen.SETTINGS.route) {
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    },
+                )
             }
             composable(Screen.QIBLA.route) { QiblaScreen() }
             composable(Screen.TRACKER.route) { TrackerScreen() }

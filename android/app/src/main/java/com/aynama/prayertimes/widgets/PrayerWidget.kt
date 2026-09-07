@@ -14,6 +14,7 @@ import android.text.style.StyleSpan
 import android.util.Log
 import android.widget.RemoteViews
 import androidx.compose.runtime.Composable
+import androidx.core.net.toUri
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.appwidget.AndroidRemoteViews
@@ -262,7 +263,7 @@ private suspend fun loadPrayerWidgetState(context: Context, profileId: Long): Pr
     val days = profileDays(profile, today)
     val todayTimes = days[today] ?: run {
         Log.w("PrayerWidget", "no times today for profile ${profile.id} (${profile.name})")
-        return PrayerWidgetState.unavailable(profile.name)
+        return PrayerWidgetState.unavailable(profile.id, profile.name)
     }
     val offset = RamadanDetector.effectiveHijriOffset(
         profile.hijriOffset, profile.hijriOffsetMonthKey, today, zone,
@@ -292,6 +293,12 @@ internal data class WidgetScheduleRow(
 )
 
 internal data class PrayerWidgetState(
+    /**
+     * The profile this widget renders. Carried into the tap intent so the app opens *this*
+     * widget's profile rather than whichever one the pager happens to start on.
+     * [NO_WIDGET_PROFILE] when no profile could be resolved.
+     */
+    val profileId: Long,
     val profileName: String,
     /**
      * The prayer the countdown refers to: the one that just started while counting up, the
@@ -316,6 +323,7 @@ internal data class PrayerWidgetState(
 ) {
     companion object {
         fun empty() = PrayerWidgetState(
+            profileId = NO_WIDGET_PROFILE,
             profileName = "Open aynama",
             countdownPrayerName = "Set up profile",
             countdownPrayerAbbreviation = "SET",
@@ -335,7 +343,8 @@ internal data class PrayerWidgetState(
          * The countdown base is "now", so the Chronometer sits at zero instead of counting
          * towards a prayer that was never resolved.
          */
-        fun unavailable(profileName: String) = PrayerWidgetState(
+        fun unavailable(profileId: Long, profileName: String) = PrayerWidgetState(
+            profileId = profileId,
             profileName = profileName,
             countdownPrayerName = "No times here",
             countdownPrayerAbbreviation = "—",
@@ -402,7 +411,7 @@ internal fun buildPrayerWidgetState(
 
     // One rule for every surface — see DESIGN.md §19 and PrayerTimeline.countdownAt.
     val countdown = countdownAt(timeline, nowInstant)
-        ?: return PrayerWidgetState.unavailable(profile.name)
+        ?: return PrayerWidgetState.unavailable(profile.id, profile.name)
     val elapsed = countdown is PrayerCountdown.Elapsed
     val millis = countdown.duration.toMillis().coerceAtLeast(0L)
 
@@ -414,6 +423,7 @@ internal fun buildPrayerWidgetState(
     val sunriseToday = timeline.firstOrNull { it.event == TimelineEvent.SUNRISE && it.date == today }
 
     return PrayerWidgetState(
+        profileId = profile.id,
         profileName = profile.name,
         countdownPrayerName = countdown.entry.displayName(),
         countdownPrayerAbbreviation = abbreviate(countdown.entry.displayName()),
@@ -508,7 +518,7 @@ private object PrayerWidgetRemoteViews {
             setTextViewText(R.id.widget_next_time, state.countdownPrayerDisplayTime)
             setCountdown(state)
             setTextViewText(R.id.widget_profile, state.profileName)
-            bindRoot(context)
+            bindRoot(context, state)
         }
 
     fun nextPrayerDated(context: Context, state: PrayerWidgetState): RemoteViews =
@@ -518,7 +528,7 @@ private object PrayerWidgetRemoteViews {
             setTextViewText(R.id.widget_next_time, state.countdownPrayerDisplayTime)
             setCountdown(state)
             setTextViewText(R.id.widget_profile, state.profileName)
-            bindRoot(context)
+            bindRoot(context, state)
         }
 
     fun schedule(context: Context, state: PrayerWidgetState): RemoteViews =
@@ -531,7 +541,7 @@ private object PrayerWidgetRemoteViews {
                 setTextViewText(id, state.schedule.getOrNull(index)?.displayTime ?: "")
             }
             setTextViewText(R.id.widget_profile, state.profileName)
-            bindRoot(context)
+            bindRoot(context, state)
         }
 
     fun full(context: Context, state: PrayerWidgetState): RemoteViews =
@@ -577,7 +587,7 @@ private object PrayerWidgetRemoteViews {
                 ),
             )
             setTextViewText(R.id.widget_profile, state.profileName)
-            bindRoot(context)
+            bindRoot(context, state)
         }
 
     // TalkBack reads the time views; the name sits in a sibling view it would otherwise
@@ -612,18 +622,29 @@ private object PrayerWidgetRemoteViews {
         setChronometerCountDown(R.id.widget_countdown, !state.countdownIsElapsed)
     }
 
-    private fun RemoteViews.bindRoot(context: Context) {
-        setOnClickPendingIntent(R.id.widget_root, openHomePendingIntent(context))
+    private fun RemoteViews.bindRoot(context: Context, state: PrayerWidgetState) {
+        setOnClickPendingIntent(R.id.widget_root, openHomePendingIntent(context, state.profileId))
     }
 
-    private fun openHomePendingIntent(context: Context): PendingIntent {
+    /**
+     * Open the app on [profileId]'s page.
+     *
+     * Every widget used to share request code 0 and an identical intent, which is one
+     * PendingIntent: extras are not part of PendingIntent equality, so whichever widget was
+     * rendered last silently overwrote the target of every other one. The profile is therefore
+     * in the request code *and* in the intent's data — either alone would keep them distinct,
+     * and the data URI also makes the target readable in `dumpsys activity intents`.
+     */
+    private fun openHomePendingIntent(context: Context, profileId: Long): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN_HOME_FROM_WIDGET
+            data = widgetOpenDataUri(profileId).toUri()
+            putExtra(EXTRA_WIDGET_PROFILE_ID, profileId)
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         return PendingIntent.getActivity(
             context,
-            0,
+            widgetOpenRequestCode(profileId),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -631,3 +652,24 @@ private object PrayerWidgetRemoteViews {
 }
 
 private const val ACTION_OPEN_HOME_FROM_WIDGET = "com.aynama.prayertimes.widgets.OPEN_HOME"
+
+/** Profile id a widget tap asks the app to show. Absent or [NO_WIDGET_PROFILE] means "no preference". */
+const val EXTRA_WIDGET_PROFILE_ID = "com.aynama.prayertimes.widgets.PROFILE_ID"
+
+const val NO_WIDGET_PROFILE = -1L
+
+// Kept clear of the alarm ranges: notifications use profileId * 20, widget rollovers 70_000+.
+internal const val WIDGET_OPEN_REQUEST_CODE_BASE = 80_000
+
+/**
+ * PendingIntent request code for a tap that opens [profileId].
+ *
+ * Two widgets on the same profile may share one — they open the same page. Two widgets on
+ * different profiles must not, which is the whole point: extras are not part of PendingIntent
+ * equality, so a shared code let the last-rendered widget silently retarget the others.
+ */
+internal fun widgetOpenRequestCode(profileId: Long): Int =
+    WIDGET_OPEN_REQUEST_CODE_BASE + profileId.toInt()
+
+/** Distinguishes the tap intents themselves, and makes the target readable in `dumpsys`. */
+internal fun widgetOpenDataUri(profileId: Long): String = "aynama://widget/profile/$profileId"
