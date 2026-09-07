@@ -326,7 +326,7 @@ Depends on: Phase 5 (channels + alarm plumbing), unified countdown (DESIGN.md §
 - [x] Watch home: unified countdown, prayer list, profile paging, Jumu'ah, disconnected states
 - [x] Complications: SHORT_TEXT, LONG_TEXT, MONOCHROMATIC_IMAGE (DESIGN.md §7)
 - [x] Complication refresh model (Reviewer Concern #5)
-- [ ] Tiles
+- [x] Tiles — prayer name and its clock time; deliberately no countdown (a tile has no live-ticking text, and a frozen countdown is worse than none)
 - [ ] Phase 4B — Android + WearOS integration gate (paired emulators)
 
 ---

@@ -280,7 +280,14 @@ Fraunces ball-terminal numerals carry the identity even at 12pt. IBM Plex Sans t
 
 Adds:
 - Prayer name spelled out (`Fajr` not `F`) in Fraunces `body` size
-- Sub-line: "in 2h 18m" or "now" in IBM Plex `body-sm`
+- Profile name above it, so a two-profile user knows which city they are looking at
+- Sub-line: the prayer's own clock time — `at 13:00`, or `began 13:00` once it is under way
+
+**The tile carries no countdown.** A tile is a static layout rebuilt on an interval; it has no
+equivalent of the widget's `Chronometer` or the complication's `TimeDifferenceComplicationText`.
+A countdown there would be frozen at whatever it was when the tile was last built — right for a
+second and quietly wrong afterwards, which is worse than not showing one. The tile answers
+*when*; the complication and the app answer *how long*.
 
 ### WearOS complication families
 

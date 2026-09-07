@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">aynama</string>
     <string name="complication_label">Next prayer</string>
+    <string name="tile_label">Prayer times</string>
 </resources>

@@ -53,6 +53,23 @@
                 android:value="0" />
         </service>
 
+        <!-- Prayer tile. Shows *when* the prayer is; the complication and the app show *how
+             long*, because a tile has no live-ticking text and a frozen countdown is worse
+             than none. See the service's KDoc. -->
+        <service
+            android:name=".tile.PrayerTileService"
+            android:exported="true"
+            android:label="@string/tile_label"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/ic_complication" />
+        </service>
+
         <receiver
             android:name=".complications.ComplicationRefreshReceiver"
             android:exported="false" />
