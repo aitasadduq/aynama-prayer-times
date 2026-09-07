@@ -10,6 +10,9 @@ import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
+import com.aynama.prayertimes.shared.CalculationMethodKey
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
+import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,12 +30,13 @@ import java.time.Clock
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
 
 data class TrackerPrayerRow(
     val prayer: Prayer,
+    /** Day-aware — "Jumuah" for a Friday's Dhuhr, on today's rows and in history alike. */
+    val displayName: String,
     val scheduledTime: String,
     val status: QazaStatus?,
     val tappable: Boolean = true,
@@ -73,7 +77,17 @@ class TrackerViewModel(
 
     private val adhan = AdhanWrapper()
     private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
-    private val prayerTimesCache = mutableMapOf<Pair<Long, LocalDate>, PrayerTimesResult>()
+    // Keyed by everything the calculation depends on, not just id+date: editing a profile's
+    // location, method or timezone must not keep serving times computed from the old settings.
+    private data class PrayerCacheKey(
+        val profileId: Long,
+        val date: LocalDate,
+        val latitude: Double,
+        val longitude: Double,
+        val method: CalculationMethodKey,
+        val timezone: String,
+    )
+    private val prayerTimesCache = mutableMapOf<PrayerCacheKey, PrayerTimesResult>()
 
     private val expandedDays = MutableStateFlow<Set<LocalDate>>(emptySet())
 
@@ -84,7 +98,11 @@ class TrackerViewModel(
         profileRepository.observeDefaultProfile()
             .flatMapLatest { profile ->
                 if (profile == null) return@flatMapLatest flowOf(TrackerUiState.Empty)
-                val today = LocalDate.now(clock)
+                // The profile's own zone, not the device's. A profile pinned to another
+                // timezone has its own "today", and DESIGN.md §17 requires every surface to
+                // resolve it the same way the home ribbon and the alarms do.
+                val zoned = clock.withZone(profile.effectiveZoneId())
+                val today = LocalDate.now(zoned)
                 val historyStart = today
                     .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
                     .minusWeeks(3)
@@ -93,7 +111,7 @@ class TrackerViewModel(
                     qazaRepository.observeOutstandingCount(profile.id),
                     expandedDays,
                 ) { entries, outstandingCount, expanded ->
-                    buildUiState(profile, today, historyStart, entries, outstandingCount, expanded)
+                    buildUiState(profile, zoned, today, historyStart, entries, outstandingCount, expanded)
                 }
             }
             .catch { e -> _uiState.value = TrackerUiState.Empty }
@@ -113,6 +131,7 @@ class TrackerViewModel(
 
     private fun buildUiState(
         profile: Profile,
+        clock: Clock,
         today: LocalDate,
         historyStart: LocalDate,
         allEntries: List<com.aynama.prayertimes.shared.data.entity.QazaEntry>,
@@ -129,6 +148,7 @@ class TrackerViewModel(
             val time = todayTimes.timeFor(prayer, profile.asrMadhab)
             TrackerPrayerRow(
                 prayer = prayer,
+                displayName = prayerDisplayName(prayer, today),
                 scheduledTime = time.format(timeFormatter),
                 status = todayEntries[prayer],
                 tappable = !time.isAfter(now),
@@ -211,6 +231,7 @@ class TrackerViewModel(
             Prayer.entries.map { prayer ->
                 TrackerPrayerRow(
                     prayer = prayer,
+                    displayName = prayerDisplayName(prayer, date),
                     scheduledTime = times.timeFor(prayer, profile.asrMadhab).format(timeFormatter),
                     status = entries[prayer],
                 )
@@ -234,16 +255,21 @@ class TrackerViewModel(
         return "$onTimeCount of $total prayers on time this week"
     }
 
-    private fun cachedPrayerTimes(profile: Profile, date: LocalDate): PrayerTimesResult =
-        prayerTimesCache.getOrPut(profile.id to date) {
+    private fun cachedPrayerTimes(profile: Profile, date: LocalDate): PrayerTimesResult {
+        val zone = profile.effectiveZoneId()
+        val key = PrayerCacheKey(
+            profile.id, date, profile.latitude, profile.longitude, profile.calculationMethod, zone.id,
+        )
+        return prayerTimesCache.getOrPut(key) {
             adhan.getPrayerTimes(
                 latitude = profile.latitude,
                 longitude = profile.longitude,
                 date = date,
-                timezone = ZoneId.systemDefault(),
+                timezone = zone,
                 method = profile.calculationMethod,
             )
         }
+    }
 
     companion object {
         fun factory(app: AynamaApplication): ViewModelProvider.Factory =

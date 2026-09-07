@@ -47,6 +47,7 @@ import com.aynama.prayertimes.shared.timeline.buildTimeline
 import com.aynama.prayertimes.shared.timeline.countdownAt
 import com.aynama.prayertimes.shared.timeline.currentEntry
 import com.aynama.prayertimes.shared.timeline.displayName
+import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -380,15 +381,11 @@ internal fun profileDays(profile: Profile, today: LocalDate): Map<LocalDate, Pra
     }.toMap()
 }
 
-/** Three-letter widget abbreviation. Widget-only: nothing else has this little room. */
-internal fun TimelineEvent.abbreviation(): String = when (this) {
-    TimelineEvent.FAJR -> "FAJ"
-    TimelineEvent.SUNRISE -> "SUN"
-    TimelineEvent.DHUHR -> "DHU"
-    TimelineEvent.ASR -> "ASR"
-    TimelineEvent.MAGHRIB -> "MAG"
-    TimelineEvent.ISHA -> "ISH"
-}
+/**
+ * Three-letter widget abbreviation, derived from the day-aware name so a Friday Dhuhr
+ * abbreviates to JUM. Widget-only: nothing else has this little room.
+ */
+internal fun abbreviate(displayName: String): String = displayName.take(3).uppercase(Locale.ROOT)
 
 internal fun buildPrayerWidgetState(
     profile: Profile,
@@ -419,7 +416,7 @@ internal fun buildPrayerWidgetState(
     return PrayerWidgetState(
         profileName = profile.name,
         countdownPrayerName = countdown.entry.displayName(),
-        countdownPrayerAbbreviation = countdown.entry.event.abbreviation(),
+        countdownPrayerAbbreviation = abbreviate(countdown.entry.displayName()),
         countdownPrayerDisplayTime = countdown.entry.time.format(timeFormatter),
         countdownIsElapsed = elapsed,
         currentPrayerName = current?.displayName() ?: "",
@@ -429,7 +426,7 @@ internal fun buildPrayerWidgetState(
         hijriDateText = hijriDateText,
         sunriseDisplayTime = todayTimes.sunrise.format(timeFormatter),
         sunriseHasPassed = sunriseToday != null && !sunriseToday.instant.isAfter(nowInstant),
-        schedule = scheduleRows(todayTimes, profile.asrMadhab, timeFormatter),
+        schedule = scheduleRows(todayTimes, profile.asrMadhab, today, timeFormatter),
     )
 }
 
@@ -467,16 +464,21 @@ internal const val SUNRISE_NAME = "Sunrise"
 internal fun scheduleRows(
     times: PrayerTimesResult,
     asrMadhab: AsrMadhab,
+    date: LocalDate,
     formatter: DateTimeFormatter,
 ): List<WidgetScheduleRow> {
     val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
+    fun row(event: TimelineEvent, time: LocalTime): WidgetScheduleRow {
+        val name = prayerDisplayName(event, date)
+        return WidgetScheduleRow(name, abbreviate(name), time, time.format(formatter))
+    }
     return listOf(
-        WidgetScheduleRow("Fajr", "FAJ", times.fajr, times.fajr.format(formatter)),
-        WidgetScheduleRow(SUNRISE_NAME, "SUN", times.sunrise, times.sunrise.format(formatter)),
-        WidgetScheduleRow("Dhuhr", "DHU", times.dhuhr, times.dhuhr.format(formatter)),
-        WidgetScheduleRow("Asr", "ASR", asr, asr.format(formatter)),
-        WidgetScheduleRow("Maghrib", "MAG", times.maghrib, times.maghrib.format(formatter)),
-        WidgetScheduleRow("Isha", "ISH", times.isha, times.isha.format(formatter)),
+        row(TimelineEvent.FAJR, times.fajr),
+        row(TimelineEvent.SUNRISE, times.sunrise),
+        row(TimelineEvent.DHUHR, times.dhuhr),
+        row(TimelineEvent.ASR, asr),
+        row(TimelineEvent.MAGHRIB, times.maghrib),
+        row(TimelineEvent.ISHA, times.isha),
     )
 }
 

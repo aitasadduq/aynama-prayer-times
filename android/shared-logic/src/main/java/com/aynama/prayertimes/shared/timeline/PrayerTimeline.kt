@@ -49,19 +49,12 @@ data class TimelineEntry(
 )
 
 /**
- * The name to show for this entry.
+ * The name to show for this entry — "Jumuah" for a Friday Dhuhr. See [prayerDisplayName].
  *
- * On [TimelineEntry] rather than [TimelineEvent] because a prayer's name can depend on the
- * day it falls on. Every surface reads names from here so there is one place to change.
+ * On [TimelineEntry] rather than [TimelineEvent] because a prayer's name depends on the day
+ * it falls on. Every surface reads names from here so there is one place to change.
  */
-fun TimelineEntry.displayName(): String = when (event) {
-    TimelineEvent.FAJR -> "Fajr"
-    TimelineEvent.SUNRISE -> "Sunrise"
-    TimelineEvent.DHUHR -> "Dhuhr"
-    TimelineEvent.ASR -> "Asr"
-    TimelineEvent.MAGHRIB -> "Maghrib"
-    TimelineEvent.ISHA -> "Isha"
-}
+fun TimelineEntry.displayName(): String = prayerDisplayName(event, date)
 
 /**
  * The count-up window: how long a prayer stays "current" after its time before the

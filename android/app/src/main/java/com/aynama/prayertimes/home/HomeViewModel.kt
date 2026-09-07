@@ -22,6 +22,7 @@ import com.aynama.prayertimes.shared.timeline.buildTimeline
 import com.aynama.prayertimes.shared.timeline.countdownAt
 import com.aynama.prayertimes.shared.timeline.displayName
 import com.aynama.prayertimes.shared.timeline.format
+import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -46,6 +47,21 @@ import java.time.temporal.ChronoUnit
 
 enum class PrayerPhase { FAJR, SUNRISE_TRANSITION, DHUHR, ASR, MAGHRIB, ISHA }
 
+/**
+ * The label for a time-of-day phase — day-aware, so a Friday afternoon reads "Jumuah".
+ *
+ * A phase is named after the prayer that opened it, so it follows the same naming rule as
+ * every other display of that day's prayer (DESIGN.md §20).
+ */
+fun phaseDisplayName(phase: PrayerPhase, date: LocalDate): String = when (phase) {
+    PrayerPhase.FAJR -> prayerDisplayName(Prayer.FAJR, date)
+    PrayerPhase.SUNRISE_TRANSITION -> "Sunrise"
+    PrayerPhase.DHUHR -> prayerDisplayName(Prayer.DHUHR, date)
+    PrayerPhase.ASR -> prayerDisplayName(Prayer.ASR, date)
+    PrayerPhase.MAGHRIB -> prayerDisplayName(Prayer.MAGHRIB, date)
+    PrayerPhase.ISHA -> prayerDisplayName(Prayer.ISHA, date)
+}
+
 enum class RibbonState { PASSED, CURRENT, UPCOMING }
 
 sealed interface RibbonRow {
@@ -53,6 +69,8 @@ sealed interface RibbonRow {
 
     data class PrayerEntry(
         val prayer: Prayer,
+        /** Day-aware — "Jumuah" on a Friday. Resolved here so the UI never re-derives it. */
+        val displayName: String,
         override val displayTime: String,
         val ribbonState: RibbonState,
     ) : RibbonRow
@@ -255,7 +273,7 @@ class HomeViewModel(
         val countdown = countdownAt(timelineFor(profile, today), now)
         return ProfileUiState(
             profile = profile,
-            ribbonRows = deriveRibbonRows(times, profile.asrMadhab, localNow, ramadan, timeFormatter),
+            ribbonRows = deriveRibbonRows(times, profile.asrMadhab, localNow, today, ramadan, timeFormatter),
             countdownText = countdown?.format() ?: NO_COUNTDOWN,
             countdownIsElapsed = countdown is PrayerCountdown.Elapsed,
             countdownPrayerName = countdown?.entry?.displayName() ?: "",
@@ -311,6 +329,7 @@ internal fun deriveRibbonRows(
     times: PrayerTimesResult,
     asrMadhab: AsrMadhab,
     now: LocalTime,
+    date: LocalDate,
     isRamadan: Boolean,
     formatter: DateTimeFormatter,
 ): List<RibbonRow> {
@@ -338,11 +357,17 @@ internal fun deriveRibbonRows(
             val imsak = times.fajr.minusMinutes(10)
             add(RibbonRow.ImsakEntry(imsak.format(formatter), isPast = imsak <= now))
         }
-        add(RibbonRow.PrayerEntry(Prayer.FAJR, times.fajr.format(formatter), stateAt(0)))
+        fun prayerRow(prayer: Prayer, time: LocalTime, index: Int) = RibbonRow.PrayerEntry(
+            prayer = prayer,
+            displayName = prayerDisplayName(prayer, date),
+            displayTime = time.format(formatter),
+            ribbonState = stateAt(index),
+        )
+        add(prayerRow(Prayer.FAJR, times.fajr, 0))
         add(RibbonRow.SunriseEntry(times.sunrise.format(formatter)))
-        add(RibbonRow.PrayerEntry(Prayer.DHUHR, times.dhuhr.format(formatter), stateAt(1)))
-        add(RibbonRow.PrayerEntry(Prayer.ASR, asr.format(formatter), stateAt(2)))
-        add(RibbonRow.PrayerEntry(Prayer.MAGHRIB, times.maghrib.format(formatter), stateAt(3)))
-        add(RibbonRow.PrayerEntry(Prayer.ISHA, times.isha.format(formatter), stateAt(4)))
+        add(prayerRow(Prayer.DHUHR, times.dhuhr, 1))
+        add(prayerRow(Prayer.ASR, asr, 2))
+        add(prayerRow(Prayer.MAGHRIB, times.maghrib, 3))
+        add(prayerRow(Prayer.ISHA, times.isha, 4))
     }
 }

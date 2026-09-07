@@ -697,4 +697,68 @@ class PrayerWidgetTest {
     private companion object {
         const val ROLLOVER_ELAPSED = 1_000L
     }
+
+    // --- Friday naming ----------------------------------------------------------
+
+    @Test
+    fun `widgets name friday's dhuhr as jumuah`() {
+        val friday = LocalDate.of(2026, 5, 15)
+        fun times(d: LocalDate) =
+            adhan.getPrayerTimes(profile.latitude, profile.longitude, d, zone, profile.calculationMethod)
+        val state = stateOf(
+            profile = profile,
+            yesterday = times(friday.minusDays(1)),
+            today = times(friday),
+            tomorrow = times(friday.plusDays(1)),
+            now = ZonedDateTime.of(friday, LocalTime.of(11, 0), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        // The 2x2 schedule and the 4x2 columns.
+        assertTrue("Jumuah" in state.schedule.map { it.name })
+        assertFalse("Dhuhr" in state.schedule.map { it.name })
+        assertEquals("JUM", state.schedule.first { it.name == "Jumuah" }.abbreviation)
+        // The countdown target on a Friday late morning.
+        assertEquals("Jumuah", state.countdownPrayerName)
+        assertEquals("JUM", state.countdownPrayerAbbreviation)
+    }
+
+    @Test
+    fun `the highlighted column still matches after the rename`() {
+        // currentPrayerName and the column names are produced by different code paths; if only
+        // one of them learned about Jumuah the 4x2 widget would highlight nothing all Friday.
+        val friday = LocalDate.of(2026, 5, 15)
+        fun times(d: LocalDate) =
+            adhan.getPrayerTimes(profile.latitude, profile.longitude, d, zone, profile.calculationMethod)
+        val today = times(friday)
+        val state = stateOf(
+            profile = profile,
+            yesterday = times(friday.minusDays(1)),
+            today = today,
+            tomorrow = times(friday.plusDays(1)),
+            now = ZonedDateTime.of(friday, today.dhuhr.plusMinutes(45), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertEquals("Jumuah", state.currentPrayerName)
+        assertEquals(1, highlightedColumnIndex(state))
+    }
+
+    @Test
+    fun `widgets keep dhuhr on other days`() {
+        val thursday = LocalDate.of(2026, 5, 14)
+        fun times(d: LocalDate) =
+            adhan.getPrayerTimes(profile.latitude, profile.longitude, d, zone, profile.calculationMethod)
+        val state = stateOf(
+            profile = profile,
+            yesterday = times(thursday.minusDays(1)),
+            today = times(thursday),
+            tomorrow = times(thursday.plusDays(1)),
+            now = ZonedDateTime.of(thursday, LocalTime.of(11, 0), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertEquals("Dhuhr", state.countdownPrayerName)
+        assertEquals("DHU", state.countdownPrayerAbbreviation)
+    }
 }

@@ -345,7 +345,7 @@ private fun PrayerRibbonRow(
         RibbonState.CURRENT -> currentColor
         RibbonState.UPCOMING -> LocalContentColor.current
     }
-    val prayerName = row.prayer.displayName()
+    val prayerName = row.displayName
     val stateLabel = when (row.ribbonState) {
         RibbonState.PASSED -> "passed"
         RibbonState.CURRENT -> "current"
@@ -623,14 +623,6 @@ private fun LoadingContent() {
             .fillMaxSize()
             .background(Ink),
     )
-}
-
-private fun Prayer.displayName(): String = when (this) {
-    Prayer.FAJR -> "Fajr"
-    Prayer.DHUHR -> "Dhuhr"
-    Prayer.ASR -> "Asr"
-    Prayer.MAGHRIB -> "Maghrib"
-    Prayer.ISHA -> "Isha"
 }
 
 private fun CalculationMethodKey.taqweemName(): String = when (this) {
