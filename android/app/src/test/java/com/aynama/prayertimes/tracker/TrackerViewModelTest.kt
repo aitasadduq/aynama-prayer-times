@@ -136,6 +136,9 @@ class TrackerViewModelTest {
         isha = LocalTime.of(19, 45),
     )
 
+    // Pinned to UTC so it agrees with fridayAtOnePm. The tracker now resolves "today" and
+    // "now" in the profile's own zone (DESIGN.md §17), so a profile that followed the device
+    // would make these assertions depend on the machine running them.
     private val londonProfile = Profile(
         id = 1,
         name = "Home",
@@ -145,6 +148,8 @@ class TrackerViewModelTest {
         asrMadhab = AsrMadhab.SHAFII,
         isGps = false,
         sortOrder = 0,
+        timezone = "UTC",
+        useLocationTimezone = true,
     )
 
     @Before
@@ -195,5 +200,33 @@ class TrackerViewModelTest {
         assertFalse("Asr is not due at 1pm", byPrayer.getValue(Prayer.ASR).tappable)
         assertFalse("Maghrib is not due at 1pm", byPrayer.getValue(Prayer.MAGHRIB).tappable)
         assertFalse("Isha is not due at 1pm", byPrayer.getValue(Prayer.ISHA).tappable)
+    }
+
+    // ---------- Profile timezone (DESIGN.md §17) ----------
+
+    @Test
+    fun `today rows are resolved in the profile's zone, not the device's`() = runTest {
+        // 2026-05-08T13:00Z is Friday 22:00 in Tokyo — by then every prayer is due. Resolving
+        // "now" against the device zone instead would leave the evening prayers untappable.
+        val tokyo = londonProfile.copy(timezone = "Asia/Tokyo", useLocationTimezone = true)
+        val profileRepo = mockk<ProfileRepository>()
+        val qazaRepo = mockk<QazaRepository>()
+        every { profileRepo.observeDefaultProfile() } returns flowOf(tokyo)
+        every { qazaRepo.observeByDateRange(1L, any(), any()) } returns flowOf(emptyList())
+        every { qazaRepo.observeOutstandingCount(1L) } returns flowOf(0)
+
+        val loaded = TrackerViewModel(profileRepo, qazaRepo, fridayAtOnePm)
+            .uiState.value as TrackerUiState.Loaded
+
+        assertTrue("every prayer is due by 22:00 Tokyo", loaded.todayRows.all { it.tappable })
+    }
+
+    @Test
+    fun `friday's dhuhr row is named jumuah`() = runTest {
+        val loaded = loadedState(emptyList())
+        val byPrayer = loaded.todayRows.associateBy { it.prayer }
+
+        assertEquals("Jumuah", byPrayer.getValue(Prayer.DHUHR).displayName)
+        assertEquals("Fajr", byPrayer.getValue(Prayer.FAJR).displayName)
     }
 }
