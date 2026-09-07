@@ -114,7 +114,12 @@ class WearHomeViewModel(
             .launchIn(viewModelScope)
     }
 
-    private fun buildPage(profile: Profile, now: Instant): WearProfilePage? {
+    /**
+     * Internal so the cross-surface check can assert the screen against the shared rule.
+     * The watch's page, its complication and its tile are three code paths; agreeing on a
+     * couple of hand-picked times would prove nothing.
+     */
+    internal fun buildPage(profile: Profile, now: Instant): WearProfilePage? {
         val zone = profile.effectiveZoneId()
         val today = now.atZone(zone).toLocalDate()
         val timeline = buildTimeline(daysFor(profile, today), profile.asrMadhab, zone)
