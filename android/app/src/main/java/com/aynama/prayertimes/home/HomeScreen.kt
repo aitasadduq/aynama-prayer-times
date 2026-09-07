@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +51,7 @@ import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
 import com.aynama.prayertimes.tracker.MarkPrayerSheet
+import com.aynama.prayertimes.widgets.NO_WIDGET_PROFILE
 import java.time.LocalDate
 import com.aynama.prayertimes.ui.theme.IbmPlexSans
 import com.aynama.prayertimes.ui.theme.Ink
@@ -59,7 +61,11 @@ import com.aynama.prayertimes.ui.theme.ParchmentMuted
 import com.aynama.prayertimes.ui.theme.Saffron
 
 @Composable
-fun HomeScreen(onNavigateToSettings: () -> Unit) {
+fun HomeScreen(
+    requestedProfileId: Long = NO_WIDGET_PROFILE,
+    onProfileShown: () -> Unit = {},
+    onNavigateToSettings: () -> Unit,
+) {
     val app = LocalContext.current.applicationContext as AynamaApplication
     val vm: HomeViewModel = viewModel(factory = HomeViewModel.factory(app))
     val uiState by vm.uiState.collectAsStateWithLifecycle()
@@ -70,6 +76,8 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
         is HomeUiState.Error -> ErrorContent(cause = state.cause)
         is HomeUiState.Loaded -> LoadedContent(
             state = state,
+            requestedProfileId = requestedProfileId,
+            onProfileShown = onProfileShown,
             onNavigateToSettings = onNavigateToSettings,
             onDismissRamadanBanner = vm::dismissRamadanBanner,
             onMarkPrayer = { profileId, prayer, date, status ->
@@ -82,6 +90,8 @@ fun HomeScreen(onNavigateToSettings: () -> Unit) {
 @Composable
 private fun LoadedContent(
     state: HomeUiState.Loaded,
+    requestedProfileId: Long,
+    onProfileShown: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onDismissRamadanBanner: () -> Unit,
     onMarkPrayer: (profileId: Long, prayer: Prayer, date: LocalDate, status: QazaStatus) -> Unit,
@@ -102,6 +112,21 @@ private fun LoadedContent(
 
     var sheetPrayer by remember { mutableStateOf<Pair<Prayer, ProfileUiState>?>(null) }
     val today = remember { LocalDate.now() }
+
+    // A widget tap names the profile that widget renders. Keyed on the profile ids too, because
+    // the first frame after a cold launch is often Loading and the pages arrive a moment later
+    // — without that key the request would be dropped before there was anything to scroll to.
+    // Ids, not the pages themselves: those carry a countdown that changes every second, and
+    // restarting this effect at 1 Hz would cancel an in-flight scroll.
+    val profileIds = state.pages.map { it.profile.id }
+    LaunchedEffect(requestedProfileId, profileIds) {
+        if (requestedProfileId == NO_WIDGET_PROFILE) return@LaunchedEffect
+        val target = profileIds.indexOf(requestedProfileId)
+        // A profile deleted since the widget last rendered leaves the pager where it is,
+        // rather than snapping to an unrelated one.
+        if (target >= 0) pagerState.scrollToPage(target)
+        onProfileShown()
+    }
 
     Box(
         modifier = Modifier

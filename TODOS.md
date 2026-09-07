@@ -291,7 +291,7 @@ Each is separately pickable in the widget drawer and only stretches on resize (`
 - [x] Next Prayer & Dates, 2×2 — dates band + next prayer cluster
 - [x] Prayer Schedule, 2×2 — dates band + six prayer times + profile
 - [x] Prayer Times, 4×2 — dates + sunrise, five prayers, countdown, current prayer highlighted
-- [x] All categories: tap → opens app Home screen
+- [x] All categories: tap → opens app Home on that widget's own profile
 - [x] Per-widget profile selection via `WidgetConfigureActivity` (stored in each instance's Glance state)
 
 **Update strategy**

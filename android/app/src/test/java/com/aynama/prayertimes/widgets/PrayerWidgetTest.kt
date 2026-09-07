@@ -761,4 +761,60 @@ class PrayerWidgetTest {
         assertEquals("Dhuhr", state.countdownPrayerName)
         assertEquals("DHU", state.countdownPrayerAbbreviation)
     }
+
+    // --- Tap target: each widget opens its own profile --------------------------
+
+    @Test
+    fun `widget state carries the profile it renders`() {
+        fun times(d: LocalDate) =
+            adhan.getPrayerTimes(profile.latitude, profile.longitude, d, zone, profile.calculationMethod)
+        val other = profile.copy(id = 7L, name = "Makkah")
+
+        fun stateFor(p: Profile) = stateOf(
+            profile = p,
+            yesterday = times(date.minusDays(1)),
+            today = times(date),
+            tomorrow = times(date.plusDays(1)),
+            now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
+            elapsedRealtime = 1_000L,
+        )
+
+        assertEquals(1L, stateFor(profile).profileId)
+        assertEquals(7L, stateFor(other).profileId)
+    }
+
+    @Test
+    fun `taps on widgets bound to different profiles are distinct pending intents`() {
+        // Extras are not part of PendingIntent equality. Before this, every widget shared
+        // request code 0 and an identical intent, so the last one rendered silently retargeted
+        // all the others and every tap opened the same profile.
+        val ids = listOf(1L, 2L, 3L, 42L)
+
+        assertEquals(ids.size, ids.map { widgetOpenRequestCode(it) }.distinct().size)
+        assertEquals(ids.size, ids.map { widgetOpenDataUri(it) }.distinct().size)
+    }
+
+    @Test
+    fun `two widgets on the same profile may share one tap intent`() {
+        assertEquals(widgetOpenRequestCode(3L), widgetOpenRequestCode(3L))
+        assertEquals(widgetOpenDataUri(3L), widgetOpenDataUri(3L))
+    }
+
+    @Test
+    fun `widget tap request codes stay clear of the rollover alarm range`() {
+        // Both live in the same app; an overlap would have one cancel the other.
+        val rollovers = WIDGET_UPDATE_REQUEST_CODE_BASE until
+            WIDGET_UPDATE_REQUEST_CODE_BASE + WIDGET_UPDATE_MAX_PROFILES * WIDGET_UPDATE_SLOT_COUNT
+
+        assertTrue((0L..999L).none { widgetOpenRequestCode(it) in rollovers })
+    }
+
+    @Test
+    fun `a widget with no resolvable profile does not share a real profile's tap intent`() {
+        // Room ids start at 1, so the "no profile" sentinel must not collide with any of them.
+        val real = (1L..100L).map { widgetOpenRequestCode(it) }
+
+        assertFalse(widgetOpenRequestCode(NO_WIDGET_PROFILE) in real)
+        assertFalse(widgetOpenDataUri(NO_WIDGET_PROFILE) in (1L..100L).map { widgetOpenDataUri(it) })
+    }
 }

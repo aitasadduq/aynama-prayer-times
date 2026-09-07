@@ -196,7 +196,7 @@ Three sizes, each with a specific job:
 | 2×2 | Next prayer name + countdown + profile name | Countdown ("2h 14m") dominates |
 | 4×2 | Next prayer countdown + full 6-time schedule | Countdown top, schedule list below |
 
-All widget sizes: tap opens app Home screen. No prayer-row taps within widget (widget interaction is launch-only in v1).
+All widget sizes: tap opens the app on **that widget's own profile**, not the default one — each widget instance carries its profile choice into the launch intent. No prayer-row taps within widget (widget interaction is launch-only in v1).
 
 Widget update strategy (Reviewer Concern #4 — resolved): **Live countdown via `RemoteViews.setChronometerCountDown()`.** The system handles ticking natively — no WorkManager needed. Widget is updated only when the active prayer changes (~5x/day). The system-rendered countdown reads live without any periodic scheduling. Note: WorkManager's minimum periodic interval is 15 minutes — not usable for live countdowns. `setChronometerCountDown()` is the correct mechanism (API 17+).
 
