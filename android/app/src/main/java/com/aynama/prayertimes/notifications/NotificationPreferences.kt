@@ -31,6 +31,15 @@ class NotificationPreferences(private val prefs: SharedPreferences) {
         get() = prefs.getBoolean(KEY_MASTER, true)
         set(value) = prefs.edit().putBoolean(KEY_MASTER, value).apply()
 
+    /**
+     * The always-on prayer notification. Off by default — the plan calls it optional, and an
+     * ongoing notification the user did not ask for is the kind of thing that gets an app's
+     * notifications muted wholesale.
+     */
+    var liveNotificationEnabled: Boolean
+        get() = prefs.getBoolean(KEY_LIVE_NOTIFICATION, false)
+        set(value) = prefs.edit().putBoolean(KEY_LIVE_NOTIFICATION, value).apply()
+
     var imsakEnabled: Boolean
         get() = prefs.getBoolean(KEY_IMSAK, true)
         set(value) = prefs.edit().putBoolean(KEY_IMSAK, value).apply()
@@ -107,6 +116,7 @@ class NotificationPreferences(private val prefs: SharedPreferences) {
         private const val KEY_NOTIFICATION_PROFILE = "notif_profile_id"
         private const val KEY_MASTER = "notif_master_enabled"
         private const val KEY_IMSAK = "notif_imsak_enabled"
+        private const val KEY_LIVE_NOTIFICATION = "notif_live_enabled"
         private const val KEY_ADHAN_VOICE = "notif_adhan_voice"
         private const val KEY_VIBRATION = "notif_vibration"
         private const val KEY_V1_MIGRATED = "notif_v1_migrated"

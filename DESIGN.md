@@ -812,7 +812,7 @@ straight on to Dhuhr. Only prayers count up.
 - The prayer the number refers to is always named next to it. A bare signed number does not
   say whether Dhuhr is coming or has just started.
 
-### Widget exception (platform constraint)
+### Platform exception: system-ticked surfaces (widgets, live notification)
 
 Android widgets render the countdown with `RemoteViews.setChronometer` +
 `setChronometerCountDown` (architecture-design.md, Reviewer Concern #4). The system ticks it
@@ -824,6 +824,10 @@ Widgets therefore render `-12:35` where the app renders `-00:12:35`. The sign is
 Chronometer format string carries it); the padding is not. **The state and the direction are
 identical** — only the padding differs. Do not "fix" this by replacing the Chronometer with
 a periodic update job; that trades a live countdown for a stale one.
+
+The live notification (§22) has the same constraint and less room: its chronometer is the
+notification's own `when` field, which takes no format string at all. There the direction is
+carried in words — "At 1:00 PM" while counting down, "Began at 1:00 PM" while counting up.
 
 ### Boundary behavior
 
@@ -902,3 +906,58 @@ composable. A field added to the form cannot appear at one entry point and not a
 
 The profile pager has no trailing "+" page. It duplicated the FAB and cost the pager a phantom
 page that the dot indicator counted, so a user with two profiles saw three dots.
+
+---
+
+## 22. Live Prayer Countdown Notification
+
+### What it is
+
+An optional ongoing notification carrying the current prayer and a live countdown, following
+the same rule as every other surface (§19).
+
+**Off by default.** An ongoing notification the user did not ask for is the kind of thing that
+gets an app's notifications muted wholesale.
+
+### Content
+
+| Field | Counting down | Counting up |
+|---|---|---|
+| Title | prayer name — day-aware (§20) | prayer name |
+| Text | `At 1:00 PM` | `Began at 1:00 PM` |
+| Sub-text | profile name | profile name |
+| Time slot | system chronometer counting **down** to the prayer | counting **up** from it |
+
+The number is the platform's own chronometer (`setWhen` + `setUsesChronometer` +
+`setChronometerCountDown`). Nothing of ours runs per second, and the count stays right while
+the app is dead. The chronometer takes no format string, so the sign lives in the text — see
+§19's platform exception.
+
+Tapping it opens the app on the profile it is about, the same as a widget tap.
+
+### Channel
+
+Its own channel at `IMPORTANCE_MIN`: silent, no vibration, no badge. This notification is
+present all day; it belongs in the shade, not on the status bar competing for attention.
+
+### How it stays current
+
+One exact alarm at a time, armed at `nextTransition()` — the moment a prayer starts, or the
+moment its 30-minute count-up window closes. The receiver re-arms on every fire, so the chain
+survives process death; boot and timezone changes re-enter through `AlarmScheduler.scheduleAll`.
+
+**Not a foreground service.** A service would hold a process alive all day to render a number
+the system can tick on its own, and would need a `FOREGROUND_SERVICE_SPECIAL_USE` justification
+it does not deserve.
+
+### Setting
+
+Notification settings → OTHER → **Live countdown**, a 64pt two-line toggle row above Ramadan
+Imsak. Same shape as the Imsak row: both are opt-in behaviours that need a sentence of
+explanation, unlike the plain per-prayer toggles.
+
+The master toggle gates it as well. Master off means "aynama may not put prayer notifications
+in my shade", and an ongoing one would contradict that most visibly of all. The user's own
+preference is left untouched, so turning master back on restores the notification without them
+having to re-find the row — which matters, because the row lives inside the master-gated part
+of the screen.

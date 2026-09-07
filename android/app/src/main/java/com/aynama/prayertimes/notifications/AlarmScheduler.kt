@@ -125,6 +125,10 @@ object AlarmScheduler {
             runCatching { scheduleForProfile(context, profile, schedulingDate(profile), notifPrefs) }
                 .onFailure { Log.w(TAG, "no alarms armed for profile ${profile.id} (${profile.name})", it) }
         }
+        // The live notification rides the same reschedule points as everything else: app
+        // start and resume, boot, timezone change, prayer rollover, settings change.
+        runCatching { LiveNotificationScheduler.refreshAndArm(context) }
+            .onFailure { Log.w(TAG, "live notification refresh failed", it) }
         scheduleMidnightReschedule(context)
     }
 
