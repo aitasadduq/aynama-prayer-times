@@ -41,6 +41,7 @@ data class NotificationSettingsUiState(
     val masterEnabled: Boolean = true,
     val prayerRows: List<PrayerRowData> = emptyList(),
     val imsakEnabled: Boolean = true,
+    val liveNotificationEnabled: Boolean = false,
     val adhanVoice: AdhanVoice = AdhanVoice.MAKKAH,
     val vibration: VibrationMode = VibrationMode.WITH_SOUND,
     val isRamadan: Boolean = false,
@@ -91,6 +92,15 @@ class NotificationSettingsViewModel(
             })
         }
         rescheduleAll()
+    }
+
+    fun setLiveNotificationEnabled(enabled: Boolean) {
+        prefs.liveNotificationEnabled = enabled
+        _state.update { it.copy(liveNotificationEnabled = enabled) }
+        // Post or tear down immediately — a toggle the user has to wait for reads as broken.
+        viewModelScope.launch(Dispatchers.IO) {
+            LiveNotificationScheduler.refreshAndArm(context)
+        }
     }
 
     fun setImsakEnabled(enabled: Boolean) {
@@ -184,6 +194,7 @@ class NotificationSettingsViewModel(
                 permissionGranted = NotificationManagerCompat.from(context).areNotificationsEnabled(),
                 masterEnabled = prefs.masterEnabled,
                 imsakEnabled = prefs.imsakEnabled,
+                liveNotificationEnabled = prefs.liveNotificationEnabled,
                 adhanVoice = prefs.adhanVoice,
                 vibration = prefs.vibration,
             )

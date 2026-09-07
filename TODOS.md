@@ -249,6 +249,22 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 
 ---
 
+### Phase 5b — Live Prayer Notification ✅ DONE
+Depends on: Phase 5 (channels + alarm plumbing), unified countdown (DESIGN.md §19).
+
+- [x] `NotificationPreferences.liveNotificationEnabled` — opt-in, default off
+- [x] Own channel at `IMPORTANCE_MIN`: silent, no vibration, no badge
+- [x] Countdown via `setWhen` + `setUsesChronometer` + `setChronometerCountDown` — no per-second job
+- [x] Direction carried in words (`At …` / `Began at …`), the chronometer takes no format string
+- [x] Day-aware prayer name (Jumu'ah on Friday)
+- [x] Tap → opens the app on the notification profile
+- [x] `LiveNotificationScheduler` — one exact alarm at `nextTransition()`, re-armed on each fire
+- [x] Re-armed on app start/resume, boot, timezone change and prayer rollover via `AlarmScheduler.scheduleAll`
+- [x] Settings toggle: Notifications → OTHER → "Live countdown"
+- [x] `LivePrayerNotificationTest` — direction, subject, chronometer base, Jumu'ah, polar-night absence
+
+---
+
 ### Phase 6 — Settings Screen
 Depends on: Phase 1 (profiles), Phase 5 (notifications config).
 
