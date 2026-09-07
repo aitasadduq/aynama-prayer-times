@@ -1,0 +1,25 @@
+{
+  "method": "ISNA",
+  "tolerance_minutes": 1,
+  "reference": "Adhan-Kotlin com.batoulapps.adhan:adhan:1.2.1",
+  "cases": [
+    {
+      "description": "New York, United States \u2014 western longitude, EDT",
+      "input": {
+        "latitude": 40.7128,
+        "longitude": -74.006,
+        "date": "2026-03-21",
+        "timezone": "America/New_York"
+      },
+      "expected": {
+        "fajr": "05:42",
+        "sunrise": "06:58",
+        "dhuhr": "13:04",
+        "asr_shafii": "16:30",
+        "asr_hanafi": "17:22",
+        "maghrib": "19:09",
+        "isha": "20:25"
+      }
+    }
+  ]
+}

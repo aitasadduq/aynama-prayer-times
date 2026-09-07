@@ -1,0 +1,25 @@
+{
+  "method": "QATAR",
+  "tolerance_minutes": 1,
+  "reference": "Adhan-Kotlin com.batoulapps.adhan:adhan:1.2.1",
+  "cases": [
+    {
+      "description": "Doha, Qatar \u2014 mid-winter, fixed 90-minute Isha interval",
+      "input": {
+        "latitude": 25.2854,
+        "longitude": 51.531,
+        "date": "2026-01-15",
+        "timezone": "Asia/Qatar"
+      },
+      "expected": {
+        "fajr": "05:01",
+        "sunrise": "06:21",
+        "dhuhr": "11:43",
+        "asr_shafii": "14:45",
+        "asr_hanafi": "15:30",
+        "maghrib": "17:05",
+        "isha": "18:35"
+      }
+    }
+  ]
+}

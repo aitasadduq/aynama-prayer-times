@@ -42,7 +42,20 @@ google-services.json
 android/local.properties
 android/.gradle/
 
-# Script generator artifacts
+# Script generator artifacts. The Adhan JAR is downloaded from Maven Central on demand and
+# pinned by scripts/reference-versions.json, so it is reproducible without being committed.
 scripts/*.jar
 scripts/*.class
 scripts/disagreements.json
+scripts/adhan-parity/*.jar
+scripts/adhan-parity/*.class
+
+# Xcode / SwiftPM
+.build/
+.swiftpm/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+
+# Package.resolved is deliberately NOT ignored. Adhan-Swift is pinned exactly, and committing
+# the resolution is what makes a CI checkout reproduce this exact dependency graph.

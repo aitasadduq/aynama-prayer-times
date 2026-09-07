@@ -520,7 +520,7 @@ The following issues were flagged during adversarial review and require decision
 
 **Deferred to TODOS.md** (resolve in-sprint or before v2/v3/v4):
 2. **Zakat nisab and Hawl logic** — nisab threshold (gold-based vs. silver-based) and the lunar year (Hawl) requirement need fiqhi specification. The calculator must document which rulings it follows. (v4 decision)
-4. **Widget countdown strategy** — iOS WidgetKit supports `Text` with `.timer` date style for live countdowns, but this consumes timeline budget differently than static "next prayer at X:XX" displays. Decide which approach before building widgets. (v1-v2 decision)
+4. ~~**Widget countdown strategy**~~ — **RESOLVED on both platforms.** Android: `RemoteViews.setChronometer` + `setChronometerCountDown`. iOS: SwiftUI `Text(timerInterval:pauseTime:countsDown:)`, with one WidgetKit timeline entry per `nextTransition()` — roughly a dozen a day, because the timer text is ticked by the system and costs no budget while a per-minute schedule of static strings would spend all of it. The concern's premise was that the timer style *consumes* budget; it does not — what consumes budget is refreshing the widget, and the timer text is precisely how you avoid needing to. Both platforms surrender the format to the system in exchange (no minus sign, no zero-padded hours); DESIGN.md §19 "Platform exception" states what each can and cannot render, and §23 covers the iOS live-countdown surfaces.
 5. **WearOS complication refresh model** — differs architecturally from watchOS timeline model. Needs platform-specific implementation spec (e.g., `TileService.onTileRequest` with `TimelineBuilders` or periodic `WorkManager` refresh). (v2 decision)
 
 ## GSTACK REVIEW REPORT

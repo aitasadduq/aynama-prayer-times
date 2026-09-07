@@ -1,0 +1,25 @@
+{
+  "method": "KUWAIT",
+  "tolerance_minutes": 1,
+  "reference": "Adhan-Kotlin com.batoulapps.adhan:adhan:1.2.1",
+  "cases": [
+    {
+      "description": "Kuwait City, Kuwait \u2014 mid-summer",
+      "input": {
+        "latitude": 29.3759,
+        "longitude": 47.9774,
+        "date": "2026-07-15",
+        "timezone": "Asia/Kuwait"
+      },
+      "expected": {
+        "fajr": "03:26",
+        "sunrise": "04:58",
+        "dhuhr": "11:54",
+        "asr_shafii": "15:29",
+        "asr_hanafi": "16:44",
+        "maghrib": "18:49",
+        "isha": "20:19"
+      }
+    }
+  ]
+}

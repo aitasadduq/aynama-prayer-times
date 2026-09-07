@@ -1,0 +1,195 @@
+{
+  "reference": "Adhan-Kotlin com.batoulapps.adhan:adhan:1.2.1",
+  "cases": [
+    {
+      "id": "probe_london_jun",
+      "description": "51.5N \u2014 just above the threshold",
+      "latitude": 51.5074,
+      "longitude": -0.1278,
+      "date": "2026-06-21",
+      "timezone": "Europe/London",
+      "method": "MWL",
+      "expected": {
+        "fajr": "01:02",
+        "sunrise": "04:43",
+        "dhuhr": "13:03",
+        "asr_shafii": "17:25",
+        "asr_hanafi": "18:40",
+        "maghrib": "21:22",
+        "isha": "01:02",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    },
+    {
+      "id": "probe_london_dec",
+      "description": "51.5N in winter \u2014 the threshold applies year round, not only in summer",
+      "latitude": 51.5074,
+      "longitude": -0.1278,
+      "date": "2026-12-21",
+      "timezone": "Europe/London",
+      "method": "MWL",
+      "expected": {
+        "fajr": "05:59",
+        "sunrise": "08:04",
+        "dhuhr": "12:00",
+        "asr_shafii": "13:38",
+        "asr_hanafi": "14:07",
+        "maghrib": "15:53",
+        "isha": "17:51",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    },
+    {
+      "id": "probe_edinburgh",
+      "description": "55.95N",
+      "latitude": 55.9533,
+      "longitude": -3.1883,
+      "date": "2026-06-21",
+      "timezone": "Europe/London",
+      "method": "MWL",
+      "expected": {
+        "fajr": "01:14",
+        "sunrise": "04:26",
+        "dhuhr": "13:16",
+        "asr_shafii": "17:47",
+        "asr_hanafi": "19:04",
+        "maghrib": "22:03",
+        "isha": "01:15",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    },
+    {
+      "id": "probe_stockholm",
+      "description": "59.33N",
+      "latitude": 59.3293,
+      "longitude": 18.0686,
+      "date": "2026-06-21",
+      "timezone": "Europe/Stockholm",
+      "method": "MWL",
+      "expected": {
+        "fajr": "00:49",
+        "sunrise": "03:31",
+        "dhuhr": "12:51",
+        "asr_shafii": "17:30",
+        "asr_hanafi": "18:48",
+        "maghrib": "22:08",
+        "isha": "00:50",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    },
+    {
+      "id": "probe_reykjavik",
+      "description": "64.15N \u2014 just south of the midnight-sun band",
+      "latitude": 64.1466,
+      "longitude": -21.9426,
+      "date": "2026-06-21",
+      "timezone": "Atlantic/Reykjavik",
+      "method": "MWL",
+      "expected": {
+        "fajr": "01:29",
+        "sunrise": "02:55",
+        "dhuhr": "13:31",
+        "asr_shafii": "18:23",
+        "asr_hanafi": "19:46",
+        "maghrib": "00:04",
+        "isha": "01:30",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    },
+    {
+      "id": "probe_65n",
+      "description": "65.0N \u2014 the collapsed-day case AdhanWrapperTest pins",
+      "latitude": 65.0,
+      "longitude": 18.9553,
+      "date": "2026-06-21",
+      "timezone": "Europe/Oslo",
+      "method": "MWL",
+      "expected": {
+        "fajr": "00:46",
+        "sunrise": "01:45",
+        "dhuhr": "12:47",
+        "asr_shafii": "17:41",
+        "asr_hanafi": "19:06",
+        "maghrib": "23:47",
+        "isha": "00:46",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    },
+    {
+      "id": "probe_paris",
+      "description": "48.86N \u2014 barely above the threshold",
+      "latitude": 48.8566,
+      "longitude": 2.3522,
+      "date": "2026-06-21",
+      "timezone": "Europe/Paris",
+      "method": "MWL",
+      "expected": {
+        "fajr": "01:52",
+        "sunrise": "05:47",
+        "dhuhr": "13:53",
+        "asr_shafii": "18:10",
+        "asr_hanafi": "19:24",
+        "maghrib": "21:58",
+        "isha": "01:07",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    },
+    {
+      "id": "probe_vienna",
+      "description": "48.21N \u2014 barely above the threshold",
+      "latitude": 48.2082,
+      "longitude": 16.3738,
+      "date": "2026-06-21",
+      "timezone": "Europe/Vienna",
+      "method": "MWL",
+      "expected": {
+        "fajr": "01:28",
+        "sunrise": "04:54",
+        "dhuhr": "12:57",
+        "asr_shafii": "17:12",
+        "asr_hanafi": "18:26",
+        "maghrib": "20:59",
+        "isha": "23:54",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    },
+    {
+      "id": "probe_munich",
+      "description": "48.14N \u2014 barely above the threshold",
+      "latitude": 48.1351,
+      "longitude": 11.582,
+      "date": "2026-06-21",
+      "timezone": "Europe/Berlin",
+      "method": "MWL",
+      "expected": {
+        "fajr": "01:50",
+        "sunrise": "05:13",
+        "dhuhr": "13:16",
+        "asr_shafii": "17:31",
+        "asr_hanafi": "18:45",
+        "maghrib": "21:18",
+        "isha": "00:12",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    },
+    {
+      "id": "probe_zurich",
+      "description": "47.38N \u2014 just below the threshold, must agree",
+      "latitude": 47.3769,
+      "longitude": 8.5417,
+      "date": "2026-06-21",
+      "timezone": "Europe/Zurich",
+      "method": "MWL",
+      "expected": {
+        "fajr": "02:25",
+        "sunrise": "05:29",
+        "dhuhr": "13:29",
+        "asr_shafii": "17:42",
+        "asr_hanafi": "18:56",
+        "maghrib": "21:26",
+        "isha": "00:09",
+        "high_latitude_rule": "MIDDLE_OF_THE_NIGHT"
+      }
+    }
+  ]
+}

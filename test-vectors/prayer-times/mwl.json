@@ -1,0 +1,62 @@
+{
+  "method": "MWL",
+  "tolerance_minutes": 1,
+  "reference": "Adhan-Kotlin com.batoulapps.adhan:adhan:1.2.1",
+  "cases": [
+    {
+      "description": "Makkah, Saudi Arabia \u2014 the app's original golden case",
+      "input": {
+        "latitude": 21.4225,
+        "longitude": 39.8262,
+        "date": "2026-03-21",
+        "timezone": "Asia/Riyadh",
+        "elevation_meters": 277
+      },
+      "expected": {
+        "fajr": "05:10",
+        "sunrise": "06:24",
+        "dhuhr": "12:29",
+        "asr_shafii": "15:53",
+        "asr_hanafi": "16:50",
+        "maghrib": "18:32",
+        "isha": "19:42"
+      }
+    },
+    {
+      "description": "London, United Kingdom \u2014 51.5N, above the 48-degree high-latitude threshold, BST",
+      "input": {
+        "latitude": 51.5074,
+        "longitude": -0.1278,
+        "date": "2026-06-21",
+        "timezone": "Europe/London"
+      },
+      "expected": {
+        "fajr": "01:02",
+        "sunrise": "04:43",
+        "dhuhr": "13:03",
+        "asr_shafii": "17:25",
+        "asr_hanafi": "18:40",
+        "maghrib": "21:22",
+        "isha": "01:02"
+      }
+    },
+    {
+      "description": "Cape Town, South Africa \u2014 southern hemisphere, winter solstice",
+      "input": {
+        "latitude": -33.9249,
+        "longitude": 18.4241,
+        "date": "2026-06-21",
+        "timezone": "Africa/Johannesburg"
+      },
+      "expected": {
+        "fajr": "06:22",
+        "sunrise": "07:51",
+        "dhuhr": "12:49",
+        "asr_shafii": "15:27",
+        "asr_hanafi": "16:07",
+        "maghrib": "17:45",
+        "isha": "19:09"
+      }
+    }
+  ]
+}

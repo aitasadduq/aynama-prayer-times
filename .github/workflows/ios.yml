@@ -1,0 +1,54 @@
+name: iOS
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - "test-vectors/**"
+      - "scripts/reference-versions.json"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "ios/**"
+      - "test-vectors/**"
+      - "scripts/reference-versions.json"
+      - ".github/workflows/ios.yml"
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shared-logic:
+    # The domain package has no UIKit and no simulator dependency, so this job is a plain
+    # `swift test` — seconds, not minutes. It carries the Adhan-Swift <-> Adhan-Kotlin parity
+    # gate (TODOS.md, pre-v3), so it must run on every commit that touches the vectors as well
+    # as every one that touches iOS code.
+    #
+    # macOS runners bill at roughly 10x Linux, which is the open "iOS CI runner strategy"
+    # decision in TODOS.md. This job is the cheapest possible shape of it: one runner, no
+    # simulator boot, no xcodebuild. If SharedLogic turns out to build under swift-corelibs
+    # Foundation, it could move to ubuntu-latest and cost almost nothing — untested, so not
+    # assumed here.
+    name: SharedLogic - domain and Adhan parity
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Report toolchain
+        run: swift --version
+
+      - name: Test
+        working-directory: ios/SharedLogic
+        run: swift test
+
+      - name: Assert the Adhan-Swift pin has not drifted
+        # Package.resolved is committed, but a hand-edited Package.swift could widen the
+        # requirement without changing the resolution until someone next resolves. Check both
+        # against the single source of truth in scripts/reference-versions.json.
+        run: |
+          pinned=$(python3 -c "import json; print(json.load(open('scripts/reference-versions.json'))['adhan-swift'])")
+          grep -q "exact: \"$pinned\"" ios/SharedLogic/Package.swift \
+            || { echo "::error::Package.swift does not pin adhan-swift exact: $pinned"; exit 1; }
+          grep -q "\"version\" : \"$pinned\"" ios/SharedLogic/Package.resolved \
+            || { echo "::error::Package.resolved is not at adhan-swift $pinned"; exit 1; }
