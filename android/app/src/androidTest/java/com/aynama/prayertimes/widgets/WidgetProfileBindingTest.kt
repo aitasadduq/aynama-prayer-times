@@ -1,9 +1,11 @@
 package com.aynama.prayertimes.widgets
 
+import android.app.PendingIntent
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.aynama.prayertimes.AynamaApplication
@@ -54,6 +56,7 @@ class WidgetProfileBindingTest {
         listOf(widgetA, widgetB)
             .filter { it != AppWidgetManager.INVALID_APPWIDGET_ID }
             .forEach { host.deleteAppWidgetId(it) }
+        PrayerWidgetScheduler.cancelAll(context)
         runBlocking {
             val all = app.profileRepository.observeAll().first()
             all.filter { it.id in createdProfileIds }.forEach { app.profileRepository.delete(it) }
@@ -110,6 +113,28 @@ class WidgetProfileBindingTest {
     }
 
     @Test
+    fun rolloverAlarmsAreActuallyArmedForBothProfiles() = runBlocking {
+        val (makkah, istanbul) = twoProfiles()
+        widgetA = place()
+        widgetB = place()
+        setWidgetProfile(context, widgetA, makkah.id)
+        setWidgetProfile(context, widgetB, istanbul.id)
+
+        PrayerWidgetScheduler.scheduleForBoundProfiles(
+            context, app.profileRepository.observeAll().first(),
+        )
+
+        // boundWidgetProfiles sorts by id, so the two profiles occupy slots 0 and 1. Each slot
+        // owns its own block of request codes; both blocks must contain armed alarms, or a
+        // widget sits on a countdown that never rolls over.
+        for (slot in 0..1) {
+            val base = WIDGET_UPDATE_REQUEST_CODE_BASE + slot * WIDGET_UPDATE_SLOT_COUNT
+            val armed = (0 until WIDGET_UPDATE_SLOT_COUNT).count { existingRollover(base + it) != null }
+            assertTrue("slot $slot has no rollover alarm armed", armed > 0)
+        }
+    }
+
+    @Test
     fun anUnconfiguredWidgetAsksForNoParticularProfile() = runBlocking {
         widgetA = place()
 
@@ -117,6 +142,15 @@ class WidgetProfileBindingTest {
     }
 
     // --- helpers ----------------------------------------------------------------
+
+    /** The PendingIntent an armed rollover would have created, or null. */
+    private fun existingRollover(requestCode: Int): PendingIntent? = PendingIntent.getBroadcast(
+        context,
+        requestCode,
+        Intent(context, PrayerWidgetUpdateReceiver::class.java)
+            .setAction(ACTION_PRAYER_WIDGET_UPDATE),
+        PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     private fun place(): Int {
         val id = host.allocateAppWidgetId()

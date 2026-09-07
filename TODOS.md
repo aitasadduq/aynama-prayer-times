@@ -69,6 +69,49 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ---
 
+## Phase 2 — Android Validation Gate ✅ PASSED
+
+Run on a rooted `google_apis` API 36 emulator, 2026-09-07. Clock control via `adb root` +
+`date`, so the countdown boundaries were walked at real instants rather than simulated.
+
+### Verified
+
+| Area | Result |
+|---|---|
+| Countdown: 5 s before / at / +5 s / +29 m 55 s / +30 m / past, around Dhuhr | sign drops at the instant, flips to the next prayer at exactly +30 m |
+| Countdown: Isha instant, Isha +30 m, 23:59:55, 00:00:05, before/after Fajr | continuous across midnight; Isha +30 m → tomorrow's Fajr |
+| Live notification across the same boundary | `At 12:59 PM` / counting down → `Began at 12:59 PM` / counting up → `Asr`, counting down |
+| Live notification with the app process killed | alarm fired, notification flipped to counting up, chain re-armed at the prayer + 30 m + guard |
+| Notification enable / disable / master gate | notification and its alarm appear and disappear together |
+| Device reboot | 3 prayer alarms + midnight reschedule re-armed without opening the app |
+| Device timezone change (Riyadh → New York) | pinned profile's displayed times and armed alarm instants byte-identical |
+| Profile create / edit / delete / switch | all correct; edit survived a force-stop |
+| Widgets: two placed on two profiles | each keeps its own profile; reconfiguring one leaves the other alone; both get rollover chains |
+| Widget → profile navigation | cold, warm, from another tab, and for a deleted profile |
+| Friday Jumu'ah | tracker history for Fri Sep 4 reads "Jumuah — 1:01 PM"; today (Monday) reads "Dhuhr" |
+| Light / dark themes | both legible; nav bar palette bug found and fixed |
+| Notification permission denied | master row becomes "Enable in Settings →" per DESIGN §15 |
+
+### Issues found and fixed
+
+1. **Turning notifications off left every alarm armed.** `cancelForProfile` built its lookup
+   intent without an action while `submitAlarm` armed one with `ACTION_PRAYER_ALARM`;
+   PendingIntent lookup matches on `Intent.filterEquals`, so nothing was ever cancelled.
+   Master off, per-prayer off, profile deleted, profile switched — all left alarms firing.
+2. **The bottom navigation was Material's default lavender**, in both themes, on every screen.
+   Unset `ColorScheme` roles keep Material's purple baseline; DESIGN §10 forbids purple.
+3. **`shared-logic`'s 16 Room instrumented tests had never run** — the module named
+   `AndroidJUnitRunner` without depending on `androidx.test:runner`.
+4. **The tracker computed prayer times in the device timezone** (fixed in the Jumu'ah PR).
+5. **The Qibla phase band did the same** (fixed in the Jumu'ah PR).
+
+### Known issues carried forward
+
+See "Known issues" above — the GPS profile's timezone assumption is real but pre-existing and
+does not block the dependent platforms.
+
+---
+
 ## Android v1 Implementation Checklist
 
 Phases run in dependency order. Each phase should be a separate PR. Scaffold (Phase 0) is done — PR #9 merged.
@@ -107,6 +150,9 @@ Prerequisite for Home, Tracker, Settings, Notifications. Implement Room before b
 **Tests**
 - [x] `ProfileRepositoryTest` — in-memory Room DB; create/update/delete/read; GPS constraint; Qaza cascade on profile delete
 - [x] `QazaTrackerTest` — TypeConverter for status enum; mark-as-prayed write; auto-mark-as-missed after next prayer starts; outstanding-count query
+      (both existed but had never run: `shared-logic` named AndroidJUnitRunner without
+      depending on it, so the instrumentation crashed on start. Fixed in the Phase 2 gate;
+      16 tests now execute.)
 
 ---
 
@@ -244,8 +290,10 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 **Tests**
 - [x] `AlarmSchedulerTest` — `scheduleAll()` sets 5 alarms; idempotent; Imsak = Fajr −10 min; daily midnight reschedule
 - [x] `RamadanDetectorTest` — `IslamicCalendar.RAMADAN` detection for known dates; non-Ramadan returns false; Imsak enabled/disabled correctly
-- [x] E2E (emulator): `AlarmFiresWhileClosedTest` — schedule alarm 30 s ahead; close app; verify notification in shade
-- [x] E2E (emulator): `AlarmRestoredAfterRebootTest` — schedule; `am broadcast -a android.intent.action.BOOT_COMPLETED`; verify rescheduled
+- [x] E2E (emulator): an armed alarm fires and reaches the shade — `AlarmDeliveryTest`
+- [x] E2E (emulator): alarms are restored after a reschedule — `AlarmDeliveryTest`
+      (was ticked here while no such file existed; written during the Phase 2 gate, and it
+      found the cancel bug below)
 
 ---
 
