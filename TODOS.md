@@ -61,6 +61,30 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Known issues
 
+- [ ] **BLOCKER — this machine cannot build or run anything for the iOS simulator.** `xcodebuild`
+  reports **zero** iOS destinations, device and simulator alike, for every project *and* for a
+  bare SwiftPM package:
+
+  ```
+  { platform:iOS, name:Any iOS Device,
+    error:iOS 26.5 is not installed. Please download and install the platform
+          from Xcode > Settings > Components. }
+  ```
+
+  Xcode 26.6 is installed with the iOS 26.5 SDK (device and simulator), and `simctl` has working
+  iOS 18.6 and 26.3 runtimes that boot fine — but Xcode will not pair them with the 26.5 SDK
+  while the iOS platform support component is missing, so `-destination`,
+  `-sdk iphonesimulator26.5` and `generic/platform=iOS Simulator` all fail before a single file
+  is compiled. Fix: `xcodebuild -downloadPlatform iOS`, or Xcode > Settings > Components (a
+  multi-gigabyte download, so not run unattended).
+
+  Consequences while it stands: no simulator run, no screenshots, no XCUITests, and **Phase 4A
+  (the iOS validation gate) cannot be executed** — every item on its list needs a running app.
+  `ios/scripts/typecheck-simulator.sh` is the stopgap: it type-checks the app against the real
+  `iPhoneSimulator26.5.sdk` with the real SwiftUI and SwiftData, which proves the code compiles
+  and nothing about how it behaves. Everything testable without a screen was moved into
+  `SharedLogic` so `swift test` still covers it.
+
 - [ ] **Wall-clock round-trip loses an hour in a DST fall-back, on both platforms.**
   `AdhanWrapper` throws away the absolute instants Adhan returns and stores wall-clock times
   (`ClockTime` / `LocalTime`); `PrayerTimeline.entriesFor` then rebuilds an instant from them.

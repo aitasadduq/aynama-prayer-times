@@ -1,0 +1,77 @@
+name: Aynama
+
+# The Xcode project is generated, not committed (see .gitignore). A .pbxproj is a merge-conflict
+# generator and reviewing one is impossible; this file is the reviewable source of truth.
+#
+#   brew install xcodegen && cd ios && xcodegen generate
+
+options:
+  bundleIdPrefix: com.aynama
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    # The domain is compiled once, in SharedLogic, and every target links it. Strict concurrency
+    # is on so a value that crosses from the widget extension into the domain has to say so.
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  SharedLogic:
+    path: SharedLogic
+
+targets:
+  Aynama:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    dependencies:
+      - package: SharedLogic
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aynama.prayertimes
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        # DESIGN.md §3: the app's surfaces are warm ink and linen parchment in both themes and
+        # it follows the system setting. Nothing here forces an appearance.
+        INFOPLIST_KEY_UIUserInterfaceStyle: Automatic
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: >-
+          Aynama uses your location to calculate prayer times and the direction of the Kaaba.
+          It stays on your device and is never sent anywhere.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        Debug:
+          # No paid team is configured, so simulator builds sign ad-hoc. Device builds need a
+          # DEVELOPMENT_TEAM set above.
+          CODE_SIGNING_ALLOWED: NO
+    info:
+      path: App/Info.plist
+      properties:
+        UIAppFonts:
+          - Fraunces.ttf
+          - IBMPlexSans.ttf
+
+# There is no iOS unit-test target yet, deliberately. Everything in the app that can be tested
+# without a screen — the countdown rule, the ribbon states, Friday naming, the Hijri offset, the
+# deep-link format — lives in SharedLogic and is tested by `swift test`, which needs no simulator
+# and runs in milliseconds. A target here would carry only what genuinely needs a running app,
+# and that is blocked on the toolchain (see ios/scripts/typecheck-simulator.sh). Add it with the
+# first XCUITest.
+
+schemes:
+  Aynama:
+    build:
+      targets:
+        Aynama: all
+    run:
+      config: Debug
