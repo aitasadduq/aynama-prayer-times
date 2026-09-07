@@ -18,9 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +55,7 @@ import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
+import com.aynama.prayertimes.settings.ProfileFormSheet
 import com.aynama.prayertimes.tracker.MarkPrayerSheet
 import com.aynama.prayertimes.widgets.NO_WIDGET_PROFILE
 import java.time.LocalDate
@@ -59,30 +65,56 @@ import com.aynama.prayertimes.ui.theme.InkMuted
 import com.aynama.prayertimes.ui.theme.Parchment
 import com.aynama.prayertimes.ui.theme.ParchmentMuted
 import com.aynama.prayertimes.ui.theme.Saffron
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
     requestedProfileId: Long = NO_WIDGET_PROFILE,
     onProfileShown: () -> Unit = {},
-    onNavigateToSettings: () -> Unit,
 ) {
     val app = LocalContext.current.applicationContext as AynamaApplication
     val vm: HomeViewModel = viewModel(factory = HomeViewModel.factory(app))
     val uiState by vm.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var showNewProfileSheet by remember { mutableStateOf(false) }
+    // Set when a profile is created here, cleared once the pager has landed on it. Shares the
+    // same channel as a widget tap: both are "show me this profile", and letting them fight
+    // over the pager would be a race.
+    var createdProfileId by remember { mutableStateOf(NO_WIDGET_PROFILE) }
+    val profileToShow = if (createdProfileId != NO_WIDGET_PROFILE) createdProfileId else requestedProfileId
 
     when (val state = uiState) {
         HomeUiState.Loading -> LoadingContent()
-        HomeUiState.Empty -> EmptyContent(onCreateProfile = onNavigateToSettings)
+        HomeUiState.Empty -> EmptyContent(onCreateProfile = { showNewProfileSheet = true })
         is HomeUiState.Error -> ErrorContent(cause = state.cause)
         is HomeUiState.Loaded -> LoadedContent(
             state = state,
-            requestedProfileId = requestedProfileId,
-            onProfileShown = onProfileShown,
-            onNavigateToSettings = onNavigateToSettings,
+            requestedProfileId = profileToShow,
+            onProfileShown = {
+                if (createdProfileId != NO_WIDGET_PROFILE) createdProfileId = NO_WIDGET_PROFILE
+                else onProfileShown()
+            },
+            onAddProfile = { showNewProfileSheet = true },
             onDismissRamadanBanner = vm::dismissRamadanBanner,
             onMarkPrayer = { profileId, prayer, date, status ->
                 vm.markPrayer(profileId, prayer, date, status)
             },
+        )
+    }
+
+    if (showNewProfileSheet) {
+        ProfileFormSheet(
+            initial = null,
+            onSave = { profile ->
+                showNewProfileSheet = false
+                // The new profile becomes the one on screen. Nothing is written until Save,
+                // so dismissing the sheet leaves the profile set untouched.
+                scope.launch { createdProfileId = vm.createProfile(profile, context) }
+            },
+            onDelete = {},
+            onDismiss = { showNewProfileSheet = false },
         )
     }
 }
@@ -92,11 +124,13 @@ private fun LoadedContent(
     state: HomeUiState.Loaded,
     requestedProfileId: Long,
     onProfileShown: () -> Unit,
-    onNavigateToSettings: () -> Unit,
+    onAddProfile: () -> Unit,
     onDismissRamadanBanner: () -> Unit,
     onMarkPrayer: (profileId: Long, prayer: Prayer, date: LocalDate, status: QazaStatus) -> Unit,
 ) {
-    val pageCount = state.pages.size + 1
+    // No trailing "+" slot: creating a profile is the FAB's job now, so every page is a real
+    // profile and the dot indicator counts profiles rather than profiles-plus-one.
+    val pageCount = state.pages.size
     val pagerState = rememberPagerState(pageCount = { pageCount })
     val activePage = pagerState.currentPage
     // Only a Ready page carries a phase and a Ramadan banner. An unavailable page falls back to
@@ -151,7 +185,7 @@ private fun LoadedContent(
                             pageIndex = page,
                             pageCount = state.pages.size,
                         )
-                        null -> AddProfilePage(onNavigateToSettings = onNavigateToSettings)
+                        null -> Unit
                     }
                 }
 
@@ -162,6 +196,19 @@ private fun LoadedContent(
                         .align(Alignment.CenterHorizontally)
                         .padding(bottom = 16.dp),
                 )
+            }
+
+            // Bottom-end FAB: the entry point to profile creation from the Prayers screen.
+            // Saffron on Ink, matching the Settings list's FAB — one affordance, one look.
+            FloatingActionButton(
+                onClick = onAddProfile,
+                containerColor = Saffron,
+                contentColor = Ink,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 24.dp, bottom = 56.dp),
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Add profile")
             }
 
             if (activeProfile?.showRamadanBanner == true) {
@@ -490,29 +537,6 @@ private fun ImsakRibbonRow(row: RibbonRow.ImsakEntry, modifier: Modifier = Modif
             color = textColor,
             textAlign = TextAlign.End,
         )
-    }
-}
-
-@Composable
-private fun AddProfilePage(onNavigateToSettings: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable(onClick = onNavigateToSettings)
-            .semantics { contentDescription = "Add a new profile" },
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "+",
-                style = MaterialTheme.typography.displayMedium,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Add profile",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
     }
 }
 
