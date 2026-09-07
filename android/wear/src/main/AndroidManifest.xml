@@ -27,6 +27,36 @@
             </intent-filter>
         </activity>
 
+        <!-- Prayer complication.
+             SHORT_TEXT / LONG_TEXT / MONOCHROMATIC_IMAGE only. RANGED_VALUE and GOAL_PROGRESS
+             are declined on purpose: watch faces draw them as circular progress arcs, and
+             DESIGN.md §10 forbids circular progress rings anywhere in this app. See the
+             service's KDoc. -->
+        <service
+            android:name=".complications.PrayerComplicationService"
+            android:exported="true"
+            android:label="@string/complication_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT,MONOCHROMATIC_IMAGE" />
+
+            <!-- The data source arms its own refresh at the next prayer-state change, which
+                 does not fall on any regular interval. 0 disables the system's periodic poll
+                 so the watch is not woken for nothing in between. -->
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+
+        <receiver
+            android:name=".complications.ComplicationRefreshReceiver"
+            android:exported="false" />
+
         <service
             android:name=".WearProfileSyncService"
             android:exported="true">

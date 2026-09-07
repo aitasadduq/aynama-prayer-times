@@ -282,6 +282,34 @@ Adds:
 - Prayer name spelled out (`Fajr` not `F`) in Fraunces `body` size
 - Sub-line: "in 2h 18m" or "now" in IBM Plex `body-sm`
 
+### WearOS complication families
+
+WearOS offers a data source a fixed set of families. aynama supports three and declines the
+rest — a decision, not an omission.
+
+**Supported**
+
+| Family | Content |
+|---|---|
+| `SHORT_TEXT` | System-ticked countdown as the text, prayer initial as the title. The 40–60px spec above. |
+| `LONG_TEXT` | Same countdown, prayer name spelled out as the title. The tile/watch-face scale above. |
+| `MONOCHROMATIC_IMAGE` | The app mark only — a single filled dot. No room for prayer state, and inventing a glyph per prayer would produce five shapes nobody can tell apart at 40px. |
+
+**Declined**
+
+- `RANGED_VALUE`, `GOAL_PROGRESS` — watch faces render these as **circular progress arcs**.
+  §10 forbids circular progress rings anywhere in this app and §9 names their absence as one of
+  the two deliberate differentiators. The arc would be drawn by the watch face rather than by
+  us, but the user would still be looking at a ring, so the rule holds.
+- `WEIGHTED_ELEMENTS`, `SMALL_IMAGE`, `PHOTO_IMAGE` — prayer state is a name and a time. There
+  is no honest image of it, and a decorative one would be §10's "Arabic calligraphy as
+  ornament" wearing a different hat.
+
+The countdown text is a `TimeDifferenceComplicationText`, so the system ticks it between
+refreshes. Its format is the platform's — "2h 18m", no sign, no seconds — the same constraint
+§19 records for widgets and the live notification. The prayer name beside it carries the
+direction.
+
 ### Rules
 
 - No gradients on watch. Solid surfaces only.
