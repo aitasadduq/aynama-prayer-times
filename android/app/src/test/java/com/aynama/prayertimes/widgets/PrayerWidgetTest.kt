@@ -6,6 +6,7 @@ import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
+import com.aynama.prayertimes.shared.timeline.COUNT_UP_WINDOW
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -50,27 +51,63 @@ class PrayerWidgetTest {
     )
     private val widgetTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
+    /** Yesterday/today/tomorrow around [day], the window the countdown timeline needs. */
+    private fun threeDays(
+        day: LocalDate,
+        times: (LocalDate) -> PrayerTimesResult,
+    ): Map<LocalDate, PrayerTimesResult> =
+        (-1L..1L).associate { day.plusDays(it) to times(day.plusDays(it)) }
+
+    /**
+     * Assemble the three-day timeline the widget builds on the device and render one state.
+     *
+     * [yesterday] matters in the small hours: a late Isha belongs to the following calendar
+     * day, so the day before "today" is what the countdown counts from before Fajr.
+     */
+    private fun stateOf(
+        profile: Profile,
+        yesterday: PrayerTimesResult,
+        today: PrayerTimesResult,
+        tomorrow: PrayerTimesResult,
+        now: ZonedDateTime,
+        elapsedRealtime: Long,
+        hijriDateText: String = "",
+    ): PrayerWidgetState = buildPrayerWidgetState(
+        profile = profile,
+        days = mapOf(
+            now.toLocalDate().minusDays(1) to yesterday,
+            now.toLocalDate() to today,
+            now.toLocalDate().plusDays(1) to tomorrow,
+        ),
+        todayTimes = today,
+        now = now,
+        elapsedRealtime = elapsedRealtime,
+        hijriDateText = hijriDateText,
+    )
+
     @Test
     fun `widget state uses next prayer abbreviation and 24-hour time`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
             elapsedRealtime = 1_000L,
         )
 
-        assertEquals("ASR", state.nextPrayerAbbreviation)
-        assertEquals("Asr", state.nextPrayerName)
-        assertEquals(todayTimes.asrShafii.format(widgetTimeFormatter), state.nextPrayerDisplayTime)
+        assertEquals("ASR", state.countdownPrayerAbbreviation)
+        assertEquals("Asr", state.countdownPrayerName)
+        assertEquals(todayTimes.asrShafii.format(widgetTimeFormatter), state.countdownPrayerDisplayTime)
     }
 
     @Test
     fun `widget schedule includes six rows with sunrise`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, LocalTime.of(1, 0), zone),
             elapsedRealtime = 1_000L,
         )
@@ -80,10 +117,11 @@ class PrayerWidgetTest {
 
     @Test
     fun `widget state exposes dates and sunrise`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
             elapsedRealtime = 1_000L,
             hijriDateText = "19 Dhu al-Ḥijjah 1446",
@@ -111,17 +149,18 @@ class PrayerWidgetTest {
             isha = LocalTime.of(18, 59),
         )
 
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = scrambled,
-            tomorrowTimes = scrambled,
+            yesterday = scrambled,
+            today = scrambled,
+            tomorrow = scrambled,
             now = ZonedDateTime.of(date, LocalTime.of(21, 14), zone),
             elapsedRealtime = 0L,
         )
 
         // Next is Sunrise (the soonest upcoming event), not tomorrow's Isha.
-        assertEquals("Sunrise", state.nextPrayerName)
-        assertEquals("SUN", state.nextPrayerAbbreviation)
+        assertEquals("Sunrise", state.countdownPrayerName)
+        assertEquals("SUN", state.countdownPrayerAbbreviation)
         // Countdown ~1h31m to 22:45, not ~21h.
         assertTrue(state.countdownBaseElapsedRealtime in 1_000L * 60 * 80..1_000L * 60 * 100)
         // The most recently started event is Fajr (19:00) — today's Sunrise (22:45) is still ahead.
@@ -130,30 +169,32 @@ class PrayerWidgetTest {
 
     @Test
     fun `sunrise is the current event between sunrise and dhuhr`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, todayTimes.sunrise.plusMinutes(5), zone),
             elapsedRealtime = 1_000L,
         )
 
         assertEquals("Sunrise", state.currentPrayerName)
-        assertEquals("Dhuhr", state.nextPrayerName)
+        assertEquals("Dhuhr", state.countdownPrayerName)
     }
 
     @Test
     fun `fajr is current before sunrise`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, todayTimes.sunrise.minusMinutes(5), zone),
             elapsedRealtime = 1_000L,
         )
 
         assertEquals("Fajr", state.currentPrayerName)
-        assertEquals("Sunrise", state.nextPrayerName)
+        assertEquals("Sunrise", state.countdownPrayerName)
     }
 
     // The handover is inclusive: an event becomes current ON its instant, not a tick later.
@@ -161,10 +202,11 @@ class PrayerWidgetTest {
     // exclusive the widget would render the previous event for that window.
     @Test
     fun `sunrise becomes current at the exact sunrise instant`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, todayTimes.sunrise, zone),
             elapsedRealtime = 1_000L,
         )
@@ -174,10 +216,11 @@ class PrayerWidgetTest {
 
     @Test
     fun `dhuhr becomes current at the exact dhuhr instant`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, todayTimes.dhuhr, zone),
             elapsedRealtime = 1_000L,
         )
@@ -191,10 +234,11 @@ class PrayerWidgetTest {
 
     @Test
     fun `sunrise block is highlighted and no prayer column is, between sunrise and dhuhr`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, todayTimes.sunrise.plusMinutes(5), zone),
             elapsedRealtime = 1_000L,
         )
@@ -205,10 +249,11 @@ class PrayerWidgetTest {
 
     @Test
     fun `dhuhr column is highlighted and the sunrise block is not, after dhuhr`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
             elapsedRealtime = 1_000L,
         )
@@ -232,10 +277,11 @@ class PrayerWidgetTest {
             maghrib = LocalTime.of(15, 14),
             isha = LocalTime.of(18, 59),
         )
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = scrambled,
-            tomorrowTimes = scrambled,
+            yesterday = scrambled,
+            today = scrambled,
+            tomorrow = scrambled,
             now = ZonedDateTime.of(date, LocalTime.of(0, 10), zone),
             elapsedRealtime = 1_000L,
         )
@@ -266,10 +312,11 @@ class PrayerWidgetTest {
 
         for (hour in 0..23) {
             val now = ZonedDateTime.of(midsummer, LocalTime.of(hour, 30), arcticZone)
-            val state = buildPrayerWidgetState(
+            val state = stateOf(
                 profile = arcticProfile,
-                todayTimes = times(midsummer),
-                tomorrowTimes = times(midsummer.plusDays(1)),
+                yesterday = times(midsummer.minusDays(1)),
+                today = times(midsummer),
+                tomorrow = times(midsummer.plusDays(1)),
                 now = now,
                 elapsedRealtime = ROLLOVER_ELAPSED,
             )
@@ -293,10 +340,11 @@ class PrayerWidgetTest {
 
     @Test
     fun `widget hijri date defaults to empty`() {
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
             elapsedRealtime = 1_000L,
         )
@@ -305,13 +353,19 @@ class PrayerWidgetTest {
     }
 
     @Test
-    fun `widget update schedule only keeps future prayer changes`() {
-        val allUpdates = rolloverScheduleAt(rDate.atStartOfDay(rZone).toInstant().toEpochMilli())
+    fun `widget update schedule is a strictly-future ascending window`() {
         val now = rDate.atTime(rToday.asrShafii.plusMinutes(1)).atZone(rZone).toInstant().toEpochMilli()
         val updates = rolloverScheduleAt(now)
 
-        assertTrue(updates.size < allUpdates.size)
+        // A rolling window of the next N state changes, not a fixed list of the day's prayers,
+        // so it stays full no matter where in the day it is asked.
+        assertEquals(WIDGET_UPDATE_SLOT_COUNT, updates.size)
         assertTrue(updates.all { it.triggerEpochMs > now })
+        assertEquals(
+            updates.map { it.triggerEpochMs }.sorted(),
+            updates.map { it.triggerEpochMs },
+        )
+        assertEquals(updates.size, updates.map { it.triggerEpochMs }.distinct().size)
     }
 
     // --- Rollover: the countdown must never run past zero ------------------------
@@ -340,10 +394,11 @@ class PrayerWidgetTest {
     // clock the alarm actually woke us at, using that instant's own day.
     private fun rolloverStateAt(instant: Instant): PrayerWidgetState {
         val now = instant.atZone(rZone)
-        return buildPrayerWidgetState(
+        return stateOf(
             profile = rProfile,
-            todayTimes = rTimesFor(now.toLocalDate()),
-            tomorrowTimes = rTimesFor(now.toLocalDate().plusDays(1)),
+            yesterday = rTimesFor(now.toLocalDate().minusDays(1)),
+            today = rTimesFor(now.toLocalDate()),
+            tomorrow = rTimesFor(now.toLocalDate().plusDays(1)),
             now = now,
             elapsedRealtime = ROLLOVER_ELAPSED,
         )
@@ -353,21 +408,66 @@ class PrayerWidgetTest {
         val day = Instant.ofEpochMilli(nowEpochMs).atZone(rZone).toLocalDate()
         return buildWidgetUpdateSchedule(
             profile = rProfile,
-            date = day,
-            times = rTimesFor(day),
-            tomorrowTimes = rTimesFor(day.plusDays(1)),
+            days = mapOf(
+                day.minusDays(1) to rTimesFor(day.minusDays(1)),
+                day to rTimesFor(day),
+                day.plusDays(1) to rTimesFor(day.plusDays(1)),
+            ),
             zone = rZone,
             nowEpochMs = nowEpochMs,
         )
     }
 
-    private fun remainingMs(state: PrayerWidgetState) = state.countdownBaseElapsedRealtime - ROLLOVER_ELAPSED
+    private fun offsetMs(state: PrayerWidgetState) = state.countdownBaseElapsedRealtime - ROLLOVER_ELAPSED
+
+    /**
+     * The countdown is coherent in whichever direction it is running (DESIGN.md §19).
+     *
+     * Counting down, the Chronometer base must be strictly in the future — a base at or before
+     * now means it already ran through zero and is ticking negative in the launcher. Counting
+     * up, the base is in the past by definition, but never by more than the 30-minute window,
+     * and only ever from a prayer.
+     */
+    private fun assertCountdownCoherent(state: PrayerWidgetState, where: String) {
+        if (state.countdownIsElapsed) {
+            assertTrue(
+                "$where: counting up from ${state.countdownPrayerName} by ${-offsetMs(state)}ms, " +
+                    "past the 30-minute window",
+                offsetMs(state) <= 0 && -offsetMs(state) < COUNT_UP_WINDOW.toMillis(),
+            )
+            assertTrue(
+                "$where: counting up from ${state.countdownPrayerName}, which is not a prayer",
+                state.countdownPrayerName != SUNRISE_NAME,
+            )
+        } else {
+            assertTrue(
+                "$where: countdown ran past zero — ${offsetMs(state)}ms to ${state.countdownPrayerName}",
+                offsetMs(state) > 0,
+            )
+        }
+    }
 
     @Test
-    fun `recomputing exactly at a prayer instant moves on to the following prayer`() {
+    fun `recomputing exactly at a prayer instant counts up from it`() {
+        val dhuhr = rDate.atTime(rToday.dhuhr).atZone(rZone).toInstant()
+        val state = rolloverStateAt(dhuhr)
+
+        assertEquals("Dhuhr", state.countdownPrayerName)
+        assertTrue(state.countdownIsElapsed)
+        assertEquals(0L, offsetMs(state))
+    }
+
+    @Test
+    fun `thirty minutes after a prayer the widget flips to counting down`() {
         val dhuhr = rDate.atTime(rToday.dhuhr).atZone(rZone).toInstant()
 
-        assertEquals("Asr", rolloverStateAt(dhuhr).nextPrayerName)
+        val justInside = rolloverStateAt(dhuhr.plus(COUNT_UP_WINDOW).minusSeconds(1))
+        assertTrue(justInside.countdownIsElapsed)
+        assertEquals("Dhuhr", justInside.countdownPrayerName)
+
+        val justOutside = rolloverStateAt(dhuhr.plus(COUNT_UP_WINDOW))
+        assertFalse(justOutside.countdownIsElapsed)
+        assertEquals("Asr", justOutside.countdownPrayerName)
     }
 
     @Test
@@ -379,31 +479,29 @@ class PrayerWidgetTest {
     }
 
     @Test
-    fun `a rollover always leaves the countdown running forwards`() {
+    fun `a rollover always leaves the countdown coherent`() {
         val updates = rolloverScheduleAt(rDate.atStartOfDay(rZone).toInstant().toEpochMilli())
         assertEquals(WIDGET_UPDATE_SLOT_COUNT, updates.size)
 
         // AlarmManager is allowed to be late, and on some OEM builds marginally
-        // early. Every delivery inside that band must still count down, not up.
+        // early. Every delivery inside that band must still render a sane countdown.
         val deliveryJitterMs = listOf(-WIDGET_UPDATE_GUARD_MS + 1, 0L, 250L, 5_000L, 60_000L)
         for (update in updates) {
             for (jitter in deliveryJitterMs) {
                 val firedAt = Instant.ofEpochMilli(update.triggerEpochMs + jitter)
-                val state = rolloverStateAt(firedAt)
-                assertTrue(
-                    "countdown ran past zero for alarm ${update.requestCode} fired at $firedAt " +
-                        "(jitter ${jitter}ms): ${remainingMs(state)}ms to ${state.nextPrayerName}",
-                    remainingMs(state) > 0,
+                assertCountdownCoherent(
+                    rolloverStateAt(firedAt),
+                    "alarm ${update.requestCode} fired at $firedAt (jitter ${jitter}ms)",
                 )
             }
         }
     }
 
     @Test
-    fun `walking the alarm chain hands each prayer off to the next`() {
+    fun `walking the alarm chain alternates counting up and counting down`() {
         val deliveryLatencyMs = 250L
         var nowMs = rDate.atStartOfDay(rZone).toInstant().toEpochMilli()
-        val handoffs = mutableListOf<String>()
+        val handoffs = mutableListOf<Pair<String, Boolean>>()
 
         repeat(WIDGET_UPDATE_SLOT_COUNT) {
             val next = rolloverScheduleAt(nowMs).minByOrNull { it.triggerEpochMs }
@@ -411,23 +509,49 @@ class PrayerWidgetTest {
 
             nowMs = next!!.triggerEpochMs + deliveryLatencyMs
             val state = rolloverStateAt(Instant.ofEpochMilli(nowMs))
-            assertTrue("countdown ran past zero at ${Instant.ofEpochMilli(nowMs)}", remainingMs(state) > 0)
-            handoffs += state.nextPrayerName
+            assertCountdownCoherent(state, "chain step at ${Instant.ofEpochMilli(nowMs)}")
+            handoffs += state.countdownPrayerName to state.countdownIsElapsed
         }
 
-        assertEquals(listOf("Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha", "Fajr", "Sunrise"), handoffs)
+        // Starting at midnight: down to Fajr, up from Fajr, down to Sunrise (Sunrise never
+        // counts up), down to Dhuhr, up from Dhuhr, and so on through the day.
+        assertEquals(
+            listOf(
+                "Fajr" to true,
+                "Sunrise" to false,
+                "Dhuhr" to false,
+                "Dhuhr" to true,
+                "Asr" to false,
+                "Asr" to true,
+                "Maghrib" to false,
+                "Maghrib" to true,
+                "Isha" to false,
+                "Isha" to true,
+                "Fajr" to false,
+                "Fajr" to true,
+            ),
+            handoffs,
+        )
     }
 
     @Test
     fun `the stretch after Isha still has a rollover armed`() {
-        val afterIsha = rDate.atTime(rToday.isha).atZone(rZone).toInstant().toEpochMilli() + 60_000L
+        val ishaMs = rDate.atTime(rToday.isha).atZone(rZone).toInstant().toEpochMilli()
+        val afterIsha = ishaMs + 60_000L
         val tomorrowFajr = rDate.plusDays(1).atTime(rTimesFor(rDate.plusDays(1)).fajr)
             .atZone(rZone).toInstant().toEpochMilli()
 
         val updates = rolloverScheduleAt(afterIsha)
+        val triggers = updates.map { it.triggerEpochMs }
 
-        assertEquals(listOf(tomorrowFajr + WIDGET_UPDATE_GUARD_MS), updates.map { it.triggerEpochMs })
-        assertEquals("Fajr", rolloverStateAt(Instant.ofEpochMilli(afterIsha)).nextPrayerName)
+        // A minute past Isha the widget is counting up; the next two things that change are
+        // the +30 minute flip and then tomorrow's Fajr. Both must be armed.
+        assertEquals(ishaMs + COUNT_UP_WINDOW.toMillis() + WIDGET_UPDATE_GUARD_MS, triggers.first())
+        assertTrue("tomorrow's Fajr must be armed", triggers.contains(tomorrowFajr + WIDGET_UPDATE_GUARD_MS))
+
+        val state = rolloverStateAt(Instant.ofEpochMilli(afterIsha))
+        assertEquals("Isha", state.countdownPrayerName)
+        assertTrue(state.countdownIsElapsed)
     }
 
     @Test
@@ -448,20 +572,15 @@ class PrayerWidgetTest {
 
         val updates = buildWidgetUpdateSchedule(
             profile = rProfile,
-            date = day,
-            times = pastMidnight,
-            tomorrowTimes = pastMidnight,
+            days = threeDays(day) { pastMidnight },
             zone = rZone,
             nowEpochMs = at2300,
         )
 
-        val isha = updates.single { it.requestCode == WIDGET_UPDATE_REQUEST_CODE_BASE + 5 }
-        assertEquals(
-            day.plusDays(1).atTime(pastMidnight.isha).atZone(rZone).toInstant().toEpochMilli()
-                + WIDGET_UPDATE_GUARD_MS,
-            isha.triggerEpochMs,
-        )
-        assertTrue("Isha rollover must still be pending at 23:00", isha.triggerEpochMs > at2300)
+        // Isha is the first transition still ahead at 23:00 — it lands on the following day.
+        val ishaAt = day.plusDays(1).atTime(pastMidnight.isha).atZone(rZone).toInstant().toEpochMilli()
+        assertEquals(ishaAt + WIDGET_UPDATE_GUARD_MS, updates.first().triggerEpochMs)
+        assertTrue("Isha rollover must still be pending at 23:00", updates.first().triggerEpochMs > at2300)
     }
 
     @Test
@@ -483,7 +602,7 @@ class PrayerWidgetTest {
             val day = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
             fun times(d: LocalDate) =
                 adhan.getPrayerTimes(p.latitude, p.longitude, d, zone, p.calculationMethod)
-            buildWidgetUpdateSchedule(p, day, times(day), times(day.plusDays(1)), zone, nowMs, slot)
+            buildWidgetUpdateSchedule(p, threeDays(day, ::times), zone, nowMs, slot)
         }
 
         // Both profiles have rollovers pending; the exact count differs because one
@@ -524,30 +643,28 @@ class PrayerWidgetTest {
         for (day in listOf(LocalDate.of(2026, 3, 29), LocalDate.of(2026, 10, 25))) {
             var nowMs = day.atStartOfDay(dstZone).toInstant().toEpochMilli()
             val armed = buildWidgetUpdateSchedule(
-                dstProfile, day, times(day), times(day.plusDays(1)), dstZone, nowMs,
+                dstProfile, threeDays(day, ::times), dstZone, nowMs,
             )
             assertEquals("$day", WIDGET_UPDATE_SLOT_COUNT, armed.size)
 
             repeat(WIDGET_UPDATE_SLOT_COUNT) {
                 val d = Instant.ofEpochMilli(nowMs).atZone(dstZone).toLocalDate()
                 val next = buildWidgetUpdateSchedule(
-                    dstProfile, d, times(d), times(d.plusDays(1)), dstZone, nowMs,
+                    dstProfile, threeDays(d, ::times), dstZone, nowMs,
                 ).minByOrNull { it.triggerEpochMs }
                 assertNotNull("$day: no rollover pending at ${Instant.ofEpochMilli(nowMs)}", next)
 
                 nowMs = next!!.triggerEpochMs + 250L
                 val at = Instant.ofEpochMilli(nowMs).atZone(dstZone)
-                val state = buildPrayerWidgetState(
+                val state = stateOf(
                     profile = dstProfile,
-                    todayTimes = times(at.toLocalDate()),
-                    tomorrowTimes = times(at.toLocalDate().plusDays(1)),
+                    yesterday = times(at.toLocalDate().minusDays(1)),
+                    today = times(at.toLocalDate()),
+                    tomorrow = times(at.toLocalDate().plusDays(1)),
                     now = at,
                     elapsedRealtime = ROLLOVER_ELAPSED,
                 )
-                assertTrue(
-                    "$day: countdown ran past zero at $at",
-                    state.countdownBaseElapsedRealtime - ROLLOVER_ELAPSED > 0,
-                )
+                assertCountdownCoherent(state, "$day at $at")
             }
         }
     }
@@ -557,10 +674,11 @@ class PrayerWidgetTest {
         // The 4x2 widget drops the sunrise row and highlights the active prayer by string
         // equality across two separately hardcoded name lists (scheduleRows vs
         // timelineEvents). Renaming in one place silently breaks columns or highlighting.
-        val state = buildPrayerWidgetState(
+        val state = stateOf(
             profile = profile,
-            todayTimes = todayTimes,
-            tomorrowTimes = tomorrowTimes,
+            yesterday = todayTimes,
+            today = todayTimes,
+            tomorrow = tomorrowTimes,
             now = ZonedDateTime.of(date, LocalTime.of(14, 0), zone),
             elapsedRealtime = 1_000L,
         )

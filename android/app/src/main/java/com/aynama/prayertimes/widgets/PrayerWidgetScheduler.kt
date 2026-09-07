@@ -6,11 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
-import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
-import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
+import com.aynama.prayertimes.shared.timeline.buildTimeline
+import com.aynama.prayertimes.shared.timeline.nextTransition
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -19,11 +19,12 @@ const val ACTION_PRAYER_WIDGET_UPDATE = "com.aynama.prayertimes.widgets.PRAYER_W
 
 internal const val WIDGET_UPDATE_REQUEST_CODE_BASE = 70_000
 
-// Slots 0-5 are one day's events, Sunrise included: buildPrayerWidgetState picks the
-// soonest upcoming event, so after Fajr the widget counts down to Sunrise and needs an
-// alarm there too. Slot 6 is tomorrow's Fajr, so a rollover is always pending —
-// including the stretch between Isha and midnight.
-internal const val WIDGET_UPDATE_SLOT_COUNT = 7
+// A slot is one *state transition* of the unified countdown (DESIGN.md §19), not just a
+// prayer boundary: the widget also has to be refreshed 30 minutes after each prayer, when
+// it stops counting up and starts counting down to the next one. A day has six events plus
+// five count-up flips (Sunrise has none), so twelve slots covers a full day of transitions
+// with one still pending — including the stretch between Isha and midnight.
+internal const val WIDGET_UPDATE_SLOT_COUNT = 12
 
 // Each profile a placed widget resolves to gets its own block of slots. Widgets carry
 // per-instance profiles, so one chain built from the notification profile would leave
@@ -44,8 +45,6 @@ data class ScheduledWidgetUpdate(
 )
 
 object PrayerWidgetScheduler {
-
-    private val adhan = AdhanWrapper()
 
     /**
      * Arm a rollover chain for every profile a placed widget resolves to.
@@ -93,9 +92,7 @@ object PrayerWidgetScheduler {
         val date = Instant.ofEpochMilli(nowEpochMs).atZone(zone).toLocalDate()
         val updates = buildWidgetUpdateSchedule(
             profile = profile,
-            date = date,
-            times = adhan.timesFor(profile, date),
-            tomorrowTimes = adhan.timesFor(profile, date.plusDays(1)),
+            days = profileDays(profile, date),
             zone = zone,
             nowEpochMs = nowEpochMs,
             profileSlot = profileSlot,
@@ -119,39 +116,32 @@ object PrayerWidgetScheduler {
     private fun updateIntent(context: Context): Intent =
         Intent(context, PrayerWidgetUpdateReceiver::class.java).setAction(ACTION_PRAYER_WIDGET_UPDATE)
 
-    private fun AdhanWrapper.timesFor(profile: Profile, date: LocalDate): PrayerTimesResult =
-        getPrayerTimes(
-            latitude = profile.latitude,
-            longitude = profile.longitude,
-            date = date,
-            timezone = profile.effectiveZoneId(),
-            method = profile.calculationMethod,
-        )
 }
 
+/**
+ * The next [WIDGET_UPDATE_SLOT_COUNT] instants at which the widget's countdown changes state.
+ *
+ * Walks [nextTransition] forward rather than listing prayer boundaries, so the +30 minute flip
+ * from counting up to counting down gets an alarm too. Each trigger is nudged past the exact
+ * instant by [WIDGET_UPDATE_GUARD_MS]: the countdown is a Chronometer ticking in the launcher
+ * process, and a rollover that lands even a millisecond early recomputes the *same* state, so
+ * the widget would sit on a stale value until something else refreshed it.
+ */
 fun buildWidgetUpdateSchedule(
     profile: Profile,
-    date: LocalDate,
-    times: PrayerTimesResult,
-    tomorrowTimes: PrayerTimesResult,
+    days: Map<LocalDate, PrayerTimesResult>,
     zone: ZoneId,
     nowEpochMs: Long,
     profileSlot: Int = 0,
 ): List<ScheduledWidgetUpdate> {
-    val asr = if (profile.asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
-    val moments = listOf(
-        date to times.fajr,
-        date to times.sunrise,
-        date to times.dhuhr,
-        date to asr,
-        date to times.maghrib,
-        (if (times.isha < times.fajr) date.plusDays(1) else date) to times.isha,
-        date.plusDays(1) to tomorrowTimes.fajr,
-    )
+    val timeline = buildTimeline(days, profile.asrMadhab, zone)
     val base = WIDGET_UPDATE_REQUEST_CODE_BASE + profileSlot * WIDGET_UPDATE_SLOT_COUNT
-    return moments.mapIndexedNotNull { index, (prayerDate, time) ->
-        val trigger = prayerDate.atTime(time).atZone(zone).toInstant().toEpochMilli() + WIDGET_UPDATE_GUARD_MS
-        if (trigger <= nowEpochMs) null
-        else ScheduledWidgetUpdate(base + index, trigger)
+    var cursor = Instant.ofEpochMilli(nowEpochMs)
+    return buildList {
+        while (size < WIDGET_UPDATE_SLOT_COUNT) {
+            val transition = nextTransition(timeline, cursor) ?: break
+            add(ScheduledWidgetUpdate(base + size, transition.toEpochMilli() + WIDGET_UPDATE_GUARD_MS))
+            cursor = transition
+        }
     }
 }

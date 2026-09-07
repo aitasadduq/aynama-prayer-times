@@ -40,10 +40,16 @@ import com.aynama.prayertimes.shared.PrayerTimesUnavailableException
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
+import com.aynama.prayertimes.shared.timeline.PrayerCountdown
+import com.aynama.prayertimes.shared.timeline.TimelineEntry
+import com.aynama.prayertimes.shared.timeline.TimelineEvent
+import com.aynama.prayertimes.shared.timeline.buildTimeline
+import com.aynama.prayertimes.shared.timeline.countdownAt
+import com.aynama.prayertimes.shared.timeline.currentEntry
+import com.aynama.prayertimes.shared.timeline.displayName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZonedDateTime
@@ -249,29 +255,12 @@ private suspend fun loadPrayerWidgetState(context: Context, profileId: Long): Pr
     val zone = profile.effectiveZoneId()
     val now = ZonedDateTime.now(zone)
     val today = now.toLocalDate()
-    val adhan = AdhanWrapper()
     // A widget bound to a location with no computable times must render a message, not throw:
     // this runs inside Glance's render and inside PrayerWidgetUpdateReceiver, and an escaping
     // throw from the receiver kills the process on every rollover alarm.
-    val todayTimes: PrayerTimesResult
-    val tomorrowTimes: PrayerTimesResult
-    try {
-        todayTimes = adhan.getPrayerTimes(
-            latitude = profile.latitude,
-            longitude = profile.longitude,
-            date = today,
-            timezone = zone,
-            method = profile.calculationMethod,
-        )
-        tomorrowTimes = adhan.getPrayerTimes(
-            latitude = profile.latitude,
-            longitude = profile.longitude,
-            date = today.plusDays(1),
-            timezone = zone,
-            method = profile.calculationMethod,
-        )
-    } catch (e: PrayerTimesUnavailableException) {
-        Log.w("PrayerWidget", "no times for profile ${profile.id} (${profile.name})", e)
+    val days = profileDays(profile, today)
+    val todayTimes = days[today] ?: run {
+        Log.w("PrayerWidget", "no times today for profile ${profile.id} (${profile.name})")
         return PrayerWidgetState.unavailable(profile.name)
     }
     val offset = RamadanDetector.effectiveHijriOffset(
@@ -283,8 +272,8 @@ private suspend fun loadPrayerWidgetState(context: Context, profileId: Long): Pr
     )
     return buildPrayerWidgetState(
         profile = profile,
+        days = days,
         todayTimes = todayTimes,
-        tomorrowTimes = tomorrowTimes,
         now = now,
         elapsedRealtime = SystemClock.elapsedRealtime(),
         timeFormatter = timeFormatter,
@@ -303,10 +292,20 @@ internal data class WidgetScheduleRow(
 
 internal data class PrayerWidgetState(
     val profileName: String,
-    val nextPrayerName: String,
-    val nextPrayerAbbreviation: String,
-    val nextPrayerDisplayTime: String,
+    /**
+     * The prayer the countdown refers to: the one that just started while counting up, the
+     * one coming next while counting down. DESIGN.md §19.
+     */
+    val countdownPrayerName: String,
+    val countdownPrayerAbbreviation: String,
+    val countdownPrayerDisplayTime: String,
+    /** True while counting up from a prayer that has started, false while counting down. */
+    val countdownIsElapsed: Boolean,
     val currentPrayerName: String,
+    /**
+     * Chronometer base. In the future while counting down, in the past while counting up —
+     * the direction is carried by [countdownIsElapsed], which also flips the Chronometer.
+     */
     val countdownBaseElapsedRealtime: Long,
     val gregorianDateText: String,
     val hijriDateText: String,
@@ -317,9 +316,10 @@ internal data class PrayerWidgetState(
     companion object {
         fun empty() = PrayerWidgetState(
             profileName = "Open aynama",
-            nextPrayerName = "Set up profile",
-            nextPrayerAbbreviation = "SET",
-            nextPrayerDisplayTime = "--:--",
+            countdownPrayerName = "Set up profile",
+            countdownPrayerAbbreviation = "SET",
+            countdownPrayerDisplayTime = "--:--",
+            countdownIsElapsed = false,
             currentPrayerName = "",
             countdownBaseElapsedRealtime = SystemClock.elapsedRealtime(),
             gregorianDateText = LocalDate.now().format(gregorianFormatter()),
@@ -336,9 +336,10 @@ internal data class PrayerWidgetState(
          */
         fun unavailable(profileName: String) = PrayerWidgetState(
             profileName = profileName,
-            nextPrayerName = "No times here",
-            nextPrayerAbbreviation = "—",
-            nextPrayerDisplayTime = "--:--",
+            countdownPrayerName = "No times here",
+            countdownPrayerAbbreviation = "—",
+            countdownPrayerDisplayTime = "--:--",
+            countdownIsElapsed = false,
             currentPrayerName = "",
             countdownBaseElapsedRealtime = SystemClock.elapsedRealtime(),
             gregorianDateText = LocalDate.now().format(gregorianFormatter()),
@@ -350,19 +351,49 @@ internal data class PrayerWidgetState(
     }
 }
 
-private data class TimelineEvent(
-    val name: String,
-    val abbreviation: String,
-    val time: LocalTime,
-)
-
 private fun gregorianFormatter(): DateTimeFormatter =
     DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
 
+/**
+ * Yesterday, today and tomorrow for [profile], skipping days with no computable times.
+ *
+ * The countdown timeline needs an event on each side of now: before Fajr the current event
+ * is last night's Isha, after Isha the next one is tomorrow's Fajr. Near the polar circles a
+ * single day can be undefined while its neighbours are fine, so days are dropped individually
+ * rather than failing the set.
+ */
+internal fun profileDays(profile: Profile, today: LocalDate): Map<LocalDate, PrayerTimesResult> {
+    val adhan = AdhanWrapper()
+    return (-1L..1L).mapNotNull { offset ->
+        val date = today.plusDays(offset)
+        try {
+            date to adhan.getPrayerTimes(
+                latitude = profile.latitude,
+                longitude = profile.longitude,
+                date = date,
+                timezone = profile.effectiveZoneId(),
+                method = profile.calculationMethod,
+            )
+        } catch (e: PrayerTimesUnavailableException) {
+            null
+        }
+    }.toMap()
+}
+
+/** Three-letter widget abbreviation. Widget-only: nothing else has this little room. */
+internal fun TimelineEvent.abbreviation(): String = when (this) {
+    TimelineEvent.FAJR -> "FAJ"
+    TimelineEvent.SUNRISE -> "SUN"
+    TimelineEvent.DHUHR -> "DHU"
+    TimelineEvent.ASR -> "ASR"
+    TimelineEvent.MAGHRIB -> "MAG"
+    TimelineEvent.ISHA -> "ISH"
+}
+
 internal fun buildPrayerWidgetState(
     profile: Profile,
+    days: Map<LocalDate, PrayerTimesResult>,
     todayTimes: PrayerTimesResult,
-    tomorrowTimes: PrayerTimesResult,
     now: ZonedDateTime,
     elapsedRealtime: Long,
     timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.US),
@@ -370,43 +401,34 @@ internal fun buildPrayerWidgetState(
 ): PrayerWidgetState {
     val today = now.toLocalDate()
     val nowInstant = now.toInstant()
-    fun instantOf(date: LocalDate, time: LocalTime) = date.atTime(time).atZone(now.zone).toInstant()
+    val timeline = buildTimeline(days, profile.asrMadhab, now.zone)
 
-    // Next event drives the countdown. It is the chronologically-soonest event strictly after now,
-    // including Sunrise — determined by actual instants so it is correct regardless of whether the
-    // displayed times happen to fall in canonical clock order (e.g. a far-from-device timezone).
-    val nextCandidates =
-        timelineEvents(todayTimes, profile.asrMadhab).map { it to instantOf(today, it.time) } +
-            timelineEvents(tomorrowTimes, profile.asrMadhab).map { it to instantOf(today.plusDays(1), it.time) }
-    val (next, nextInstant) = nextCandidates
-        .filter { it.second.isAfter(nowInstant) }
-        .minByOrNull { it.second }!!
-    val millisUntilNext = Duration.between(nowInstant, nextInstant).toMillis().coerceAtLeast(0L)
+    // One rule for every surface — see DESIGN.md §19 and PrayerTimeline.countdownAt.
+    val countdown = countdownAt(timeline, nowInstant)
+        ?: return PrayerWidgetState.unavailable(profile.name)
+    val elapsed = countdown is PrayerCountdown.Elapsed
+    val millis = countdown.duration.toMillis().coerceAtLeast(0L)
 
-    // Current event = the most recently started timeline event, Sunrise included. Searched over
-    // yesterday and today (yesterday handles the pre-Fajr window where last night's Isha is still
-    // current). Between sunrise and Dhuhr the current event is Sunrise, so the 4x2 widget
-    // highlights its sunrise block rather than an already-finished Fajr.
-    val events = timelineEvents(todayTimes, profile.asrMadhab)
-    val currentCandidates =
-        events.map { it to instantOf(today.minusDays(1), it.time) } +
-            events.map { it to instantOf(today, it.time) }
-    val currentPrayerName = currentCandidates
-        .filter { !it.second.isAfter(nowInstant) }
-        .maxByOrNull { it.second }
-        ?.first?.name ?: ""
+    // Current event = the most recently started timeline event, Sunrise included. Between
+    // sunrise and Dhuhr that is Sunrise, so the 4x2 widget highlights its sunrise block
+    // rather than an already-finished Fajr. Distinct from the countdown's subject, which
+    // moves on to the next prayer once the count-up window closes.
+    val current: TimelineEntry? = currentEntry(timeline, nowInstant)
+    val sunriseToday = timeline.firstOrNull { it.event == TimelineEvent.SUNRISE && it.date == today }
 
     return PrayerWidgetState(
         profileName = profile.name,
-        nextPrayerName = next.name,
-        nextPrayerAbbreviation = next.abbreviation,
-        nextPrayerDisplayTime = next.time.format(timeFormatter),
-        currentPrayerName = currentPrayerName,
-        countdownBaseElapsedRealtime = elapsedRealtime + millisUntilNext,
+        countdownPrayerName = countdown.entry.displayName(),
+        countdownPrayerAbbreviation = countdown.entry.event.abbreviation(),
+        countdownPrayerDisplayTime = countdown.entry.time.format(timeFormatter),
+        countdownIsElapsed = elapsed,
+        currentPrayerName = current?.displayName() ?: "",
+        // Counting up anchors the Chronometer in the past; counting down, in the future.
+        countdownBaseElapsedRealtime = if (elapsed) elapsedRealtime - millis else elapsedRealtime + millis,
         gregorianDateText = today.format(gregorianFormatter()),
         hijriDateText = hijriDateText,
         sunriseDisplayTime = todayTimes.sunrise.format(timeFormatter),
-        sunriseHasPassed = !instantOf(today, todayTimes.sunrise).isAfter(nowInstant),
+        sunriseHasPassed = sunriseToday != null && !sunriseToday.instant.isAfter(nowInstant),
         schedule = scheduleRows(todayTimes, profile.asrMadhab, timeFormatter),
     )
 }
@@ -436,9 +458,10 @@ internal fun columnRows(state: PrayerWidgetState): List<WidgetScheduleRow> =
 internal fun highlightedColumnIndex(state: PrayerWidgetState): Int? =
     columnRows(state).indexOfFirst { it.name == state.currentPrayerName }.takeIf { it >= 0 }
 
-// Sunrise is matched by name in three places (the schedule rows, the timeline events, and the
-// 4x2 renderer, which both highlights it and drops it from the prayer columns). Naming it once
-// keeps those in step — a rename now fails to compile instead of silently breaking the highlight.
+// Sunrise is matched by name in the schedule rows and in the 4x2 renderer, which both
+// highlights it and drops it from the prayer columns. Naming it once keeps those in step —
+// a rename now fails to compile instead of silently breaking the highlight. It must stay
+// equal to TimelineEntry.displayName() for TimelineEvent.SUNRISE.
 internal const val SUNRISE_NAME = "Sunrise"
 
 internal fun scheduleRows(
@@ -454,20 +477,6 @@ internal fun scheduleRows(
         WidgetScheduleRow("Asr", "ASR", asr, asr.format(formatter)),
         WidgetScheduleRow("Maghrib", "MAG", times.maghrib, times.maghrib.format(formatter)),
         WidgetScheduleRow("Isha", "ISH", times.isha, times.isha.format(formatter)),
-    )
-}
-
-// The day's events in canonical order. Sunrise is included: it is a valid countdown target
-// between Fajr and sunrise, and the current event from sunrise until Dhuhr.
-private fun timelineEvents(times: PrayerTimesResult, asrMadhab: AsrMadhab): List<TimelineEvent> {
-    val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
-    return listOf(
-        TimelineEvent("Fajr", "FAJ", times.fajr),
-        TimelineEvent(SUNRISE_NAME, "SUN", times.sunrise),
-        TimelineEvent("Dhuhr", "DHU", times.dhuhr),
-        TimelineEvent("Asr", "ASR", asr),
-        TimelineEvent("Maghrib", "MAG", times.maghrib),
-        TimelineEvent("Isha", "ISH", times.isha),
     )
 }
 
@@ -493,8 +502,8 @@ private object PrayerWidgetRemoteViews {
 
     fun nextPrayer(context: Context, state: PrayerWidgetState): RemoteViews =
         RemoteViews(context.packageName, R.layout.widget_next_prayer).apply {
-            setTextViewText(R.id.widget_next_name, state.nextPrayerName)
-            setTextViewText(R.id.widget_next_time, state.nextPrayerDisplayTime)
+            setTextViewText(R.id.widget_next_name, state.countdownPrayerName)
+            setTextViewText(R.id.widget_next_time, state.countdownPrayerDisplayTime)
             setCountdown(state)
             setTextViewText(R.id.widget_profile, state.profileName)
             bindRoot(context)
@@ -503,8 +512,8 @@ private object PrayerWidgetRemoteViews {
     fun nextPrayerDated(context: Context, state: PrayerWidgetState): RemoteViews =
         RemoteViews(context.packageName, R.layout.widget_next_prayer_dated).apply {
             setDates(state)
-            setTextViewText(R.id.widget_next_name, state.nextPrayerName)
-            setTextViewText(R.id.widget_next_time, state.nextPrayerDisplayTime)
+            setTextViewText(R.id.widget_next_name, state.countdownPrayerName)
+            setTextViewText(R.id.widget_next_time, state.countdownPrayerDisplayTime)
             setCountdown(state)
             setTextViewText(R.id.widget_profile, state.profileName)
             bindRoot(context)
@@ -558,7 +567,13 @@ private object PrayerWidgetRemoteViews {
             }
 
             setCountdown(state)
-            setTextViewText(R.id.widget_until, context.getString(R.string.widget_until, state.nextPrayerName))
+            setTextViewText(
+                R.id.widget_until,
+                context.getString(
+                    if (state.countdownIsElapsed) R.string.widget_since else R.string.widget_until,
+                    state.countdownPrayerName,
+                ),
+            )
             setTextViewText(R.id.widget_profile, state.profileName)
             bindRoot(context)
         }
@@ -585,9 +600,14 @@ private object PrayerWidgetRemoteViews {
         setTextViewText(R.id.widget_hijri, state.hijriDateText)
     }
 
+    // The launcher's own Chronometer ticks this — no per-second update job. Its format is the
+    // platform's (MM:SS under an hour, H:MM:SS above) and cannot be zero-padded, so widgets read
+    // `-12:35` where the app reads `-00:12:35`. The sign is ours, via the format string. State
+    // and direction match the app exactly; only the padding differs. DESIGN.md §19.
     private fun RemoteViews.setCountdown(state: PrayerWidgetState) {
-        setChronometer(R.id.widget_countdown, state.countdownBaseElapsedRealtime, null, true)
-        setChronometerCountDown(R.id.widget_countdown, true)
+        val format = if (state.countdownIsElapsed) null else "-%s"
+        setChronometer(R.id.widget_countdown, state.countdownBaseElapsedRealtime, format, true)
+        setChronometerCountDown(R.id.widget_countdown, !state.countdownIsElapsed)
     }
 
     private fun RemoteViews.bindRoot(context: Context) {
