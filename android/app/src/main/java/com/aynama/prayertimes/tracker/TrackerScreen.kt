@@ -176,7 +176,7 @@ private fun TodayPrayerRow(
     row: TrackerPrayerRow,
     onTap: () -> Unit,
 ) {
-    val prayerName = row.prayer.displayName()
+    val prayerName = row.displayName
     val a11y = if (row.tappable) "Mark $prayerName prayer" else "$prayerName prayer, not due yet"
     Row(
         modifier = Modifier
@@ -302,7 +302,7 @@ private fun DayRow(
 
 @Composable
 private fun ExpandedPrayerRow(row: TrackerPrayerRow, onTap: () -> Unit) {
-    val prayerName = row.prayer.displayName()
+    val prayerName = row.displayName
     Row(
         modifier = Modifier
             .fillMaxWidth()

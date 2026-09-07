@@ -30,6 +30,7 @@ import com.aynama.prayertimes.shared.data.entity.QazaStatus
 import com.aynama.prayertimes.ui.theme.InkMuted
 import com.aynama.prayertimes.ui.theme.ParchmentMuted
 import com.aynama.prayertimes.ui.theme.Saffron
+import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -50,7 +51,7 @@ fun MarkPrayerSheet(
                 .padding(bottom = 40.dp),
         ) {
             Text(
-                text = prayer.displayName(),
+                text = prayerDisplayName(prayer, date),
                 style = MaterialTheme.typography.displaySmall,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
@@ -134,14 +135,6 @@ internal fun PrayerStatusSquare(
                 .border(1.dp, ParchmentMuted),
         )
     }
-}
-
-internal fun Prayer.displayName(): String = when (this) {
-    Prayer.FAJR -> "Fajr"
-    Prayer.DHUHR -> "Dhuhr"
-    Prayer.ASR -> "Asr"
-    Prayer.MAGHRIB -> "Maghrib"
-    Prayer.ISHA -> "Isha"
 }
 
 private fun sheetDateLabel(date: LocalDate): String {

@@ -832,3 +832,39 @@ reality.
 
 Surfaces that cannot tick continuously (widgets, live notification) arm their next refresh
 at `nextTransition()`, which returns the +30 minute flip as well as prayer boundaries.
+
+---
+
+## 20. Friday Naming — Jumu'ah
+
+### The rule
+
+On Friday, Dhuhr is displayed as **Jumuah**. Every other prayer, and every other day, is
+unchanged.
+
+This is a label, not a prayer. Jumu'ah is calculated, scheduled, tracked and notified as
+Dhuhr; `Prayer.DHUHR` remains the stored value and nothing downstream branches on the name.
+Implemented once, in `shared-logic/.../shared/timeline/PrayerNaming.kt`.
+
+### Where it applies
+
+Anywhere a **specific day's prayer** is shown:
+
+- Home countdown hero and prayer ribbon
+- All four widgets — schedule rows, 4×2 columns, countdown subject, and the 3-letter
+  abbreviation (`JUM`, not `DHU`)
+- Prayer notifications and early reminders, including their text
+- Prayer tracker — today's rows, history rows, and the mark-prayer sheet
+- Watch apps and complications, when those are built
+
+### Where it does not
+
+Anywhere a **recurring setting** is configured. A notification settings row governs all seven
+days; calling it "Jumuah" because today happens to be Friday would misdescribe what the toggle
+does. Those rows keep the canonical name, with today's time beside them as reference — the
+same treatment §15 already gives them.
+
+### Abbreviation
+
+Widget abbreviations are derived from the displayed name (first three letters, uppercased)
+rather than mapped per prayer, so the abbreviation cannot drift from the label it abbreviates.

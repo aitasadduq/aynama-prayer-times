@@ -402,4 +402,31 @@ class AlarmSchedulerTest {
             correct.first().triggerEpochMs - deviceZoneDay.first().triggerEpochMs,
         )
     }
+
+    // ---- Friday naming ----
+
+    @Test
+    fun `friday's dhuhr alarm announces itself as jumuah`() {
+        val friday = LocalDate.of(2026, 5, 15)
+        val alarms = buildAlarmSchedule(profile, friday, isRamadan = false, times = times)
+
+        assertTrue(alarms.any { it.prayerName == "Jumuah" })
+        assertFalse(alarms.any { it.prayerName == "Dhuhr" })
+        // Same slot, same time — only the label moved.
+        val jumuah = alarms.first { it.prayerName == "Jumuah" }
+        assertEquals(
+            (profile.id * REQUEST_CODE_MULTIPLIER + PRAYER_INDEX_DHUHR).toInt(),
+            jumuah.requestCode,
+        )
+        assertEquals(localTimeToEpochMs(times.dhuhr, friday), jumuah.triggerEpochMs)
+    }
+
+    @Test
+    fun `other days still announce dhuhr`() {
+        val thursday = LocalDate.of(2026, 5, 14)
+        val alarms = buildAlarmSchedule(profile, thursday, isRamadan = false, times = times)
+
+        assertTrue(alarms.any { it.prayerName == "Dhuhr" })
+        assertFalse(alarms.any { it.prayerName == "Jumuah" })
+    }
 }

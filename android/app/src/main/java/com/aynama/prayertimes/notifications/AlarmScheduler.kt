@@ -11,7 +11,9 @@ import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
+import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -21,6 +23,11 @@ const val ACTION_PRAYER_ALARM = "com.aynama.prayertimes.PRAYER_ALARM"
 const val ACTION_MIDNIGHT_RESCHEDULE = "com.aynama.prayertimes.MIDNIGHT_RESCHEDULE"
 const val EXTRA_PROFILE_ID = "profile_id"
 const val EXTRA_PRAYER_INDEX = "prayer_index"
+
+// Resolved at scheduling time, when the alarm's calendar day is known. The receiver has only
+// a request code, and re-deriving the day there would be wrong for an alarm that fired late
+// across midnight. Alarms armed by an older build carry no extra; the receiver falls back.
+const val EXTRA_PRAYER_NAME = "prayer_name"
 
 const val PRAYER_INDEX_FAJR = 0
 const val PRAYER_INDEX_DHUHR = 1
@@ -38,6 +45,12 @@ internal const val REQUEST_CODE_MULTIPLIER = 20
 private const val MIDNIGHT_REQUEST_CODE = 9999
 private const val TAG = "AlarmScheduler"
 
+/**
+ * Canonical, day-independent names, for the notification *settings* screen — a row there
+ * governs all seven days, so naming it after today would misdescribe the toggle.
+ *
+ * A fired notification names the prayer as it falls on its own day: see [prayerNameOn].
+ */
 val PRAYER_NAMES = mapOf(
     PRAYER_INDEX_FAJR to "Fajr",
     PRAYER_INDEX_DHUHR to "Dhuhr",
@@ -46,6 +59,16 @@ val PRAYER_NAMES = mapOf(
     PRAYER_INDEX_ISHA to "Isha",
     PRAYER_INDEX_IMSAK to "Imsak",
 )
+
+/** The name an alarm for [prayerIndex] on [date] should announce — "Jumuah" for a Friday Dhuhr. */
+fun prayerNameOn(prayerIndex: Int, date: LocalDate): String = when (prayerIndex) {
+    PRAYER_INDEX_FAJR -> prayerDisplayName(Prayer.FAJR, date)
+    PRAYER_INDEX_DHUHR -> prayerDisplayName(Prayer.DHUHR, date)
+    PRAYER_INDEX_ASR -> prayerDisplayName(Prayer.ASR, date)
+    PRAYER_INDEX_MAGHRIB -> prayerDisplayName(Prayer.MAGHRIB, date)
+    PRAYER_INDEX_ISHA -> prayerDisplayName(Prayer.ISHA, date)
+    else -> PRAYER_NAMES[prayerIndex] ?: ""
+}
 
 data class ScheduledAlarm(
     val requestCode: Int,
@@ -190,6 +213,7 @@ object AlarmScheduler {
             action = ACTION_PRAYER_ALARM
             putExtra(EXTRA_PROFILE_ID, profileIdFromRequestCode(alarm.requestCode))
             putExtra(EXTRA_PRAYER_INDEX, prayerIndexFromRequestCode(alarm.requestCode))
+            putExtra(EXTRA_PRAYER_NAME, alarm.prayerName)
         }
         val pi = PendingIntent.getBroadcast(
             context, alarm.requestCode, intent,
@@ -244,7 +268,7 @@ fun buildAlarmSchedule(
             add(ScheduledAlarm(
                 requestCode = (profile.id * REQUEST_CODE_MULTIPLIER + index).toInt(),
                 triggerEpochMs = localTimeToEpochMs(effectiveTime, date, zone),
-                prayerName = PRAYER_NAMES[index]!!,
+                prayerName = prayerNameOn(index, date),
             ))
             val earlyMinutes = earlyReminderMinutes(index)
             if (earlyMinutes > 0) {
@@ -252,7 +276,7 @@ fun buildAlarmSchedule(
                 add(ScheduledAlarm(
                     requestCode = (profile.id * REQUEST_CODE_MULTIPLIER + index + EARLY_REMINDER_BASE_INDEX).toInt(),
                     triggerEpochMs = localTimeToEpochMs(earlyTime, date, zone),
-                    prayerName = PRAYER_NAMES[index]!!,
+                    prayerName = prayerNameOn(index, date),
                     isEarlyReminder = true,
                 ))
             }

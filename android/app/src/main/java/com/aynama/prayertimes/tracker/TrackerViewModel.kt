@@ -10,6 +10,7 @@ import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
+import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,8 @@ import java.time.temporal.TemporalAdjusters
 
 data class TrackerPrayerRow(
     val prayer: Prayer,
+    /** Day-aware — "Jumuah" for a Friday's Dhuhr, on today's rows and in history alike. */
+    val displayName: String,
     val scheduledTime: String,
     val status: QazaStatus?,
     val tappable: Boolean = true,
@@ -129,6 +132,7 @@ class TrackerViewModel(
             val time = todayTimes.timeFor(prayer, profile.asrMadhab)
             TrackerPrayerRow(
                 prayer = prayer,
+                displayName = prayerDisplayName(prayer, today),
                 scheduledTime = time.format(timeFormatter),
                 status = todayEntries[prayer],
                 tappable = !time.isAfter(now),
@@ -211,6 +215,7 @@ class TrackerViewModel(
             Prayer.entries.map { prayer ->
                 TrackerPrayerRow(
                     prayer = prayer,
+                    displayName = prayerDisplayName(prayer, date),
                     scheduledTime = times.timeFor(prayer, profile.asrMadhab).format(timeFormatter),
                     status = entries[prayer],
                 )
