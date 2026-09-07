@@ -135,7 +135,6 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
     val boxBg = if (isDark) Ink else Parchment
     val boxFg = if (isDark) Parchment else Ink
     val boxFgMuted = if (isDark) Parchment.copy(alpha = 0.65f) else InkMuted
-    val boxFgQuiet = if (isDark) Parchment.copy(alpha = 0.4f) else Ink.copy(alpha = 0.4f)
     val boxAccent = if (isDark) Saffron else SaffronInk
 
     val (gradTop, gradBottom) = gradientColorsFor(state.phase)
@@ -326,8 +325,6 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
                 BearingChipsRow(
                     qiblaDeg = qiblaDeg,
                     boxBg = boxBg,
-                    boxFg = boxFg,
-                    boxFgQuiet = boxFgQuiet,
                     boxAccent = boxAccent,
                 )
             }
@@ -400,8 +397,6 @@ private fun BearingReadout(
 private fun BearingChipsRow(
     qiblaDeg: Int,
     boxBg: Color,
-    boxFg: Color,
-    boxFgQuiet: Color,
     boxAccent: Color,
 ) {
     Row(
@@ -411,9 +406,7 @@ private fun BearingChipsRow(
         horizontalArrangement = Arrangement.spacedBy(18.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BearingChip(label = "Qibla", deg = qiblaDeg, color = boxAccent, dimDot = false, dimText = false)
-        DotSep(color = boxFgQuiet)
-        BearingChip(label = "North", deg = 0, color = boxFg, dimDot = true, dimText = true)
+        BearingChip(label = "Qibla", deg = qiblaDeg, color = boxAccent)
     }
 }
 
@@ -422,8 +415,6 @@ private fun BearingChip(
     label: String,
     deg: Int,
     color: Color,
-    dimDot: Boolean,
-    dimText: Boolean,
 ) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -432,7 +423,7 @@ private fun BearingChip(
         Spacer(
             modifier = Modifier
                 .size(6.dp)
-                .background(color.copy(alpha = if (dimDot) 0.6f else 1f), CircleShape),
+                .background(color, CircleShape),
         )
         Text(
             text = label,
@@ -443,7 +434,7 @@ private fun BearingChip(
                 lineHeight = 11.sp,
                 letterSpacing = 0.1f.em,
             ),
-            color = color.copy(alpha = if (dimText) 0.75f else 1f),
+            color = color,
         )
         Text(
             text = "$deg°",
@@ -455,18 +446,9 @@ private fun BearingChip(
                 letterSpacing = 0.1f.em,
                 fontFeatureSettings = "tnum",
             ),
-            color = color.copy(alpha = if (dimText) 0.55f else 0.85f),
+            color = color.copy(alpha = 0.85f),
         )
     }
-}
-
-@Composable
-private fun DotSep(color: Color) {
-    Spacer(
-        modifier = Modifier
-            .size(3.dp)
-            .background(color.copy(alpha = 0.7f), CircleShape),
-    )
 }
 
 @Composable

@@ -2,6 +2,7 @@ package com.aynama.prayertimes
 
 import android.app.Application
 import android.content.SharedPreferences
+import android.util.Log
 import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.notifications.NotificationHelper
 import com.aynama.prayertimes.shared.CalculationMethodKey
@@ -10,6 +11,7 @@ import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
 import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,7 +20,15 @@ import kotlinx.coroutines.launch
 
 class AynamaApplication : Application() {
 
-    internal val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    // SupervisorJob keeps one failed child from cancelling its siblings, but it does not stop an
+    // uncaught throw from reaching the thread's default handler and killing the process. Startup
+    // work here touches every profile, so a single unsupported one would take the app down on
+    // launch. Log and carry on instead.
+    internal val appScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
+            Log.e("AynamaApplication", "background work failed", throwable)
+        },
+    )
 
     val db: AynamaDatabase by lazy { AynamaDatabase.build(this) }
     val profileRepository: ProfileRepository by lazy { ProfileRepository(db.profileDao()) }

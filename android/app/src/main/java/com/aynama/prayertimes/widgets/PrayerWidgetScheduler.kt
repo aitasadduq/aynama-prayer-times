@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
@@ -35,6 +36,8 @@ internal const val WIDGET_UPDATE_MAX_PROFILES = 16
 // costs nothing and makes the recomputation unambiguous.
 internal const val WIDGET_UPDATE_GUARD_MS = 2_000L
 
+private const val TAG = "PrayerWidgetSched"
+
 data class ScheduledWidgetUpdate(
     val requestCode: Int,
     val triggerEpochMs: Long,
@@ -60,7 +63,13 @@ object PrayerWidgetScheduler {
         cancelAll(context)
         boundWidgetProfiles(context, profiles)
             .take(WIDGET_UPDATE_MAX_PROFILES)
-            .forEachIndexed { slot, profile -> arm(context, slot, profile, nowEpochMs) }
+            .forEachIndexed { slot, profile ->
+                // Slots are independent chains. A profile whose times cannot be computed loses
+                // its own rollovers; every other widget must keep updating, and this must never
+                // throw out of here — the callers run on scopes that would take the process down.
+                runCatching { arm(context, slot, profile, nowEpochMs) }
+                    .onFailure { Log.w(TAG, "no widget rollovers for profile ${profile.id} (${profile.name})", it) }
+            }
     }
 
     fun cancelAll(context: Context) {

@@ -9,6 +9,7 @@ import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.PrayerTimesResult
+import com.aynama.prayertimes.shared.PrayerTimesUnavailableException
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import com.aynama.prayertimes.shared.data.entity.Profile
@@ -67,11 +68,28 @@ data class ProfileUiState(
     val hijriDateText: String,
 )
 
+/**
+ * One page of the home pager.
+ *
+ * Failure is per profile, not per screen: a location whose times cannot be calculated becomes an
+ * [Unavailable] page and every other profile still renders. Folding the failure into the shared
+ * [HomeUiState.Error] would blank the whole pager, including profiles that are perfectly fine.
+ */
+sealed interface ProfilePage {
+    val profile: Profile
+
+    data class Ready(val state: ProfileUiState) : ProfilePage {
+        override val profile: Profile get() = state.profile
+    }
+
+    data class Unavailable(override val profile: Profile, val reason: String) : ProfilePage
+}
+
 sealed interface HomeUiState {
     data object Loading : HomeUiState
     data object Empty : HomeUiState
     data class Error(val cause: String) : HomeUiState
-    data class Loaded(val profiles: List<ProfileUiState>) : HomeUiState
+    data class Loaded(val pages: List<ProfilePage>) : HomeUiState
 }
 
 class HomeViewModel(
@@ -124,8 +142,17 @@ class HomeViewModel(
             val dismissedYear = prefs.getInt(KEY_RAMADAN_BANNER_YEAR, -1)
             HomeUiState.Loaded(
                 profiles.map { profile ->
-                    val times = cachedPrayerTimes(profile, today)
-                    buildProfileUiState(profile, times, now, today, qazaCounts[profile.id] ?: 0, hijriYear, dismissedYear)
+                    try {
+                        val times = cachedPrayerTimes(profile, today)
+                        ProfilePage.Ready(
+                            buildProfileUiState(
+                                profile, times, now, today,
+                                qazaCounts[profile.id] ?: 0, hijriYear, dismissedYear,
+                            )
+                        )
+                    } catch (e: PrayerTimesUnavailableException) {
+                        ProfilePage.Unavailable(profile, UNAVAILABLE_POLAR_REASON)
+                    }
                 }
             )
         }
@@ -199,6 +226,11 @@ class HomeViewModel(
 
     companion object {
         private const val KEY_RAMADAN_BANNER_YEAR = "ramadan_banner_dismissed_year"
+
+        internal const val UNAVAILABLE_POLAR_REASON =
+            "The sun doesn't fully rise or set at this location today, so there are no times " +
+                "to calculate from. This happens inside the polar circles around midsummer and " +
+                "midwinter. Other profiles are unaffected."
 
         fun factory(app: AynamaApplication): ViewModelProvider.Factory =
             object : ViewModelProvider.Factory {

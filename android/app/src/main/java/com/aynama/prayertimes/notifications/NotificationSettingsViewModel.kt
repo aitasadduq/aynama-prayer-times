@@ -200,13 +200,17 @@ class NotificationSettingsViewModel(
                 notificationProfile.hijriOffset, notificationProfile.hijriOffsetMonthKey, date, notificationProfile.effectiveZoneId(),
             )
             val isRamadan = RamadanDetector.isRamadanWithOffset(date, offset, notificationProfile.effectiveZoneId())
-            val times = AdhanWrapper().getPrayerTimes(
-                latitude = notificationProfile.latitude,
-                longitude = notificationProfile.longitude,
-                date = date,
-                timezone = notificationProfile.effectiveZoneId(),
-                method = notificationProfile.calculationMethod,
-            )
+            // Leave the rows without times rather than taking the process down: viewModelScope
+            // has no exception handler, and the toggles stay meaningful without a clock value.
+            val times = runCatching {
+                AdhanWrapper().getPrayerTimes(
+                    latitude = notificationProfile.latitude,
+                    longitude = notificationProfile.longitude,
+                    date = date,
+                    timezone = notificationProfile.effectiveZoneId(),
+                    method = notificationProfile.calculationMethod,
+                )
+            }.getOrElse { return@launch }
             val asr = if (notificationProfile.asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
             val prayerEntries = listOf(
                 PRAYER_INDEX_FAJR to times.fajr,
