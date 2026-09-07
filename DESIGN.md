@@ -146,8 +146,8 @@ Watch scales defined separately in §7.
 
 ```
 ┌─────────────────────────┐
-│    Dhuhr · 12:47         │  ← Fraunces display-xl, current prayer
-│    in 2h 18m             │  ← IBM Plex body-lg
+│    -00:12:35             │  ← Fraunces display-xl, tabular. §19
+│    Dhuhr · 12:47         │  ← Fraunces display-md, the prayer it refers to
 │                          │
 │    ─●─ Fajr   04:21 ✓    │  ← muted ink, passed
 │     │                    │
@@ -188,8 +188,9 @@ Watch scales defined separately in §7.
 
 ### Countdown screen
 
-- Prayer name in Fraunces `display-lg`, top.
-- Time-until in Fraunces `display-xl`, tabular numerals, center. E.g. `2h 18m`.
+- Time-until in Fraunces `display-xl`, tabular numerals. E.g. `-00:12:35`. Format and
+  direction are governed by §19 — one rule, every surface.
+- Prayer name below it in Fraunces `display-md`, with the prayer's own clock time.
 - Adhan trigger time in IBM Plex `body-lg`, bottom.
 - Time-of-day surface behind.
 
@@ -270,7 +271,7 @@ Adds:
 
 - Prayer-time transitions: 400ms ease-out cross-fade. Never a hard cut.
 - Surface cycle (time-of-day): interpolated continuously across the full day, not stepped at prayer boundaries.
-- Countdown tick: updates every second for final minute, every minute otherwise. Do not animate numbers rolling.
+- Countdown tick: updates every second, always — the countdown shows seconds (§19), so a per-minute tick would visibly stall. Do not animate numbers rolling.
 - Qibla arrow: physics-based rotation (damping 0.8, stiffness 100). No magnetic-needle jitter.
 - Page transitions: iOS native push, Android Material predictive back. No custom page transitions.
 
@@ -768,3 +769,66 @@ The offset applies globally (not per-profile): Imsak display, Ramadan banner, an
 
 Stored as `ramadanOffset: Int` on the `Profile` entity (Room column, default `0`). Applied independently per profile.
 - Sunrise is not a tracked prayer. Five indicators per row, not six.
+
+---
+
+## 19. Unified Prayer Countdown
+
+### Context
+
+The countdown is the reason people open the app. It appears on the home screen, on all four
+widgets, in the live notification, and — once those platforms exist — on iOS, watchOS and
+WearOS. Before this spec each surface derived its own version, and they disagreed about what
+happens in the minutes just after a prayer begins.
+
+One rule now governs all of them, implemented once in
+`shared-logic/.../shared/timeline/PrayerTimeline.kt`. UI may differ; the number may not.
+
+### The rule
+
+| When | Reads | Direction |
+|---|---|---|
+| Before the prayer | `-00:12:35` | counting down towards it |
+| At the prayer instant | `00:00:00` | sign drops |
+| First 30 minutes after | `00:15:42` | counting up from it |
+| After 30 minutes | `-03:42:18` | counting down towards the next |
+
+The count-up window ends early if the next event arrives before 30 minutes are up, so two
+events are never "current" at once.
+
+**Sunrise is a target, never a source.** It closes the Fajr window, so the countdown runs
+towards it — but nothing begins at sunrise, so the moment it passes the countdown moves
+straight on to Dhuhr. Only prayers count up.
+
+### Format
+
+- `HH:MM:SS`, zero-padded, minus sign only while counting down.
+- Hours are not wrapped at 24. A gap longer than a day (possible at high latitudes) reads
+  `-31:04:12` rather than silently restarting.
+- Fraunces `display-xl` on the home hero, tabular numerals (`tnum`). Never centred — §5.
+- The prayer the number refers to is always named next to it. A bare signed number does not
+  say whether Dhuhr is coming or has just started.
+
+### Widget exception (platform constraint)
+
+Android widgets render the countdown with `RemoteViews.setChronometer` +
+`setChronometerCountDown` (architecture-design.md, Reviewer Concern #4). The system ticks it
+natively in the launcher process, which is what makes a live countdown possible at all
+without a per-second update job — but the format belongs to the platform's `Chronometer`,
+which emits `MM:SS` under an hour and `H:MM:SS` above it, and cannot be zero-padded.
+
+Widgets therefore render `-12:35` where the app renders `-00:12:35`. The sign is ours (the
+Chronometer format string carries it); the padding is not. **The state and the direction are
+identical** — only the padding differs. Do not "fix" this by replacing the Chronometer with
+a periodic update job; that trades a live countdown for a stale one.
+
+### Boundary behavior
+
+Deterministic at: the prayer instant, exactly +30 minutes, midnight, Fajr across the date
+boundary, Isha → next day's Fajr, and profile/timezone/location changes mid-countdown. All
+comparisons are on absolute instants resolved in `profile.effectiveZoneId()`, never on
+wall-clock `LocalTime` — an Isha at 00:25 sorts before Fajr on a clock and after Maghrib in
+reality.
+
+Surfaces that cannot tick continuously (widgets, live notification) arm their next refresh
+at `nextTransition()`, which returns the +30 minute flip as well as prayer boundaries.
