@@ -4,12 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.aynama.prayertimes"
+    namespace = "com.aynama.prayertimes.wear"
     compileSdk = 36
 
     defaultConfig {
         applicationId = "com.aynama.prayertimes"
-        minSdk = 26
+        // Wear OS 3 and later. Older watches run a different app model entirely.
+        minSdk = 30
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -21,7 +22,7 @@ android {
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -38,38 +39,37 @@ android {
 }
 
 dependencies {
+    // The prayer domain — Adhan wrapper, Room entities, and the countdown and naming rules —
+    // is the same code the phone runs. The watch must not re-derive any of it.
+    implementation(project(":shared-logic"))
+
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.navigation.compose)
-    implementation(libs.androidx.glance.appwidget)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
-    implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.compose.material3)
-    implementation(libs.compose.material.icons.extended)
+    implementation(libs.wear.compose.material)
+    implementation(libs.wear.compose.foundation)
 
-    implementation(project(":shared-logic"))
+    implementation(libs.wear.tiles)
+    implementation(libs.kotlinx.coroutines.guava)
+    implementation(libs.wear.tiles.material)
+    implementation(libs.wear.protolayout)
+    implementation(libs.wear.protolayout.material)
+    implementation(libs.wear.protolayout.expression)
+    implementation(libs.wear.watchface.complications.data.source)
     implementation(libs.play.services.wearable)
     implementation(libs.kotlinx.coroutines.play.services)
-    // play-services-wearable drags in androidx.fragment 1.0.0, which resolves below the 1.3.0
-    // the ActivityResult APIs require — older FragmentActivity never called
-    // super.onRequestPermissionsResult, so the notification permission result would be lost.
-    implementation(libs.androidx.fragment)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
 
     testImplementation(libs.junit)
-    testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.test.junit)
-    androidTestImplementation(libs.androidx.test.espresso.core)
-    androidTestImplementation(platform(libs.compose.bom))
-    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
     debugImplementation(libs.compose.ui.tooling)
-    debugImplementation(libs.compose.ui.test.manifest)
 }

@@ -252,7 +252,7 @@ private suspend fun loadPrayerWidgetState(context: Context, profileId: Long): Pr
     // The widget's chosen profile takes priority; fall back to the global notification profile.
     val profile = profiles.find { profileId != NO_PROFILE && it.id == profileId }
         ?: resolveNotificationProfile(NotificationPreferences(app.prefs).notificationProfileId, profiles)
-        ?: return PrayerWidgetState.empty()
+        ?: return PrayerWidgetState.empty(SystemClock.elapsedRealtime())
 
     val zone = profile.effectiveZoneId()
     val now = ZonedDateTime.now(zone)
@@ -263,7 +263,7 @@ private suspend fun loadPrayerWidgetState(context: Context, profileId: Long): Pr
     val days = profileDays(profile, today)
     val todayTimes = days[today] ?: run {
         Log.w("PrayerWidget", "no times today for profile ${profile.id} (${profile.name})")
-        return PrayerWidgetState.unavailable(profile.id, profile.name)
+        return PrayerWidgetState.unavailable(SystemClock.elapsedRealtime(), profile.id, profile.name)
     }
     val offset = RamadanDetector.effectiveHijriOffset(
         profile.hijriOffset, profile.hijriOffsetMonthKey, today, zone,
@@ -322,7 +322,7 @@ internal data class PrayerWidgetState(
     val schedule: List<WidgetScheduleRow>,
 ) {
     companion object {
-        fun empty() = PrayerWidgetState(
+        fun empty(elapsedRealtime: Long) = PrayerWidgetState(
             profileId = NO_WIDGET_PROFILE,
             profileName = "Open aynama",
             countdownPrayerName = "Set up profile",
@@ -330,7 +330,7 @@ internal data class PrayerWidgetState(
             countdownPrayerDisplayTime = "--:--",
             countdownIsElapsed = false,
             currentPrayerName = "",
-            countdownBaseElapsedRealtime = SystemClock.elapsedRealtime(),
+            countdownBaseElapsedRealtime = elapsedRealtime,
             gregorianDateText = LocalDate.now().format(gregorianFormatter()),
             hijriDateText = "",
             sunriseDisplayTime = "--:--",
@@ -340,10 +340,14 @@ internal data class PrayerWidgetState(
 
         /**
          * Shown when the bound profile's location has no computable times for today.
+         *
+         * Takes the clock rather than reading it: `SystemClock` is a platform call, and a
+         * fallback state that reaches for one cannot be built in a plain JVM test — which is
+         * exactly where the cross-surface checks need to build it.
          * The countdown base is "now", so the Chronometer sits at zero instead of counting
          * towards a prayer that was never resolved.
          */
-        fun unavailable(profileId: Long, profileName: String) = PrayerWidgetState(
+        fun unavailable(elapsedRealtime: Long, profileId: Long, profileName: String) = PrayerWidgetState(
             profileId = profileId,
             profileName = profileName,
             countdownPrayerName = "No times here",
@@ -351,7 +355,7 @@ internal data class PrayerWidgetState(
             countdownPrayerDisplayTime = "--:--",
             countdownIsElapsed = false,
             currentPrayerName = "",
-            countdownBaseElapsedRealtime = SystemClock.elapsedRealtime(),
+            countdownBaseElapsedRealtime = elapsedRealtime,
             gregorianDateText = LocalDate.now().format(gregorianFormatter()),
             hijriDateText = "Midnight sun or polar night",
             sunriseDisplayTime = "--:--",
@@ -411,7 +415,7 @@ internal fun buildPrayerWidgetState(
 
     // One rule for every surface — see DESIGN.md §19 and PrayerTimeline.countdownAt.
     val countdown = countdownAt(timeline, nowInstant)
-        ?: return PrayerWidgetState.unavailable(profile.id, profile.name)
+        ?: return PrayerWidgetState.unavailable(elapsedRealtime, profile.id, profile.name)
     val elapsed = countdown is PrayerCountdown.Elapsed
     val millis = countdown.duration.toMillis().coerceAtLeast(0L)
 

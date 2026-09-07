@@ -125,4 +125,42 @@ class ProfileRepositoryTest {
         val after = qazaRepo.observeByDateRange(id, LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30)).first()
         assertTrue(after.isEmpty())
     }
+
+    // ---- mirror: the watch's copy of the phone's profile set ----
+
+    @Test
+    fun mirrorMatchesTheIncomingSetExactly() = runBlocking {
+        repo.insert(profile("Keep", sortOrder = 0))
+        repo.insert(profile("Drop", sortOrder = 1))
+        val keepId = repo.observeAll().first().first { it.name == "Keep" }.id
+
+        repo.mirror(
+            listOf(
+                repo.observeAll().first().first { it.id == keepId }.copy(name = "Keep (renamed)"),
+                profile("Added", sortOrder = 2).copy(id = 99),
+            ),
+        )
+
+        val after = repo.observeAll().first()
+        assertEquals(listOf("Keep (renamed)", "Added"), after.map { it.name })
+        // Ids have to survive the crossing: a complication that remembers "profile 99" must
+        // still mean the same place after a sync.
+        assertEquals(listOf(keepId, 99L), after.map { it.id })
+    }
+
+    @Test
+    fun mirrorKeepsTrackerHistoryForProfilesThatSurvive() = runBlocking {
+        val id = repo.insert(profile("Home", sortOrder = 0))
+        qazaRepo.markPrayer(id, Prayer.FAJR, LocalDate.of(2026, 9, 4), QazaStatus.PRAYED_ON_TIME)
+        assertEquals(1, qazaRepo.observeByDateRange(id, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)).first().size)
+
+        // A wipe-and-reinsert would cascade through the Qaḍā foreign key and take the prayer
+        // history of a profile that is still perfectly current.
+        repo.mirror(listOf(repo.observeAll().first().first { it.id == id }))
+
+        assertEquals(
+            1,
+            qazaRepo.observeByDateRange(id, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)).first().size,
+        )
+    }
 }

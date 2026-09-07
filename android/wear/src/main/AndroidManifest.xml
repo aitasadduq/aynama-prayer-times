@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <application
+        android:name=".WearApplication"
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault">
+
+        <!-- The watch computes prayer times itself from the mirrored profiles, so it is useful
+             with the phone away. Declaring it standalone is what makes that honest. -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+
+        <activity
+            android:name=".WearMainActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.DeviceDefault">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Prayer complication.
+             SHORT_TEXT / LONG_TEXT / MONOCHROMATIC_IMAGE only. RANGED_VALUE and GOAL_PROGRESS
+             are declined on purpose: watch faces draw them as circular progress arcs, and
+             DESIGN.md §10 forbids circular progress rings anywhere in this app. See the
+             service's KDoc. -->
+        <service
+            android:name=".complications.PrayerComplicationService"
+            android:exported="true"
+            android:label="@string/complication_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,LONG_TEXT,MONOCHROMATIC_IMAGE" />
+
+            <!-- The data source arms its own refresh at the next prayer-state change, which
+                 does not fall on any regular interval. 0 disables the system's periodic poll
+                 so the watch is not woken for nothing in between. -->
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="0" />
+        </service>
+
+        <!-- Prayer tile. Shows *when* the prayer is; the complication and the app show *how
+             long*, because a tile has no live-ticking text and a frozen countdown is worse
+             than none. See the service's KDoc. -->
+        <service
+            android:name=".tile.PrayerTileService"
+            android:exported="true"
+            android:label="@string/tile_label"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/ic_complication" />
+        </service>
+
+        <receiver
+            android:name=".complications.ComplicationRefreshReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".WearProfileSyncService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/aynama" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

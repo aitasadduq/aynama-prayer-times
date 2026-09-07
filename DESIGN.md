@@ -280,7 +280,42 @@ Fraunces ball-terminal numerals carry the identity even at 12pt. IBM Plex Sans t
 
 Adds:
 - Prayer name spelled out (`Fajr` not `F`) in Fraunces `body` size
-- Sub-line: "in 2h 18m" or "now" in IBM Plex `body-sm`
+- Profile name above it, so a two-profile user knows which city they are looking at
+- Sub-line: the prayer's own clock time — `at 13:00`, or `began 13:00` once it is under way
+
+**The tile carries no countdown.** A tile is a static layout rebuilt on an interval; it has no
+equivalent of the widget's `Chronometer` or the complication's `TimeDifferenceComplicationText`.
+A countdown there would be frozen at whatever it was when the tile was last built — right for a
+second and quietly wrong afterwards, which is worse than not showing one. The tile answers
+*when*; the complication and the app answer *how long*.
+
+### WearOS complication families
+
+WearOS offers a data source a fixed set of families. aynama supports three and declines the
+rest — a decision, not an omission.
+
+**Supported**
+
+| Family | Content |
+|---|---|
+| `SHORT_TEXT` | System-ticked countdown as the text, prayer initial as the title. The 40–60px spec above. |
+| `LONG_TEXT` | Same countdown, prayer name spelled out as the title. The tile/watch-face scale above. |
+| `MONOCHROMATIC_IMAGE` | The app mark only — a single filled dot. No room for prayer state, and inventing a glyph per prayer would produce five shapes nobody can tell apart at 40px. |
+
+**Declined**
+
+- `RANGED_VALUE`, `GOAL_PROGRESS` — watch faces render these as **circular progress arcs**.
+  §10 forbids circular progress rings anywhere in this app and §9 names their absence as one of
+  the two deliberate differentiators. The arc would be drawn by the watch face rather than by
+  us, but the user would still be looking at a ring, so the rule holds.
+- `WEIGHTED_ELEMENTS`, `SMALL_IMAGE`, `PHOTO_IMAGE` — prayer state is a name and a time. There
+  is no honest image of it, and a decorative one would be §10's "Arabic calligraphy as
+  ornament" wearing a different hat.
+
+The countdown text is a `TimeDifferenceComplicationText`, so the system ticks it between
+refreshes. Its format is the platform's — "2h 18m", no sign, no seconds — the same constraint
+§19 records for widgets and the live notification. The prayer name beside it carries the
+direction.
 
 ### Rules
 

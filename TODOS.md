@@ -26,8 +26,14 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 - [x] ~~Reviewer Concern #1: Forbidden prayer time calculation~~ → **RESOLVED** (Adhan default sunrise marker; v1 has no forbidden-times warning; Fajr row shows as "past" after sunrise)
 - [ ] **Reviewer Concern #2: Zakat nisab / Hawl logic.** v4-v5 decision.
 - [x] ~~Reviewer Concern #3: Qaza tracking UX~~ → **RESOLVED** (schema: `QazaEntry(id, prayer, date, status: enum{missed, made_up, intention_to_makeup}, profile_id, updated_at)`)
-- [x] ~~Reviewer Concern #4: Widget countdown strategy~~ → **RESOLVED on both platforms** (Android: `RemoteViews.setChronometerCountDown()`, updates on prayer change. iOS: `Text(timerInterval:pauseTime:countsDown:)` with one WidgetKit entry per `nextTransition()`; DESIGN.md §19 "Platform exception" and §23)
-- [ ] **Reviewer Concern #5: WearOS complication refresh model.** Decide before v2.
+- [x] ~~Reviewer Concern #4: Widget countdown strategy~~ → **RESOLVED** (Android: `RemoteViews.setChronometerCountDown()`, updates on prayer change; iOS v3: resolve before iOS notification settings)
+- [x] ~~Reviewer Concern #5: WearOS complication refresh model~~ → **RESOLVED**: WearOS has no
+  watchOS-style timeline, so the data source is asked for one value at a time and must say when
+  to ask again. One exact alarm at the countdown's `nextTransition()` — a prayer starting, or
+  its 30-minute count-up window closing — re-armed each time the source is queried, plus
+  `UPDATE_PERIOD_SECONDS=0` to disable the system's periodic poll. Between those points the
+  text is a `TimeDifferenceComplicationText` that the system ticks itself, so nothing of ours
+  runs. Tracks the content exactly and wakes the watch far less than a 15-minute poll would.
 
 ## Temporal Interrogation follow-ups (non-blocking, low effort)
 
@@ -133,6 +139,66 @@ Run on a rooted `google_apis` API 36 emulator, 2026-09-07. Clock control via `ad
 
 See "Known issues" above — the GPS profile's timezone assumption is real but pre-existing and
 does not block the dependent platforms.
+
+---
+
+## Phase 4B — Android + WearOS Integration Gate ✅ PASSED (with one documented limitation)
+
+Run 2026-09-07 on a phone emulator (rooted `google_apis` API 36) and a Wear OS 5 emulator
+(384×384 round) side by side.
+
+### The limitation, stated up front
+
+**A real inter-device Data Layer link could not be established here.** Pairing two emulators
+needs the Wear OS companion app on the phone; the `google_apis` image has no working Play Store
+(`com.android.vending` is a v1.8 stub), the companion app is absent, and no APK for it ships
+with the SDK. Installing it would need a Play Store sign-in.
+
+What that leaves unverified is the Play Services hop between two nodes — three lines of
+`putDataItem` / `onDataChanged`. Everything on both sides of it is covered by
+`WearSyncRoundTripTest`, which publishes exactly what the phone publishes (same contract, same
+codec) onto the real Data Layer and reads it back through the watch's own pull path.
+
+### Verified
+
+| Area | Result |
+|---|---|
+| Profile sync, all fields | `WearSyncRoundTripTest` — ids, madhab, method, timezone, Hijri offset all survive |
+| Profile created on the phone | appears on the watch |
+| Profile deleted on the phone | disappears from the watch |
+| Profile renamed | follows the same row, id preserved |
+| Active profile changed | the watch follows |
+| All profiles deleted | the watch clears and says so |
+| Multiple profiles | both mirrored, both pageable |
+| Stale / unreadable payload | the watch keeps its last good state |
+| Tracker history across a sync | preserved for profiles that survive |
+| Watch app restart | state and countdown intact |
+| Watch reboot | app returns with the same profile and a live countdown; complication receiver runs, no crash |
+| Phone app restart | publishes, renders normally |
+| Phone with no watch paired | publish fails, is logged not thrown, phone unaffected |
+| Countdown agreement, live on both devices | phone `-01:54:35` to Asr 16:34, watch `-01:55:00` to the same, ~25 s apart |
+| Friday Jumu'ah | asserted on every surface, both modules |
+
+### Cross-surface consistency
+
+The gate's headline requirement — phone, widgets, notifications, watch app and complications
+reporting one state — is held by two suites that walk **a whole day**, every minute plus the
+exact instants either side of every transition (~1,450 moments each):
+
+- `CrossSurfaceConsistencyTest` (app) — widget state and live-notification content vs the shared
+  rule, and against each other.
+- `WearSurfaceConsistencyTest` (wear) — complication state and watch screen vs the shared rule,
+  and against each other. The tile renders what the complication source returns, so asserting
+  that source covers both.
+
+Each surface is asserted against `countdownAt` rather than against its siblings: two surfaces
+that drifted the same way would still pass a sibling comparison.
+
+### Notes for whoever runs this next
+
+- `:wear` and `:app` share an `applicationId`, so installing one replaces the other and
+  `connectedAndroidTest` will try to run wear tests on the phone. Set `ANDROID_SERIAL`.
+- `connectedAndroidTest` uninstalls the app afterwards; reinstall before doing manual checks.
 
 ---
 
@@ -334,6 +400,18 @@ Depends on: Phase 5 (channels + alarm plumbing), unified countdown (DESIGN.md §
 - [x] Re-armed on app start/resume, boot, timezone change and prayer rollover via `AlarmScheduler.scheduleAll`
 - [x] Settings toggle: Notifications → OTHER → "Live countdown"
 - [x] `LivePrayerNotificationTest` — direction, subject, chronometer base, Jumu'ah, polar-night absence
+
+---
+
+### Phase 3B — WearOS (in progress)
+
+- [x] `wear` module consuming `shared-logic` — same Adhan wrapper, countdown rule and naming
+- [x] Phone → watch profile sync over the Data Layer (`ProfileCodec`, `WearSyncContract`)
+- [x] Watch home: unified countdown, prayer list, profile paging, Jumu'ah, disconnected states
+- [x] Complications: SHORT_TEXT, LONG_TEXT, MONOCHROMATIC_IMAGE (DESIGN.md §7)
+- [x] Complication refresh model (Reviewer Concern #5)
+- [x] Tiles — prayer name and its clock time; deliberately no countdown (a tile has no live-ticking text, and a frozen countdown is worse than none)
+- [x] Phase 4B — Android + WearOS integration gate (see below)
 
 ---
 
