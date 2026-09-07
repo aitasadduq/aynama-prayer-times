@@ -12,6 +12,7 @@ glance = "1.1.1"
 adhan = "1.2.1"
 junit = "4.13.2"
 androidxTestJunit = "1.2.1"
+androidxTestRunner = "1.6.2"
 espresso = "3.6.1"
 mockk = "1.13.13"
 coroutinesTest = "1.10.2"
@@ -43,6 +44,7 @@ adhan = { group = "com.batoulapps.adhan", name = "adhan", version.ref = "adhan" 
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-test-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 androidx-test-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espresso" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }

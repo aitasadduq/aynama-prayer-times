@@ -181,10 +181,9 @@ object AlarmScheduler {
     fun cancelForProfile(context: Context, profileId: Long) {
         val alarmManager = context.getSystemService(AlarmManager::class.java)
         for (index in 0 until REQUEST_CODE_MULTIPLIER) {
-            val intent = Intent(context, PrayerAlarmReceiver::class.java)
             val requestCode = (profileId * REQUEST_CODE_MULTIPLIER + index).toInt()
             val pi = PendingIntent.getBroadcast(
-                context, requestCode, intent,
+                context, requestCode, alarmIntent(context),
                 PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
             )
             if (pi != null) {
@@ -193,6 +192,18 @@ object AlarmScheduler {
             }
         }
     }
+
+    /**
+     * The intent identity every prayer alarm shares.
+     *
+     * PendingIntent lookup matches on [Intent.filterEquals], which compares the action and
+     * ignores extras. Building the cancel-side intent separately let it drift: it carried no
+     * action while the armed one did, so FLAG_NO_CREATE never found anything and
+     * cancelForProfile silently cancelled nothing — prayer alarms kept firing after the user
+     * turned notifications off. One builder, so the two sides cannot disagree again.
+     */
+    private fun alarmIntent(context: Context): Intent =
+        Intent(context, PrayerAlarmReceiver::class.java).setAction(ACTION_PRAYER_ALARM)
 
     fun scheduleMidnightReschedule(context: Context) {
         val midnight = LocalDate.now().plusDays(1)
@@ -213,8 +224,7 @@ object AlarmScheduler {
     }
 
     private fun submitAlarm(context: Context, alarmManager: AlarmManager, alarm: ScheduledAlarm) {
-        val intent = Intent(context, PrayerAlarmReceiver::class.java).apply {
-            action = ACTION_PRAYER_ALARM
+        val intent = alarmIntent(context).apply {
             putExtra(EXTRA_PROFILE_ID, profileIdFromRequestCode(alarm.requestCode))
             putExtra(EXTRA_PRAYER_INDEX, prayerIndexFromRequestCode(alarm.requestCode))
             putExtra(EXTRA_PRAYER_NAME, alarm.prayerName)

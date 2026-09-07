@@ -32,4 +32,8 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.junit)
+    // Without the runner on the test APK's classpath the instrumentation cannot start at all:
+    // AndroidJUnitRunner is named in defaultConfig but was never a dependency, so every Room
+    // test in this module crashed with ClassNotFoundException before running.
+    androidTestImplementation(libs.androidx.test.runner)
 }
