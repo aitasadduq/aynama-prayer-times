@@ -30,9 +30,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Clock
+import com.aynama.prayertimes.home.phaseDisplayName
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneId
 
 sealed interface QiblaUiState {
     data object Loading : QiblaUiState
@@ -48,6 +49,8 @@ sealed interface QiblaUiState {
         val distanceKm: Double,
         val accuracy: SensorAccuracy,
         val phase: PrayerPhase,
+        /** The phase label, day-aware — "Jumuah" on a Friday afternoon. */
+        val phaseName: String,
     ) : QiblaUiState
 }
 
@@ -191,7 +194,10 @@ class QiblaViewModel(
         val profile = activeProfile ?: return
         if (sensor == null) return
 
-        val today = LocalDate.now(clock)
+        // The profile's own zone, matching Home, the tracker and the alarms (DESIGN.md §17).
+        // The tint follows the profile's day, not the device's.
+        val zone = profile.effectiveZoneId()
+        val today = LocalDate.now(clock.withZone(zone))
         val cached = cachedTimes?.takeIf { it.first == today }?.second
 
         if (cached != null) {
@@ -216,7 +222,7 @@ class QiblaViewModel(
                         latitude = profile.latitude,
                         longitude = profile.longitude,
                         date = today,
-                        timezone = ZoneId.systemDefault(),
+                        timezone = zone,
                         method = profile.calculationMethod,
                     )
                 }.getOrNull()
@@ -239,9 +245,11 @@ class QiblaViewModel(
         times: com.aynama.prayertimes.shared.PrayerTimesResult?,
         profile: Profile,
     ) {
+        val zone = profile.effectiveZoneId()
+        val today = LocalDate.now(clock.withZone(zone))
         // No times means no derivable phase; ISHA is the same neutral surface the home screen
         // falls back to, so the two screens agree.
-        val phase = times?.let { derivePhase(it, profile.asrMadhab, LocalTime.now(clock)) }
+        val phase = times?.let { derivePhase(it, profile.asrMadhab, LocalTime.now(clock.withZone(zone))) }
             ?: PrayerPhase.ISHA
         _uiState.value = QiblaUiState.Ready(
             unwrappedAzimuth = unwrapped,
@@ -253,6 +261,7 @@ class QiblaViewModel(
             distanceKm = distanceKm,
             accuracy = accuracy,
             phase = phase,
+            phaseName = phaseDisplayName(phase, today),
         )
     }
 

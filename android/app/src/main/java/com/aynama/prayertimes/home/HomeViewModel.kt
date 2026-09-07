@@ -47,6 +47,21 @@ import java.time.temporal.ChronoUnit
 
 enum class PrayerPhase { FAJR, SUNRISE_TRANSITION, DHUHR, ASR, MAGHRIB, ISHA }
 
+/**
+ * The label for a time-of-day phase — day-aware, so a Friday afternoon reads "Jumuah".
+ *
+ * A phase is named after the prayer that opened it, so it follows the same naming rule as
+ * every other display of that day's prayer (DESIGN.md §20).
+ */
+fun phaseDisplayName(phase: PrayerPhase, date: LocalDate): String = when (phase) {
+    PrayerPhase.FAJR -> prayerDisplayName(Prayer.FAJR, date)
+    PrayerPhase.SUNRISE_TRANSITION -> "Sunrise"
+    PrayerPhase.DHUHR -> prayerDisplayName(Prayer.DHUHR, date)
+    PrayerPhase.ASR -> prayerDisplayName(Prayer.ASR, date)
+    PrayerPhase.MAGHRIB -> prayerDisplayName(Prayer.MAGHRIB, date)
+    PrayerPhase.ISHA -> prayerDisplayName(Prayer.ISHA, date)
+}
+
 enum class RibbonState { PASSED, CURRENT, UPCOMING }
 
 sealed interface RibbonRow {

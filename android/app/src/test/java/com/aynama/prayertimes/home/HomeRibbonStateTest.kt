@@ -204,4 +204,14 @@ class HomeRibbonStateTest {
 
         assertEquals("Dhuhr", prayers[1].displayName)
     }
+
+    @Test
+    fun `phase label follows the same friday rule`() {
+        // The Qibla screen names its time-of-day band after the prayer that opened it.
+        val friday = LocalDate.of(2026, 5, 15)
+        assertEquals("Jumuah", phaseDisplayName(PrayerPhase.DHUHR, friday))
+        assertEquals("Dhuhr", phaseDisplayName(PrayerPhase.DHUHR, monday))
+        assertEquals("Sunrise", phaseDisplayName(PrayerPhase.SUNRISE_TRANSITION, friday))
+        assertEquals("Asr", phaseDisplayName(PrayerPhase.ASR, friday))
+    }
 }

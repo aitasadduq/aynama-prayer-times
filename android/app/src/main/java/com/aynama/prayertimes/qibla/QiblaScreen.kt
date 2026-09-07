@@ -223,7 +223,7 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
                     color = boxFg,
                 )
                 Text(
-                    text = state.phase.displayName().uppercase(),
+                    text = state.phaseName.uppercase(),
                     style = TextStyle(
                         fontFamily = IbmPlexSans,
                         fontWeight = FontWeight.Medium,
@@ -591,15 +591,6 @@ private fun DebugRow(label: String, value: String) {
         Text(text = label, fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Color(0xFFAAAAAA))
         Text(text = value, fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Color.White)
     }
-}
-
-private fun PrayerPhase.displayName(): String = when (this) {
-    PrayerPhase.FAJR -> "Fajr"
-    PrayerPhase.SUNRISE_TRANSITION -> "Sunrise"
-    PrayerPhase.DHUHR -> "Dhuhr"
-    PrayerPhase.ASR -> "Asr"
-    PrayerPhase.MAGHRIB -> "Maghrib"
-    PrayerPhase.ISHA -> "Isha"
 }
 
 private fun buildA11yDescription(azimuth: Float, qiblaBearing: Float): String {
