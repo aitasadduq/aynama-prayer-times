@@ -83,6 +83,27 @@ All text meets **WCAG AA** minimum (4.5:1 for body, 3:1 for large text).
 
 Any new color added to this system must be verified against both ink and parchment backgrounds.
 
+### Every Material role must be assigned
+
+On Android, a `ColorScheme` role left unset keeps Material 3's **baseline palette, which is
+purple** — and §10 forbids purple and indigo outright. Naming the dozen roles the app reads
+directly is not enough.
+
+This is not theoretical. `NavigationBar` draws its background from `surfaceContainer` and its
+selected-item pill from `secondaryContainer`; neither was set, so the bottom navigation
+rendered lavender on every screen of the app, in both themes, until the Phase 2 gate caught it.
+
+`AynamaTheme` therefore assigns **every** role from the six tokens above:
+
+- **secondary / tertiary** — saffron and its pressed shade. There is no second accent, so these
+  are not an opportunity to introduce one.
+- **surfaceContainer ladder** — Material's elevation tones flattened onto parchment/ink and
+  their muted partners. The palette has no tint scale to climb, and §2 asks utilitarian
+  surfaces to stay on one stable ground.
+- **error** — the system red, as above. The only colour in the app from outside the palette.
+
+When adding a Material component, check which roles it reads before assuming it inherits.
+
 ---
 
 ## 4. Typography
