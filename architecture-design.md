@@ -28,7 +28,7 @@ The key architectural decision: whether to share business logic across platforms
 5. **Notifications/Adhan** — local notification scheduling with configurable adhan audio per prayer (see strategy below)
 
 ### v2 — WearOS Integration
-6. **WearOS app** — next prayer display, quick tasbeeh
+6. **WearOS app** — all prayer times list, next prayer display, qibla compass, quick tasbeeh
 7. **WearOS tiles/complications** — showing next prayer name + time
 
 ### v3 — iOS & Daily Companion
