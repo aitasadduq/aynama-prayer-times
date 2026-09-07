@@ -207,10 +207,12 @@ private fun ProfilePageContent(
 
         // Counting up reads as "Dhuhr, 12 minutes ago"; counting down as "Dhuhr in 12 minutes".
         // The signed digits carry that visually, so TalkBack has to say it in words.
-        val countdownLabel = if (profileState.countdownIsElapsed) {
-            "${profileState.countdownPrayerName} began ${profileState.countdownText} ago"
-        } else {
-            "${profileState.countdownPrayerName} in ${profileState.countdownText.removePrefix("-")}"
+        val countdownLabel = when {
+            profileState.countdownPrayerName.isEmpty() -> "No countdown available"
+            profileState.countdownIsElapsed ->
+                "${profileState.countdownPrayerName} began ${profileState.countdownText} ago"
+            else ->
+                "${profileState.countdownPrayerName} in ${profileState.countdownText.removePrefix("-")}"
         }
 
         // Left-aligned, not centred: architecture-design.md lists a centred home countdown
