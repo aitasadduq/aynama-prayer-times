@@ -5,11 +5,14 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.notifications.NotificationHelper
+import com.aynama.prayertimes.notifications.resolveNotificationProfile
 import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.db.AynamaDatabase
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
+import com.aynama.prayertimes.shared.sync.WearSyncContract
+import com.aynama.prayertimes.wear.PhoneWearSync
 import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +49,28 @@ class AynamaApplication : Application() {
             val profiles = profileRepository.observeAll().first()
             AlarmScheduler.scheduleAll(this@AynamaApplication, profiles)
             updateAllPrayerWidgets(this@AynamaApplication)
+        }
+        publishProfilesToWatch()
+    }
+
+    /**
+     * Keep any paired watch's mirror current.
+     *
+     * Collected from the repository rather than called at each mutation site: creating,
+     * editing and deleting a profile all end in a Flow emission, so one collector covers every
+     * path — including ones added later, which is exactly where a per-call-site hook would rot.
+     */
+    private fun publishProfilesToWatch() {
+        appScope.launch {
+            profileRepository.observeAll().collect { profiles ->
+                PhoneWearSync.publish(
+                    context = this@AynamaApplication,
+                    profiles = profiles,
+                    activeProfileId = resolveNotificationProfile(
+                        notificationPreferences.notificationProfileId, profiles,
+                    )?.id ?: WearSyncContract.NO_ACTIVE_PROFILE,
+                )
+            }
         }
     }
 
