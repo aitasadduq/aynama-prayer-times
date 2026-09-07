@@ -56,6 +56,7 @@ dependencies {
     implementation(libs.wear.compose.foundation)
 
     implementation(libs.wear.tiles)
+    implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.wear.tiles.material)
     implementation(libs.wear.protolayout)
     implementation(libs.wear.protolayout.material)
