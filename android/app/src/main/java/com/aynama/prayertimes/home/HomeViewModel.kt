@@ -1,10 +1,12 @@
 package com.aynama.prayertimes.home
 
+import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aynama.prayertimes.AynamaApplication
+import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.CalculationMethodKey
@@ -24,7 +26,10 @@ import com.aynama.prayertimes.shared.timeline.displayName
 import com.aynama.prayertimes.shared.timeline.format
 import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
+import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +39,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -202,6 +208,25 @@ class HomeViewModel(
     fun markPrayer(profileId: Long, prayer: Prayer, date: LocalDate, status: QazaStatus) {
         viewModelScope.launch { qazaRepository.markPrayer(profileId, prayer, date, status) }
     }
+
+    /**
+     * Persist a profile created from the Prayers screen and report the id it was given.
+     *
+     * The caller needs the id to scroll the pager onto the new profile, which is the whole
+     * point of the flow — the plan asks for the user to land on what they just made. It is
+     * appended last, so it becomes the final page.
+     *
+     * Runs off the main thread: [AlarmScheduler.scheduleAll] does binder work for every
+     * reserved alarm slot and reads each placed widget's Glance state off disk.
+     */
+    suspend fun createProfile(profile: Profile, context: Context): Long =
+        withContext(Dispatchers.IO) {
+            val existing = profileRepository.observeAll().first()
+            val id = profileRepository.insert(profile.copy(sortOrder = existing.size))
+            AlarmScheduler.scheduleAll(context, profileRepository.observeAll().first())
+            updateAllPrayerWidgets(context)
+            id
+        }
 
     /** Today's times for [profile], or null when the location has none (polar day/night). */
     private fun cachedPrayerTimes(profile: Profile, date: LocalDate): PrayerTimesResult? {

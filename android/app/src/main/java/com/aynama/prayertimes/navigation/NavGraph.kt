@@ -98,12 +98,6 @@ fun NavGraph(
                 HomeScreen(
                     requestedProfileId = requestedProfileId,
                     onProfileShown = onProfileShown,
-                    onNavigateToSettings = {
-                        navController.navigate(Screen.SETTINGS.route) {
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
                 )
             }
             composable(Screen.QIBLA.route) { QiblaScreen() }

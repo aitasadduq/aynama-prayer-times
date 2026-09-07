@@ -203,8 +203,11 @@ Watch scales defined separately in §7.
 
 ### Multi-profile UX (weather-app metaphor)
 
-- Horizontal paging cards, one per profile (Home, Work, Travel, Parents').
+- Horizontal paging cards, one per profile (Home, Work, Travel, Parents'). Every page is a
+  real profile — no trailing "+" slot, so the dots count profiles rather than profiles-plus-one.
 - Page indicator dots at bottom.
+- Creating a profile is a saffron FAB at the bottom-right of the Prayers screen. It opens the
+  profile form as a bottom sheet in place; on Save the pager lands on the new profile. §21.
 - Active card's surface carries that location's time-of-day cycle.
 - Swipe between profiles never interrupts the prayer ribbon structure — only the times and profile label change.
 
@@ -868,3 +871,34 @@ same treatment §15 already gives them.
 
 Widget abbreviations are derived from the displayed name (first three letters, uppercased)
 rather than mapped per prayer, so the abbreviation cannot drift from the label it abbreviates.
+
+---
+
+## 21. Profile Creation — FAB Flow
+
+### Entry point
+
+A saffron FAB sits at the bottom-right of the **Prayers** screen, clear of the dot indicator
+and the bottom nav. Icon only (`Add`), `Ink` on `Saffron` — the same treatment the Settings
+profile list already uses, so the affordance reads as one thing in two places.
+
+### The flow
+
+1. Tap the FAB → the profile form opens as a bottom sheet **on the Prayers screen**. The user
+   does not leave the screen they were reading.
+2. Fill in name, location, calculation method, Asr school, Hijri adjustment (§18).
+3. **Save** → the profile is persisted, becomes the selected profile, and the pager scrolls
+   onto it. The user lands on what they just made.
+4. **Dismiss** → nothing is written. No profile is created, and no existing profile changes.
+
+The empty state's "Create profile" CTA opens the same sheet.
+
+### One form, three doors
+
+Prayers FAB, empty-state CTA and Settings > Profiles all open the same `ProfileFormSheet`
+composable. A field added to the form cannot appear at one entry point and not another.
+
+### No "+" pager slot
+
+The profile pager has no trailing "+" page. It duplicated the FAB and cost the pager a phantom
+page that the dot indicator counted, so a user with two profiles saw three dots.

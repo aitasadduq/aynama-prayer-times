@@ -202,17 +202,24 @@ Widget update strategy (Reviewer Concern #4 — resolved): **Live countdown via 
 
 ### Profile Creation Flow
 
-Full-screen flow (not a bottom sheet — city search needs keyboard + results space):
+Bottom sheet, opened fully expanded (superseded the original full-screen flow: the sheet opens
+at full height, so city search still gets keyboard + results space, and creating a profile no
+longer takes the user off the screen they were reading):
 
 1. **Profile name** — text field, pre-filled with "Home" on first profile, "Profile 2" etc. subsequently. Max 20 chars.
 2. **Location** — city search (autocomplete from offline city DB or geocoder) OR "Use current location" GPS button. GPS button auto-names the profile with detected city name if user hasn't changed it.
 3. **Calculation method** — optional step, collapsible. Default: ISNA. Shows 6 main methods with brief description. Can be changed in profile settings later.
-4. **Save** — navigates back to Home with new profile active. If first profile, home screen animates from empty state to times.
+4. **Save** — the sheet closes and the Home pager lands on the new profile, which becomes the
+   selected one. If it is the first profile, the home screen animates from empty state to times.
+   Dismissing the sheet writes nothing.
 
 Entry points to profile creation:
-- Home empty state CTA ("Create profile")
-- Profile switcher swipe past the last dot (reveals a "+" slot)
-- Settings > Profiles > "Add profile"
+- **FAB on the Prayers screen** (primary) — opens the form as a bottom sheet in place
+- Home empty state CTA ("Create profile") — same sheet
+- Settings > Profiles > FAB — same sheet
+
+There is no "+" slot past the last profile dot. It duplicated the FAB and cost the pager a
+phantom page that the dot indicator counted.
 
 ### Ramadan Treatment
 

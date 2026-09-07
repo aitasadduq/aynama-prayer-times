@@ -51,6 +51,15 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 - [ ] **iOS notification limit analysis.** Before v3 iOS notification settings work: OS limit = 64 pending. 5 prayers × 7 days = 35 (fine). + advance-notice reminders = 70 (overflow). Options: (a) cap at 6 days; (b) background-app-refresh regeneration at 5-day mark; (c) alternating schedule. Resolve before speccing advance-notice for iOS.
 
+## Known issues
+
+- [ ] **GPS profile assumes the device timezone matches the fix.** "Use current location" sets
+  `timezone = ZoneId.systemDefault()`, which is right at home and wrong for a traveller whose
+  phone has not updated its zone: the profile then computes correct prayer instants and renders
+  them in the wrong wall clock. Derive the zone from the fix's coordinates instead, as the
+  city-search path already does via `detectTimezoneForLocation`. (found while testing the
+  add-profile FAB flow)
+
 ## Supply-chain / security
 
 - [ ] **Verify Adhan license (MIT vs Apache 2.0).** Check `LICENSE` file in batoulapps/adhan-java + batoulapps/adhan-swift on GitHub. Update `legal-posture.md` compliance framework accordingly — MIT = copyright notice only; Apache 2.0 = NOTICE file + state-changes. Maven POM for adhan2-jvm says MIT; adhan:1.2.1 POM tag is empty. Blocks first public release. (flagged /plan-eng-review 2026-04-19)
@@ -122,7 +131,7 @@ Depends on: Phase 1.
 **Profile switcher**
 - [x] Horizontal swipe between profiles (`HorizontalPager`, weather-app pager)
 - [x] Dot indicator at bottom of Home content (not nav bar)
-- [x] Swipe past last dot → reveals "+" slot → navigates to Settings (Phase 6 profile-creation stub)
+- [x] ~~Swipe past last dot → reveals "+" slot~~ → **SUPERSEDED**: replaced by the Prayers-screen FAB, which opens the profile sheet in place
 - [x] Profile switcher never disrupts ribbon structure — only times and label change
 
 **Empty + error states**
