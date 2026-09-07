@@ -27,7 +27,13 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 - [ ] **Reviewer Concern #2: Zakat nisab / Hawl logic.** v4-v5 decision.
 - [x] ~~Reviewer Concern #3: Qaza tracking UX~~ → **RESOLVED** (schema: `QazaEntry(id, prayer, date, status: enum{missed, made_up, intention_to_makeup}, profile_id, updated_at)`)
 - [x] ~~Reviewer Concern #4: Widget countdown strategy~~ → **RESOLVED** (Android: `RemoteViews.setChronometerCountDown()`, updates on prayer change; iOS v3: resolve before iOS notification settings)
-- [ ] **Reviewer Concern #5: WearOS complication refresh model.** Decide before v2.
+- [x] ~~Reviewer Concern #5: WearOS complication refresh model~~ → **RESOLVED**: WearOS has no
+  watchOS-style timeline, so the data source is asked for one value at a time and must say when
+  to ask again. One exact alarm at the countdown's `nextTransition()` — a prayer starting, or
+  its 30-minute count-up window closing — re-armed each time the source is queried, plus
+  `UPDATE_PERIOD_SECONDS=0` to disable the system's periodic poll. Between those points the
+  text is a `TimeDifferenceComplicationText` that the system ticks itself, so nothing of ours
+  runs. Tracks the content exactly and wakes the watch far less than a 15-minute poll would.
 
 ## Temporal Interrogation follow-ups (non-blocking, low effort)
 
@@ -310,6 +316,18 @@ Depends on: Phase 5 (channels + alarm plumbing), unified countdown (DESIGN.md §
 - [x] Re-armed on app start/resume, boot, timezone change and prayer rollover via `AlarmScheduler.scheduleAll`
 - [x] Settings toggle: Notifications → OTHER → "Live countdown"
 - [x] `LivePrayerNotificationTest` — direction, subject, chronometer base, Jumu'ah, polar-night absence
+
+---
+
+### Phase 3B — WearOS (in progress)
+
+- [x] `wear` module consuming `shared-logic` — same Adhan wrapper, countdown rule and naming
+- [x] Phone → watch profile sync over the Data Layer (`ProfileCodec`, `WearSyncContract`)
+- [x] Watch home: unified countdown, prayer list, profile paging, Jumu'ah, disconnected states
+- [x] Complications: SHORT_TEXT, LONG_TEXT, MONOCHROMATIC_IMAGE (DESIGN.md §7)
+- [x] Complication refresh model (Reviewer Concern #5)
+- [ ] Tiles
+- [ ] Phase 4B — Android + WearOS integration gate (paired emulators)
 
 ---
 

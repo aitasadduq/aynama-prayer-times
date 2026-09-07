@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
 import com.aynama.prayertimes.shared.sync.ProfileCodec
+import com.aynama.prayertimes.wear.complications.ComplicationUpdateScheduler
 import com.aynama.prayertimes.shared.sync.WearSyncContract
 import com.google.android.gms.wearable.DataEvent
 import com.google.android.gms.wearable.DataEventBuffer
@@ -59,6 +60,9 @@ object WearProfileSync {
         app.syncState.activeProfileId =
             dataMap.getLong(WearSyncContract.KEY_ACTIVE_PROFILE_ID, WearSyncContract.NO_ACTIVE_PROFILE)
         app.syncState.lastSyncedAt = System.currentTimeMillis()
+        // The profile set decides which prayer times a complication shows, so a sync that
+        // changed it must not wait for the next armed refresh to reach the watch face.
+        ComplicationUpdateScheduler.requestUpdateNow(context)
     }
 
     /**
