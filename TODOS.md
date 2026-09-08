@@ -61,29 +61,25 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Known issues
 
-- [ ] **BLOCKER — this machine cannot build or run anything for the iOS simulator.** `xcodebuild`
-  reports **zero** iOS destinations, device and simulator alike, for every project *and* for a
-  bare SwiftPM package:
+- [x] ~~**BLOCKER — this machine cannot build or run anything for the iOS simulator.**~~ →
+  **RESOLVED.** The iOS platform component is installed now. Verified 2026-09-08:
+  `xcodebuild -showdestinations` lists dozens of iOS Simulator destinations including OS 26.5,
+  `simctl` has the 26.5 runtime, and the app builds, installs, launches and ticks on
+  `iPhone 17 Pro (26.5)`. **Phase 4A is no longer blocked** and no `-downloadPlatform` download
+  is needed. `ios/scripts/typecheck-simulator.sh` still works and is still the fastest check,
+  but it is no longer the only one available.
 
-  ```
-  { platform:iOS, name:Any iOS Device,
-    error:iOS 26.5 is not installed. Please download and install the platform
-          from Xcode > Settings > Components. }
-  ```
+- [ ] **The App Group does not take effect without a `DEVELOPMENT_TEAM`.**
+  `ios/project.yml` declares `group.com.aynama.prayertimes` and XcodeGen wires
+  `CODE_SIGN_ENTITLEMENTS` correctly, but an App Group is scoped to a team identifier and the
+  Debug config signs ad-hoc with none — measured, the embedded entitlement dictionary comes out
+  empty. `AynamaStore` then falls back to its app-private container and logs the warning it was
+  written for.
 
-  Xcode 26.6 is installed with the iOS 26.5 SDK (device and simulator), and `simctl` has working
-  iOS 18.6 and 26.3 runtimes that boot fine — but Xcode will not pair them with the 26.5 SDK
-  while the iOS platform support component is missing, so `-destination`,
-  `-sdk iphonesimulator26.5` and `generic/platform=iOS Simulator` all fail before a single file
-  is compiled. Fix: `xcodebuild -downloadPlatform iOS`, or Xcode > Settings > Components (a
-  multi-gigabyte download, so not run unattended).
-
-  Consequences while it stands: no simulator run, no screenshots, no XCUITests, and **Phase 4A
-  (the iOS validation gate) cannot be executed** — every item on its list needs a running app.
-  `ios/scripts/typecheck-simulator.sh` is the stopgap: it type-checks the app against the real
-  `iPhoneSimulator26.5.sdk` with the real SwiftUI and SwiftData, which proves the code compiles
-  and nothing about how it behaves. Everything testable without a screen was moved into
-  `SharedLogic` so `swift test` still covers it.
+  Harmless for the app on its own. It is the first thing that blocks the widget extension: a
+  widget cannot read profiles it has no shared container for, and "the widget shows a profile
+  the user deleted" is a Phase 4A item. Needs a paid team set in `project.yml` before that PR
+  can be tested for real, on a device or a signed simulator build.
 
 - [ ] **Wall-clock round-trip loses an hour in a DST fall-back, on both platforms.**
   `AdhanWrapper` throws away the absolute instants Adhan returns and stores wall-clock times
