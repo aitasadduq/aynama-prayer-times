@@ -1,0 +1,11 @@
+{
+  "praytimes-python": "2.3.2",
+  "adhan-java": "1.2.1",
+  "adhan-java-maven": "com.batoulapps.adhan:adhan:1.2.1",
+  "adhan-java-url": "https://repo1.maven.org/maven2/com/batoulapps/adhan/adhan/1.2.1/adhan-1.2.1.jar",
+  "adhan-java-sha256": "eba99a3d6a3ab47cd6a622bdece60fff75aaf02f801b54bdb9d3b6edd867bdd8",
+  "adhan-swift": "1.5.0",
+  "adhan-swift-url": "https://github.com/batoulapps/adhan-swift.git",
+  "adhan-swift-tag": "1.5.0",
+  "adhan-swift-commit": "a6fa2deee80c5abb0b9ad04466f8ab12b53144e7"
+}

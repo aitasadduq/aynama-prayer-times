@@ -870,6 +870,13 @@ straight on to Dhuhr. Only prayers count up.
 
 ### Platform exception: system-ticked surfaces (widgets, live notification)
 
+Both platforms have the same shape of constraint: the only way to show a countdown that ticks
+without something of ours running every second is to hand the system a target instant and let
+it render the number. In exchange the system owns the format. **The state and the direction
+are always ours; the padding is not.**
+
+#### Android
+
 Android widgets render the countdown with `RemoteViews.setChronometer` +
 `setChronometerCountDown` (architecture-design.md, Reviewer Concern #4). The system ticks it
 natively in the launcher process, which is what makes a live countdown possible at all
@@ -884,6 +891,32 @@ a periodic update job; that trades a live countdown for a stale one.
 The live notification (§22) has the same constraint and less room: its chronometer is the
 notification's own `when` field, which takes no format string at all. There the direction is
 carried in words — "At 1:00 PM" while counting down, "Began at 1:00 PM" while counting up.
+
+#### iOS
+
+iOS widgets and Live Activities render the countdown with SwiftUI's
+`Text(timerInterval:pauseTime:countsDown:)`. WidgetKit ticks it in the system's own render
+process, so the widget extension is not woken and no timeline budget is spent on the ticking
+itself — the iOS counterpart of the Android `Chronometer`, and the resolution of Reviewer
+Concern #4 for this platform.
+
+Two differences from Android follow from the API, and neither is negotiable:
+
+- **No sign at all.** `Text(timerInterval:)` takes no format string, so unlike the Android
+  `Chronometer` we cannot even prepend the minus. iOS widgets carry the direction the way the
+  Android live notification does — in words beside the number: `At 1:00 PM` while counting
+  down, `Began at 1:00 PM` while counting up. The prayer name is always named next to it.
+- **One direction per timeline entry.** The view is fixed at render time and cannot flip from
+  counting down to counting up partway through. So a WidgetKit entry covers exactly one
+  segment of the rule, and the entry boundaries are exactly `nextTransition()` — prayer
+  instants and +30-minute closes, nothing else. That is roughly a dozen entries a day, well
+  inside WidgetKit's refresh budget, and it is why the shared timeline exposes `transitions()`
+  as well as `nextTransition()`: WidgetKit needs the whole schedule up front, where Android is
+  woken at one boundary at a time.
+
+Do not replace the timer text with a per-minute timeline of static strings. It would spend the
+entire daily budget to render a worse countdown, and the widget would be visibly stale between
+refreshes.
 
 ### Boundary behavior
 
@@ -1017,3 +1050,98 @@ in my shade", and an ongoing one would contradict that most visibly of all. The 
 preference is left untouched, so turning master back on restores the notification without them
 having to re-find the row — which matters, because the row lives inside the master-gated part
 of the screen.
+
+---
+
+## 23. Live Prayer Countdown — iOS
+
+### Why this is not §22 with the nouns changed
+
+§22's mechanism is an ongoing notification that costs nothing because the system ticks it and
+it stays in the shade all day. iOS has no such object. The nearest candidates each fail on an
+Apple constraint rather than a design one:
+
+| Candidate | Why not |
+|---|---|
+| An ongoing local notification | iOS has no ongoing/persistent notification. Every delivered notification is dismissible and inert — nothing in it ticks. |
+| A repeating silent notification | Would consume the 64-pending budget (§24) to redraw a number, and clutter Notification Center all day. |
+| An all-day Live Activity | ActivityKit ends an activity after **8 hours** active plus up to 4 stale, and starting one from the background needs a push token, which needs a server. §22's "present all day, survives process death" is not available. |
+
+So the iOS live countdown is **two surfaces, not one**, and the always-on half is a widget.
+
+### The always-on half: lock-screen and home-screen widgets
+
+`.accessoryRectangular` and `.accessoryInline` widgets on the Lock Screen are the true iOS
+analogue of a persistent status notification: always visible, always current, ticked by the
+system, no battery cost, no server, and they survive process death and reboot because
+WidgetKit owns the timeline. They follow §19 exactly, in the iOS form of the platform
+exception above.
+
+This is on by default in the sense that any widget the user places is live — there is no
+toggle, because there is nothing running to turn off.
+
+### The opt-in half: a bounded Live Activity
+
+An optional Live Activity covering **the current prayer window only** — never all day.
+
+- Started only from the foreground, when the user asks for it. No push server.
+- `staleDate` at `nextTransition()`; the activity ends at the count-up window's close or the
+  next prayer, whichever the rule says comes first.
+- Content follows §19 and §20: the day-aware prayer name, the timer text, the profile name.
+- Tapping it opens the app on the profile it is about, the same as a widget tap.
+
+A single prayer window fits inside ActivityKit's 8-hour budget in every ordinary case. The one
+that does not is the Isha → Fajr gap in a high-latitude winter, which can exceed 8 hours; the
+activity is allowed to expire there rather than being renewed, and the Lock Screen widget —
+which has no such limit — carries the countdown across the night.
+
+**Off by default**, for §22's reason: a persistent surface the user did not ask for is how an
+app gets muted wholesale.
+
+### Setting
+
+Notification settings → OTHER → **Live countdown**, the same two-line 64pt row as Android,
+with copy that says what it actually is on this platform ("Shows the current prayer on the
+Lock Screen until the next one begins"). Gated by the master toggle, like Android's.
+
+---
+
+## 24. iOS Notification Budget
+
+### The constraint
+
+iOS keeps at most **64 pending local notifications per app**. Anything scheduled beyond that
+is silently dropped — no error, no callback. Android's exact-alarm chain has no equivalent
+limit, so this is a genuinely iOS-shaped problem and the iOS answer wins over Android's
+scheduling shape (Phase 3A conflict resolution).
+
+The naive schedule overflows: 5 prayers × 7 days = 35, which is fine, but adding a per-prayer
+early reminder doubles it to 70.
+
+### The rule
+
+Schedule a **horizon of whole days**, sized from what the user has actually enabled:
+
+```
+perDay  = enabled prayers + enabled early reminders + Imsak (Ramadan only)
+horizon = clamp(60 / perDay, 3...7) days
+```
+
+- **60, not 64.** Four slots are held back as headroom so a feature that needs a one-off
+  notification cannot silently push a prayer out of the queue.
+- **Prayers are scheduled before reminders**, day by day. If the budget runs out mid-day the
+  thing dropped is an early reminder, never the prayer it reminds about. Overflow degrades in
+  the order the user would choose.
+- The worst realistic case — all five prayers, all five reminders, plus Imsak — is 11 a day,
+  which still yields a 5-day horizon. The best case is capped at 7 days rather than 12: past a
+  week the times drift enough that rescheduling is better than a longer queue.
+
+### Refilling
+
+The queue is rebuilt whenever the app becomes active, and from a `BGAppRefreshTask` registered
+for roughly daily. Both are opportunistic — iOS guarantees neither — which is why the horizon
+floor is 3 days and not 1: the user who does not open the app for a couple of days must not
+lose their notifications.
+
+Profile edits, timezone changes and permission changes rebuild it immediately. There is
+nothing to restore after a reboot: pending notifications survive it, unlike Android alarms.

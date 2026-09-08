@@ -49,15 +49,63 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 - [x] ~~**Vector generator self-tests.**~~ → **COMPLETE** (`scripts/test_generator.py`, 9 tests pass). Golden values corrected to Adhan 1.2.1 actual output (arch-design.md had stale PrayTimes.py values): fajr=05:10, sunrise=06:24, dhuhr=12:29, asr_shafii=15:53, asr_hanafi=16:50, maghrib=18:32, isha=19:42. `architecture-design.md` golden values table needs updating separately.
 
-- [ ] **Run all test vectors in CI.** Load all 12 cities from `test-vectors/schema.json` in `android.yml` CI; parse + loop all methods (MWL, ISNA, UMM_AL_QURA, etc.). Assert each prayer time within ±1 min of test vector. Replace hardcoded Makkah-only tests in `AdhanWrapperTest.kt`. Required v1 gate (before launch) to catch Adhan upstream regressions.
+- [ ] **Run all test vectors in CI.** ~~Load all 12 cities from `test-vectors/schema.json`~~ — `schema.json` is a JSON Schema and never contained any cities; the twelve now exist, defined in `scripts/adhan-parity/cases.json` and generated into `test-vectors/prayer-times/*.json` (Phase 3A). **iOS side is done** — `VectorParityTests` loops all twelve under `swift test`. **Android side remains:** replace the hardcoded Makkah-only tests in `AdhanWrapperTest.kt` with a file-driven loop over the same directory, and wire it into `android.yml`. Required v1 gate (before launch) to catch Adhan upstream regressions.
 
-- [ ] **Adhan-Swift version pin + parity check.** Before v3 iOS work: pin Adhan-Swift to a specific release in `scripts/reference-versions.json`; verify all 12 test-vector cities agree between Adhan-Swift and Adhan-Kotlin within ±1 min; add parity check to ios.yml CI. Required pre-v3 gate.
+- [ ] **`scripts/generate_vectors.py` is on an unmerged branch.** The PrayTimes.py cross-validation generator (`vector-generator-self-tests`, db1268d) was never merged to `main` or `agent-main`, and its `CITY_CONFIGS` holds one city, not twelve. `scripts/adhan-parity/` (Phase 3A) solves a different problem — cross-*port* agreement, Swift vs Kotlin — and does not replace the two-source correctness check architecture-design.md specifies. Merge that branch and extend its city list to the twelve now defined in `scripts/adhan-parity/cases.json`, so the vectors are validated for correctness and not only for port parity. Note `scripts/reference-versions.json` now exists on both branches and will conflict trivially: keep the superset (Phase 3A added the `adhan-swift` keys).
+
+- [x] ~~**Adhan-Swift version pin + parity check.**~~ → **COMPLETE** (Phase 3A). Adhan-Swift pinned to `1.5.0` (exact, not a range) in `ios/SharedLogic/Package.swift`, mirrored in `scripts/reference-versions.json` with the tag's commit SHA. The twelve parity cities did not exist anywhere in the repo, so they are now defined in `scripts/adhan-parity/cases.json` and their vectors generated from Adhan-Kotlin 1.2.1 into `test-vectors/prayer-times/*.json` — all ten calculation methods covered. `VectorParityTests` asserts Adhan-Swift matches every vector within ±1 min and runs under plain `swift test`. **11 of 12 agreed on the first run; London did not — see the high-latitude item below.**
 
 - [ ] **adhan-test-vectors companion repo ownership protocol.** Before v1 launch: document in companion repo README: (1) how to trigger vector regeneration on Adhan upstream release (GitHub Actions manual dispatch); (2) who reviews PrayTimes.py vs Adhan disagreements; (3) process for syncing updated vectors back to main repo.
 
-- [ ] **iOS notification limit analysis.** Before v3 iOS notification settings work: OS limit = 64 pending. 5 prayers × 7 days = 35 (fine). + advance-notice reminders = 70 (overflow). Options: (a) cap at 6 days; (b) background-app-refresh regeneration at 5-day mark; (c) alternating schedule. Resolve before speccing advance-notice for iOS.
+- [x] ~~**iOS notification limit analysis.**~~ → **RESOLVED** (Phase 3A, DESIGN.md §24). A fixed day cap is the wrong shape — it is sized for the worst case and short-changes the common one, where the user has enabled far fewer than eleven notifications a day. The horizon is computed from what is actually enabled instead: `perDay = enabled prayers + enabled early reminders + Imsak`, `horizon = clamp(60 / perDay, 3...7)` days. Four of the 64 slots are held back as headroom, prayers are scheduled before their reminders so overflow drops the reminder and never the prayer, and the queue is refilled on foreground and from a `BGAppRefreshTask`. Worst realistic case (5 prayers + 5 reminders + Imsak = 11/day) still yields a 5-day horizon; the common case is capped at 7.
 
 ## Known issues
+
+- [ ] **Wall-clock round-trip loses an hour in a DST fall-back, on both platforms.**
+  `AdhanWrapper` throws away the absolute instants Adhan returns and stores wall-clock times
+  (`ClockTime` / `LocalTime`); `PrayerTimeline.entriesFor` then rebuilds an instant from them.
+  In the repeated hour of a fall-back that round-trip is lossy — measured on Europe/London
+  2026-10-25, an instant of `01:30:00Z` reads as 01:30 local and reconstructs to `00:30:00Z`,
+  one hour early. The spring-forward gap is fine (it resolves forward, as `java.time` does);
+  it is the autumn overlap that has no representation.
+
+  **Not reachable with the five prayers today.** Fall-back happens in autumn, when Fajr and
+  Isha are nowhere near the repeated hour, and the midsummer high-latitude collapse that does
+  put them at 01:02 never lands on a transition date. It becomes reachable the moment anything
+  round-trips a time that can fall there. The fix is to carry the instant through
+  `PrayerTimesResult` instead of recomputing it, which is a change to both ports — recorded
+  here rather than made inside an iOS PR.
+
+- [ ] **Android follow-ups from the iOS review (PR #29).** Two divergences found by porting,
+  both fixed on iOS and still open on Android:
+  (a) `QiblaCalculator.distanceKm` passes `sqrt(1.0 - a)` unclamped, so haversine rounding can
+  return `NaN` at the antipode of the Kaaba. One-line `coerceAtMost(1.0)`.
+  (b) `Profile.effectiveZoneId()` calls bare `ZoneId.of(timezone)`, which throws
+  `ZoneRulesException` for an identifier the tz database has dropped. Swift falls back to the
+  device zone instead. One of the two behaviours should win; silently computing in the wrong
+  zone and taking the app down are both bad, so the answer is probably "fall back and say so".
+
+- [ ] **DECISION NEEDED — the two Adhan ports disagree above 48° latitude, and London is one of
+  them.** Adhan-Kotlin 1.2.1 (what Android ships) applies `MIDDLE_OF_THE_NIGHT` at every
+  latitude: its `nightPortions()` never sees the coordinates. Adhan-Swift 1.5.0 leaves the rule
+  unset and falls back to `HighLatitudeRule.recommended(for:)`, which is `SEVENTH_OF_THE_NIGHT`
+  above 48°. Measured on the twelve parity cities: eleven agree to the minute, **London on the
+  June solstice is 157 minutes apart on Fajr and 158 on Isha.**
+
+  iOS now pins `.middleOfTheNight` to match Android, because Phase 3A makes the tested Android
+  behaviour the specification, and all twelve cities pass. But the pin preserves a consequence
+  worth deciding on rather than inheriting: under middle-of-the-night, **London's Fajr and Isha
+  collapse onto the same instant (01:02) for weeks around midsummer** — the degenerate case the
+  timeline already handles, occurring in a city with one of the largest Muslim populations in
+  Europe, not in the Arctic. Adhan upstream changed its own recommendation for this reason.
+
+  This is one decision for both platforms, not something iOS settles alone, and it is a fiqh
+  question as much as a UX one. Options: (a) keep middle-of-the-night everywhere, as today;
+  (b) move both platforms to seventh-of-the-night above 48°, which means changing Android and
+  regenerating the vectors; (c) make it a per-profile setting, which no other calculation
+  input currently is. Pinned by `HighLatitudeParityTests` either way, so the decision cannot
+  be made accidentally. Needs a product call before iOS ships to users above 48°.
+
 
 - [ ] **GPS profile assumes the device timezone matches the fix.** "Use current location" sets
   `timezone = ZoneId.systemDefault()`, which is right at home and wrong for a traveller whose
@@ -460,7 +508,7 @@ Depends on: all phases (run after each PR, gate on `main` merge).
 **Test vectors**
 - [ ] Generate full vector set: run `scripts/generate_test_vectors.py` for all 12 cities × all methods; commit output to `test-vectors/`
 - [ ] Expand `AdhanWrapperTest` to load from `test-vectors/schema.json` — replace hardcoded Makkah test with file-driven loop over all 12 cities and methods
-- [ ] `vectors.yml` GitHub Actions workflow — validate `test-vectors/*.json` against `test-vectors/schema.json` on every vector file change
+- [x] ~~`vectors.yml` GitHub Actions workflow~~ → **DONE, as the `vectors` job in `ios.yml`** rather than its own file (it gates the macOS job, so it has to be in the same workflow). `scripts/validate-vectors.py` validates every `test-vectors/prayer-times/*.json` against `schema.json`. `schema.json` had claimed this was enforced since it was written; until now nothing enforced it.
 
 **android.yml**
 - [ ] Unit tests (`:shared-logic:test`, `:app:test`) on every commit
