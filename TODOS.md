@@ -61,6 +61,30 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Known issues
 
+- [ ] **Wall-clock round-trip loses an hour in a DST fall-back, on both platforms.**
+  `AdhanWrapper` throws away the absolute instants Adhan returns and stores wall-clock times
+  (`ClockTime` / `LocalTime`); `PrayerTimeline.entriesFor` then rebuilds an instant from them.
+  In the repeated hour of a fall-back that round-trip is lossy — measured on Europe/London
+  2026-10-25, an instant of `01:30:00Z` reads as 01:30 local and reconstructs to `00:30:00Z`,
+  one hour early. The spring-forward gap is fine (it resolves forward, as `java.time` does);
+  it is the autumn overlap that has no representation.
+
+  **Not reachable with the five prayers today.** Fall-back happens in autumn, when Fajr and
+  Isha are nowhere near the repeated hour, and the midsummer high-latitude collapse that does
+  put them at 01:02 never lands on a transition date. It becomes reachable the moment anything
+  round-trips a time that can fall there. The fix is to carry the instant through
+  `PrayerTimesResult` instead of recomputing it, which is a change to both ports — recorded
+  here rather than made inside an iOS PR.
+
+- [ ] **Android follow-ups from the iOS review (PR #29).** Two divergences found by porting,
+  both fixed on iOS and still open on Android:
+  (a) `QiblaCalculator.distanceKm` passes `sqrt(1.0 - a)` unclamped, so haversine rounding can
+  return `NaN` at the antipode of the Kaaba. One-line `coerceAtMost(1.0)`.
+  (b) `Profile.effectiveZoneId()` calls bare `ZoneId.of(timezone)`, which throws
+  `ZoneRulesException` for an identifier the tz database has dropped. Swift falls back to the
+  device zone instead. One of the two behaviours should win; silently computing in the wrong
+  zone and taking the app down are both bad, so the answer is probably "fall back and say so".
+
 - [ ] **DECISION NEEDED — the two Adhan ports disagree above 48° latitude, and London is one of
   them.** Adhan-Kotlin 1.2.1 (what Android ships) applies `MIDDLE_OF_THE_NIGHT` at every
   latitude: its `nightPortions()` never sees the coordinates. Adhan-Swift 1.5.0 leaves the rule
@@ -484,7 +508,7 @@ Depends on: all phases (run after each PR, gate on `main` merge).
 **Test vectors**
 - [ ] Generate full vector set: run `scripts/generate_test_vectors.py` for all 12 cities × all methods; commit output to `test-vectors/`
 - [ ] Expand `AdhanWrapperTest` to load from `test-vectors/schema.json` — replace hardcoded Makkah test with file-driven loop over all 12 cities and methods
-- [ ] `vectors.yml` GitHub Actions workflow — validate `test-vectors/*.json` against `test-vectors/schema.json` on every vector file change
+- [x] ~~`vectors.yml` GitHub Actions workflow~~ → **DONE, as the `vectors` job in `ios.yml`** rather than its own file (it gates the macOS job, so it has to be in the same workflow). `scripts/validate-vectors.py` validates every `test-vectors/prayer-times/*.json` against `schema.json`. `schema.json` had claimed this was enforced since it was written; until now nothing enforced it.
 
 **android.yml**
 - [ ] Unit tests (`:shared-logic:test`, `:app:test`) on every commit

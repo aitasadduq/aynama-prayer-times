@@ -231,14 +231,19 @@ struct PrayerTimelineTests {
 
     @Test("across a DST spring-forward the countdown measures real elapsed time")
     func dstSpringForward() {
-        // Europe/London jumps 01:00 → 02:00 on 2026-03-29. The point is only that the gap is
-        // measured on instants, not on the wall clock that skipped an hour.
+        // Europe/London jumps 01:00 → 02:00 on 2026-03-29, so 00:30 to Fajr at 03:20 is 2h50m
+        // on the wall clock and 1h50m of real time.
+        //
+        // The literal is the assertion. Comparing against `duration(from: before, to:
+        // fajr.instant)` would only restate how `.remaining` is built and would hold whatever
+        // `atTime` did with the zone, including nothing at all.
         let dstDay = CalendarDate(year: 2026, month: 3, day: 29)
         let tl = buildTimeline(days: [dstDay: day], asrMadhab: .shafii, timeZone: zone)
         let before = dstDay.atTime(ClockTime(hour: 0, minute: 30), in: zone)
         let state = countdownAt(tl, now: before)
-        let fajr = tl.first { $0.event == .fajr }!
-        #expect(state?.duration == duration(from: before, to: fajr.instant))
+
+        #expect(state?.entry.event == .fajr)
+        #expect(state?.formatted() == "-01:50:00")
     }
 
     // MARK: - Madhab
@@ -356,5 +361,40 @@ struct PrayerTimelineTests {
         // extrapolate a prayer it has not been given.
         let stops = transitions(tl, from: at(21, 0), limit: 64)
         #expect(stops == [at(21, 10), at(21, 45), at(22, 15)])
+    }
+}
+
+/// `CalendarDate` is the key of the timeline's `days`, so its equality has to be the same
+/// question its ordering asks.
+@Suite("Calendar date identity")
+struct CalendarDateIdentityTests {
+
+    @Test("an out-of-range component resolves to the day it names")
+    func outOfRangeComponentsAreTheSameDay() {
+        // The vector schema's date pattern permits 2026-02-30, and epochDay has always resolved
+        // it to 2026-03-02. Synthesized equality compared the raw triple instead, so the two were
+        // unequal while neither sorted before the other.
+        let named = CalendarDate(year: 2026, month: 2, day: 30)
+        let resolved = CalendarDate(year: 2026, month: 3, day: 2)
+
+        #expect(named == resolved)
+        #expect(!(named < resolved) && !(resolved < named))
+        #expect(named.hashValue == resolved.hashValue)
+    }
+
+    @Test("one real day is one key")
+    func oneDayIsOneKey() {
+        var days: [CalendarDate: String] = [:]
+        days[CalendarDate(year: 2026, month: 2, day: 30)] = "first"
+        days[CalendarDate(year: 2026, month: 3, day: 2)] = "second"
+        #expect(days.count == 1)
+    }
+
+    @Test("ordinary dates are still distinct")
+    func ordinaryDatesAreDistinct() {
+        let a = CalendarDate(year: 2026, month: 5, day: 12)
+        #expect(a != a.plusDays(1))
+        #expect(a < a.plusDays(1))
+        #expect(a == CalendarDate(year: 2026, month: 5, day: 12))
     }
 }

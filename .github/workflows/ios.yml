@@ -5,20 +5,51 @@ on:
     paths:
       - "ios/**"
       - "test-vectors/**"
+      - "scripts/adhan-parity/**"
+      - "scripts/validate-vectors.py"
       - "scripts/reference-versions.json"
       - ".github/workflows/ios.yml"
   pull_request:
     paths:
       - "ios/**"
       - "test-vectors/**"
+      - "scripts/adhan-parity/**"
+      - "scripts/validate-vectors.py"
       - "scripts/reference-versions.json"
       - ".github/workflows/ios.yml"
+
+# Nothing here writes to the repository, and a new workflow inherits whatever the repository
+# default happens to be. Say it explicitly instead.
+permissions:
+  contents: read
 
 concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  vectors:
+    # schema.json has described itself as "enforced by vectors.yml CI on every commit" since it
+    # was written, and nothing enforced it. This is that check.
+    #
+    # It gates the macOS job rather than running beside it: the vectors are what iOS is held to,
+    # so a malformed or incomplete one should fail before ten minutes of a 10x runner are spent
+    # comparing against it. Linux, so it costs almost nothing.
+    name: Test vectors - schema
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install jsonschema
+        run: python3 -m pip install --quiet jsonschema
+
+      - name: Validate the vectors
+        run: python3 scripts/validate-vectors.py
+
   shared-logic:
     # The domain package has no UIKit and no simulator dependency, so this job is a plain
     # `swift test` — seconds, not minutes. It carries the Adhan-Swift <-> Adhan-Kotlin parity
@@ -32,23 +63,32 @@ jobs:
     # assumed here.
     name: SharedLogic - domain and Adhan parity
     runs-on: macos-15
+    needs: vectors
     steps:
       - uses: actions/checkout@v4
 
       - name: Report toolchain
         run: swift --version
 
-      - name: Test
-        working-directory: ios/SharedLogic
-        run: swift test
-
       - name: Assert the Adhan-Swift pin has not drifted
-        # Package.resolved is committed, but a hand-edited Package.swift could widen the
-        # requirement without changing the resolution until someone next resolves. Check both
-        # against the single source of truth in scripts/reference-versions.json.
+        # Before the tests, not after: a drifted pin fails the parity suite with twelve mystery
+        # deltas, and the whole point of this step is to say why in one line instead.
+        #
+        # All three facts are checked against scripts/reference-versions.json, because each can
+        # rot on its own. A hand-edited Package.swift could widen the requirement without moving
+        # the resolution until someone next resolves; a hand-edited Package.resolved could keep
+        # the version string while pointing at a different revision, which is why the commit SHA
+        # is recorded at all.
         run: |
           pinned=$(python3 -c "import json; print(json.load(open('scripts/reference-versions.json'))['adhan-swift'])")
+          commit=$(python3 -c "import json; print(json.load(open('scripts/reference-versions.json'))['adhan-swift-commit'])")
           grep -q "exact: \"$pinned\"" ios/SharedLogic/Package.swift \
             || { echo "::error::Package.swift does not pin adhan-swift exact: $pinned"; exit 1; }
           grep -q "\"version\" : \"$pinned\"" ios/SharedLogic/Package.resolved \
             || { echo "::error::Package.resolved is not at adhan-swift $pinned"; exit 1; }
+          grep -q "\"revision\" : \"$commit\"" ios/SharedLogic/Package.resolved \
+            || { echo "::error::Package.resolved is not at adhan-swift revision $commit"; exit 1; }
+
+      - name: Test
+        working-directory: ios/SharedLogic
+        run: swift test

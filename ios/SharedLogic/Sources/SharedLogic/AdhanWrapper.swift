@@ -164,10 +164,22 @@ public struct AdhanWrapper: Sendable {
     /// moment, including the stretch after Isha and the stretch before Fajr. Days are dropped
     /// rather than failing the whole window because near the polar circles a single day can be
     /// undefined while the days around it are fine.
+    ///
+    /// - Throws: ``PrayerTimesError/invalidCoordinates(latitude:longitude:)``. A coordinate out
+    ///   of range is a corrupt profile, not a polar one, and the two must not arrive at the same
+    ///   empty result: they render an identical blank surface, and only one of them is a real
+    ///   place where the sun does not both rise and set.
     public func timelineDays(
         for profile: Profile,
         around today: CalendarDate
-    ) -> [CalendarDate: PrayerTimesResult] {
+    ) throws -> [CalendarDate: PrayerTimesResult] {
+        guard (-90.0...90.0).contains(profile.latitude),
+              (-180.0...180.0).contains(profile.longitude)
+        else {
+            throw PrayerTimesError.invalidCoordinates(
+                latitude: profile.latitude, longitude: profile.longitude
+            )
+        }
         var days: [CalendarDate: PrayerTimesResult] = [:]
         for offset in -1...1 {
             let date = today.plusDays(offset)

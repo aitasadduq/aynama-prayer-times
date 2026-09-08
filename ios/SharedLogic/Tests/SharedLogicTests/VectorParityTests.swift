@@ -128,6 +128,19 @@ struct VectorParityTests {
         ]
 
         let label = vector.testCase.description ?? "\(input.latitude),\(input.longitude)"
+
+        // Every field, not merely the ones the file happens to carry. The loop below iterates
+        // `expected`, so a regenerated vector that dropped `isha` would compare six times, pass,
+        // and quietly stop guarding the seventh. schema.json requires all seven; this is the
+        // half of that guarantee which lives in the test rather than in CI.
+        #expect(
+            Set(vector.testCase.expected.keys) == Set(produced.keys),
+            """
+            \(label): vector covers \(vector.testCase.expected.keys.sorted()), \
+            expected all of \(produced.keys.sorted())
+            """
+        )
+
         for (key, expectedText) in vector.testCase.expected.sorted(by: { $0.key < $1.key }) {
             let expected = try #require(parseClockTime(expectedText), "unparsable \(key): \(expectedText)")
             let produced = try #require(produced[key], "vector names an unknown time: \(key)")

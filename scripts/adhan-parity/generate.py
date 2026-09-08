@@ -18,6 +18,7 @@ is gitignored — the pin lives in scripts/reference-versions.json.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -28,21 +29,64 @@ REPO_ROOT = HERE.parent.parent
 VECTORS_DIR = REPO_ROOT / "test-vectors" / "prayer-times"
 REFERENCE_VERSIONS = json.loads((HERE.parent / "reference-versions.json").read_text())
 JAR = HERE / f"adhan-{REFERENCE_VERSIONS['adhan-java']}.jar"
+JAR_SHA256 = REFERENCE_VERSIONS["adhan-java-sha256"]
 RUNNER_CLASS = HERE / "AdhanKotlinRunner.class"
 REFERENCE = f"Adhan-Kotlin {REFERENCE_VERSIONS['adhan-java-maven']}"
 
 
-def ensure_runner() -> None:
-    if not JAR.exists():
-        url = REFERENCE_VERSIONS["adhan-java-url"]
-        print(f"[info] downloading {JAR.name}")
-        subprocess.run(["curl", "-fsSL", "-o", str(JAR), url], check=True)
-    if not RUNNER_CLASS.exists() or RUNNER_CLASS.stat().st_mtime < (HERE / "AdhanKotlinRunner.java").stat().st_mtime:
-        print("[info] compiling AdhanKotlinRunner")
-        subprocess.run(
-            ["javac", "-cp", str(JAR), "-d", str(HERE), str(HERE / "AdhanKotlinRunner.java")],
-            check=True,
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def ensure_jar() -> None:
+    """Fetch the reference JAR, verified against the pin.
+
+    This JAR is what "correct" means for every iOS prayer time — the vectors it writes are what
+    VectorParityTests holds Adhan-Swift to — and unlike Adhan-Swift it is downloaded rather than
+    resolved from a committed lockfile. So the pin has to carry a digest as well as a version.
+
+    Downloading to a temporary name and renaming only after the digest matches also stops an
+    interrupted transfer from leaving a truncated JAR behind: it is gitignored, so the next run
+    would find it, skip the download and fail at javac with nothing pointing at the cause.
+    """
+    if JAR.exists():
+        if sha256(JAR) == JAR_SHA256:
+            return
+        print(f"[warn] {JAR.name} does not match its pinned digest, re-downloading", file=sys.stderr)
+        JAR.unlink()
+
+    url = REFERENCE_VERSIONS["adhan-java-url"]
+    print(f"[info] downloading {JAR.name}")
+    partial = JAR.with_name(JAR.name + ".part")
+    subprocess.run(["curl", "-fsSL", "-o", str(partial), url], check=True)
+    actual = sha256(partial)
+    if actual != JAR_SHA256:
+        partial.unlink(missing_ok=True)
+        raise SystemExit(
+            f"[error] {JAR.name} sha256 {actual}\n"
+            f"        does not match adhan-java-sha256 {JAR_SHA256} in reference-versions.json"
         )
+    partial.rename(JAR)
+
+
+def ensure_runner() -> None:
+    ensure_jar()
+    source = HERE / "AdhanKotlinRunner.java"
+    # Recompile when the JAR moves as well as when the source does. A .class built against an
+    # older Adhan is the one failure here that produces plausible, wrong vectors rather than an
+    # error, and the vectors are the thing nothing downstream re-checks.
+    stale = (
+        not RUNNER_CLASS.exists()
+        or RUNNER_CLASS.stat().st_mtime < source.stat().st_mtime
+        or RUNNER_CLASS.stat().st_mtime < JAR.stat().st_mtime
+    )
+    if stale:
+        print("[info] compiling AdhanKotlinRunner")
+        subprocess.run(["javac", "-cp", str(JAR), "-d", str(HERE), str(source)], check=True)
 
 
 def run_case(case: dict) -> dict:

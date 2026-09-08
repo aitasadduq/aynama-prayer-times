@@ -48,12 +48,15 @@ scripts/*.jar
 scripts/*.class
 scripts/disagreements.json
 scripts/adhan-parity/*.jar
+scripts/adhan-parity/*.jar.part
 scripts/adhan-parity/*.class
 
 # Xcode / SwiftPM
 .build/
 .swiftpm/
 DerivedData/
+# The Xcode project is generated from ios/project.yml by XcodeGen, so it is build output here
+# and not the source of truth its extension normally implies.
 *.xcodeproj/
 *.xcworkspace/
 

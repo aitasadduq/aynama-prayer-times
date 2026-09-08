@@ -96,6 +96,21 @@ public struct CalendarDate: Hashable, Comparable, Codable, Sendable {
     public static func < (lhs: CalendarDate, rhs: CalendarDate) -> Bool {
         lhs.epochDay < rhs.epochDay
     }
+
+    /// Equality is the epoch day too, as ``epochDay`` says and as ``<`` already used.
+    ///
+    /// The synthesized version compared the raw triple, so an out-of-range component — and the
+    /// vector schema's date pattern permits `2026-02-30` — was unequal to the `2026-03-02` it
+    /// resolves to while neither sorted before the other. That breaks `Comparable`, and this
+    /// type is the key of ``buildTimeline(days:asrMadhab:timeZone:)``'s `days`, where it would
+    /// have meant two dictionary entries for one real day.
+    public static func == (lhs: CalendarDate, rhs: CalendarDate) -> Bool {
+        lhs.epochDay == rhs.epochDay
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(epochDay)
+    }
 }
 
 extension CalendarDate: CustomStringConvertible {

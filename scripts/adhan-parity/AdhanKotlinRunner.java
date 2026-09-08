@@ -10,6 +10,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.Locale;
 
 /**
  * Emits one case's prayer times as JSON, computed by the same Adhan-Kotlin release the Android
@@ -17,7 +18,9 @@ import java.util.Date;
  *
  * Deliberately a thin mirror of AdhanWrapper.kt rather than a second opinion: the vectors this
  * feeds are the contract iOS is held to, so they must be what Android actually produces —
- * including the same Shafii/Hanafi double call and the same truncation to whole seconds.
+ * including the same Shafii/Hanafi double call. Times are emitted as HH:MM, the resolution the
+ * vectors are compared at, in Locale.ROOT: a JVM defaulting to a locale with its own numerals
+ * would otherwise write vectors the Swift parser rejects.
  *
  * Usage: java -cp .:adhan-1.2.1.jar AdhanKotlinRunner <lat> <lng> <yyyy-mm-dd> <tz> <METHOD>
  */
@@ -70,7 +73,8 @@ public final class AdhanKotlinRunner {
     private static String field(String name, Date value, ZoneId zone) {
         LocalTime time =
             value.toInstant().atZone(zone).toLocalTime().truncatedTo(ChronoUnit.SECONDS);
-        return "\"" + name + "\": \"" + String.format("%02d:%02d", time.getHour(), time.getMinute())
+        return "\"" + name + "\": \""
+            + String.format(Locale.ROOT, "%02d:%02d", time.getHour(), time.getMinute())
             + "\"";
     }
 

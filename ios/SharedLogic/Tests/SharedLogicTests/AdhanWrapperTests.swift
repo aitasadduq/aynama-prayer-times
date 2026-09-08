@@ -138,7 +138,7 @@ struct AdhanWrapperTests {
     // MARK: - The timeline window
 
     @Test("timelineDays drops the undefined days and keeps the rest")
-    func timelineDaysDropsUndefinedDays() {
+    func timelineDaysDropsUndefinedDays() throws {
         // Tromsø on the June solstice: the day itself has no times, and neither do its
         // neighbours, so the window is empty rather than partially wrong.
         let polar = Profile(
@@ -151,7 +151,7 @@ struct AdhanWrapperTests {
             useLocationTimezone: true
         )
         let solstice = CalendarDate(year: 2026, month: 6, day: 21)
-        #expect(wrapper.timelineDays(for: polar, around: solstice).isEmpty)
+        #expect(try wrapper.timelineDays(for: polar, around: solstice).isEmpty)
 
         let makkahProfile = Profile(
             name: "Makkah",
@@ -162,10 +162,28 @@ struct AdhanWrapperTests {
             timezone: "Asia/Riyadh",
             useLocationTimezone: true
         )
-        let days = wrapper.timelineDays(
+        let days = try wrapper.timelineDays(
             for: makkahProfile, around: CalendarDate(year: 2026, month: 3, day: 21)
         )
         #expect(days.count == 3)
+    }
+
+    @Test("a corrupt coordinate is not mistaken for a polar day")
+    func timelineDaysRejectsCorruptCoordinates() {
+        // Both would otherwise return an empty window and render the same blank surface, and
+        // only one of them is a place where the sun does not both rise and set.
+        let corrupt = Profile(
+            name: "Corrupt",
+            latitude: 91,
+            longitude: 0,
+            calculationMethod: .mwl,
+            asrMadhab: .shafii
+        )
+        #expect(throws: PrayerTimesError.invalidCoordinates(latitude: 91, longitude: 0)) {
+            try wrapper.timelineDays(
+                for: corrupt, around: CalendarDate(year: 2026, month: 3, day: 21)
+            )
+        }
     }
 
     func expectWithin(

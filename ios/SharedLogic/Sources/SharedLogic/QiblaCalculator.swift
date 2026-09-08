@@ -28,8 +28,14 @@ public enum QiblaCalculator {
         let lat2 = kaabaLatitude * .pi / 180
         let dLat = (kaabaLatitude - latitude) * .pi / 180
         let dLng = (kaabaLongitude - longitude) * .pi / 180
-        let a = sin(dLat / 2) * sin(dLat / 2)
-            + cos(lat1) * cos(lat2) * sin(dLng / 2) * sin(dLng / 2)
+        // `a` is 1 at the antipode and rounding can carry it a hair past, which makes
+        // `sqrt(1 - a)` NaN and the whole distance NaN with it. Clamping costs nothing and the
+        // antipode of the Kaaba is open Pacific, so this is a guard rather than a correction.
+        let a = min(
+            sin(dLat / 2) * sin(dLat / 2)
+                + cos(lat1) * cos(lat2) * sin(dLng / 2) * sin(dLng / 2),
+            1
+        )
         return earthRadiusKm * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 }

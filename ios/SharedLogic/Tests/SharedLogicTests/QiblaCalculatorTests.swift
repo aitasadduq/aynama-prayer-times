@@ -58,3 +58,30 @@ struct QiblaCalculatorTests {
         #expect(city.range.contains(distance), "\(city.name): got \(distance) km")
     }
 }
+
+/// The two places the great-circle formulas can produce a non-number.
+@Suite("Qibla edge cases")
+struct QiblaEdgeCaseTests {
+
+    @Test("the antipode of the Kaaba has a finite distance")
+    func antipodeIsFinite() {
+        // Haversine's `a` is exactly 1 here, and floating point can carry it just past, which
+        // would make sqrt(1 - a) NaN and take the distance with it.
+        let distance = QiblaCalculator.distanceKm(
+            latitude: -QiblaCalculator.kaabaLatitude,
+            longitude: QiblaCalculator.kaabaLongitude - 180
+        )
+        #expect(distance.isFinite)
+        #expect(abs(distance - 20_015) < 5)
+    }
+
+    @Test("the Kaaba itself is zero away", arguments: [0.0, 1e-12])
+    func zeroDistanceAtTheKaaba(offset: Double) {
+        let distance = QiblaCalculator.distanceKm(
+            latitude: QiblaCalculator.kaabaLatitude + offset,
+            longitude: QiblaCalculator.kaabaLongitude
+        )
+        #expect(distance.isFinite)
+        #expect(distance < 1)
+    }
+}
