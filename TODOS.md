@@ -61,6 +61,26 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Known issues
 
+- [x] ~~**BLOCKER — this machine cannot build or run anything for the iOS simulator.**~~ →
+  **RESOLVED.** The iOS platform component is installed now. Verified 2026-09-08:
+  `xcodebuild -showdestinations` lists dozens of iOS Simulator destinations including OS 26.5,
+  `simctl` has the 26.5 runtime, and the app builds, installs, launches and ticks on
+  `iPhone 17 Pro (26.5)`. **Phase 4A is no longer blocked** and no `-downloadPlatform` download
+  is needed. `ios/scripts/typecheck-simulator.sh` still works and is still the fastest check,
+  but it is no longer the only one available.
+
+- [ ] **The App Group does not take effect without a `DEVELOPMENT_TEAM`.**
+  `ios/project.yml` declares `group.com.aynama.prayertimes` and XcodeGen wires
+  `CODE_SIGN_ENTITLEMENTS` correctly, but an App Group is scoped to a team identifier and the
+  Debug config signs ad-hoc with none — measured, the embedded entitlement dictionary comes out
+  empty. `AynamaStore` then falls back to its app-private container and logs the warning it was
+  written for.
+
+  Harmless for the app on its own. It is the first thing that blocks the widget extension: a
+  widget cannot read profiles it has no shared container for, and "the widget shows a profile
+  the user deleted" is a Phase 4A item. Needs a paid team set in `project.yml` before that PR
+  can be tested for real, on a device or a signed simulator build.
+
 - [ ] **Wall-clock round-trip loses an hour in a DST fall-back, on both platforms.**
   `AdhanWrapper` throws away the absolute instants Adhan returns and stores wall-clock times
   (`ClockTime` / `LocalTime`); `PrayerTimeline.entriesFor` then rebuilds an instant from them.

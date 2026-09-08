@@ -92,3 +92,26 @@ jobs:
       - name: Test
         working-directory: ios/SharedLogic
         run: swift test
+
+  app:
+    # The app target. The Xcode project is generated from ios/project.yml rather than committed,
+    # so this job regenerates it and fails if the checked-in yml no longer describes a buildable
+    # project — a .pbxproj in git is a merge-conflict generator and nobody reviews one.
+    name: Aynama app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build for the simulator
+        working-directory: ios
+        run: |
+          xcodebuild -project Aynama.xcodeproj -scheme Aynama \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug build
