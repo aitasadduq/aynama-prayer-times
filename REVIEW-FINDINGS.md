@@ -1,6 +1,6 @@
 # Review Findings — Deferred
 
-Open findings from `/review` runs that were not addressed in the originating PR. Each finding cites `file:line` and is tagged with the originating PR + reviewer category. Close items by deleting them; do not "soft-close" with strikethroughs.
+Open findings from `/review` runs that were not addressed in the originating PR, and from design-doc syncs (DESIGN.md vs shipped code). Each finding cites `file:line` and is tagged with its origin and category. Close items by deleting them; do not "soft-close" with strikethroughs. Line numbers were correct when each finding was written; re-check them before relying on them.
 
 Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR #N, /review YYYY-MM-DD)*`
 
@@ -12,8 +12,6 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 - [ ] **[M1]** `android/app/src/main/java/com/aynama/prayertimes/qibla/QiblaViewModel.kt` — `QiblaUiState.Ready.rawAzimuth`, `pitch`, `roll` are only consumed by `DebugOverlay`, which is gated by `SHOW_DEBUG=false`. Dead state in production builds; widens the data class API and forces `postUpdate`/`emitReady` to thread unused values. **Fix:** Drop the three fields from `Ready` and from the `postUpdate`/`emitReady` signatures. If the debug overlay stays, compute its values inline behind `SHOW_DEBUG`. *(Origin: PR #12, /review 2026-05-08)*
 
-- [ ] **[M4]** `QiblaViewModel.kt:101-102` — Comment "AXIS_X/AXIS_Z remap improves portrait-vertical stability but causes singularity when flat" describes a `remapCoordinateSystem` call that no longer exists (removed in commit `3ecbf69`). Reads stale. **Fix:** Rewrite to explicitly state the absence: "Intentionally NOT calling `remapCoordinateSystem(AXIS_X, AXIS_Z)` — it would improve vertical-portrait use but introduces a singularity in the flat-phone posture this compass targets." *(Origin: PR #12)*
-
 - [ ] **[M7]** `android/app/src/main/java/com/aynama/prayertimes/qibla/QiblaScreen.kt` — File is 614 lines holding screen entry, ReadyContent, BearingReadout, BearingChipsRow, BearingChip, DotSep, QiblaArrow, NorthGlyph, CalibrationBanner, three empty-state composables, DebugOverlay/DebugRow, plus two private helpers. Single-file monolith. **Fix:** Split into siblings under `qibla/`: `QiblaCompass.kt` (rose, arrow, north glyph), `QiblaReadout.kt` (BearingReadout + chips), `QiblaStates.kt` (Loading/NoProfile/NoSensor + CalibrationBanner), `QiblaA11y.kt` (`buildA11yDescription`, `bearingToCardinal`). Keep `QiblaScreen.kt` as the entry + `ReadyContent` orchestrator. *(Origin: PR #12)*
 
 - [ ] **[M8]** `android/app/src/main/java/com/aynama/prayertimes/ui/theme/AynamaTypography.kt:15` — `frauncesFamily` widened from `private` to `internal` so QiblaScreen could call `frauncesFamily(32f)` / `frauncesFamily(96f)` directly. Becomes a module-wide opsz factory; ad-hoc `TextStyle`s will keep duplicating around it (already happening in QiblaScreen). **Fix:** Keep `frauncesFamily` private; expose named `TextStyle` tokens from `AynamaTypography` (e.g. `DisplayLg`, `DisplayMd`, `TitleMd`) that bake in opsz, weight, letter-spacing, and feature settings. Have QiblaScreen consume those tokens. *(Origin: PR #12)*
@@ -21,8 +19,6 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 - [ ] **[M9]** `android/app/src/main/java/com/aynama/prayertimes/home/GradientColors.kt` — `gradientColorsFor` and `isLightPhase` live in package `com.aynama.prayertimes.home` as `internal` helpers, but QiblaScreen now imports them cross-package. The `home` package is acting as a de facto shared phase-styling module. **Fix:** Move `PrayerPhase`, `derivePhase`, `gradientColorsFor`, `isLightPhase` into a neutral package such as `com.aynama.prayertimes.ui.phase` (or `ui.theme.phase`); both home and qibla import from there. *(Origin: PR #12)*
 
 - [ ] **[M10]** `QiblaScreen.kt:580-587` — `PrayerPhase.displayName()` defined privately in QiblaScreen.kt; HomeScreen.kt has its own `Prayer.displayName()` and almost certainly will need the `PrayerPhase` mapping too. **Fix:** Move `PrayerPhase.displayName()` next to `PrayerPhase` itself (or into the new shared phase package from M9). *(Origin: PR #12)*
-
-- [ ] **[M11]** `QiblaViewModel.kt:85` — `lastSmoothed = -1f` sentinel for "never set" (azimuths are always ≥ 0). Brittle: easy to break if sensor ever yields negative or someone rounds. **Fix:** Replace with `Float?` (`lastSmoothed: Float? = null`); use `?:` / `!= null` checks. Removes the implicit invariant. *(Origin: PR #12)*
 
 ### Performance
 
@@ -38,15 +34,13 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ### Testing
 
-- [ ] **[T1]** `android/app/src/main/java/com/aynama/prayertimes/qibla/QiblaViewModel.kt` — Zero unit tests despite non-trivial logic: low-pass sin/cos filter convergence, azimuth unwrap delta math, profile-change cache invalidation (the C1 fix), magnetic-declination application, accuracy state mapping, null-sensor early-return path, single-flight `timesJob` dedup. **Fix:** Inject `SensorManager` (already done) + `Clock` / `() -> LocalDate`; add a JVM unit test with a fake `SensorManager` that drives `postUpdate` and asserts: (1) lowpass converges toward steady-state, (2) wrap from 359°→1° produces +2° unwrap not −358°, (3) profile change cancels in-flight `timesJob` and clears `cachedTimes`, (4) `sensor==null` transitions to `NoSensor`, (5) accuracy ints map to enum correctly, (6) midnight rollover does not flood coroutines. *(Origin: PR #12)*
-
 - [ ] **[T2]** `QiblaScreen.kt:601` — Private `bearingToCardinal()` has untested boundary cases at exact bin edges (22.5°, 67.5°, 337.5°, etc.) and overflow inputs. Negative azimuth from unwrapped float is normalized but never tested. **Fix:** Make `bearingToCardinal` `internal`/`@VisibleForTesting`; add tests for 0°, 22°, 23°, 67°, 68°, 112°, 157°, 158°, 202°, 247°, 292°, 337°, 359°, −90°, 720°. Also test `buildA11yDescription` 'straight ahead' vs 'turn right/left' boundary at diff=5° and diff=355°. *(Origin: PR #12)*
 
 - [ ] **[T3]** `android/app/src/main/java/com/aynama/prayertimes/home/GradientColors.kt` — Newly extracted pure functions `gradientColorsFor()` and `isLightPhase()` have zero direct tests. Used by both HomeScreen and QiblaScreen now; a regression silently breaks both surfaces. **Fix:** JVM unit test asserting (a) every `PrayerPhase` produces a non-null pair (exhaustive `when`), (b) `isLightPhase` returns true exactly for `{DHUHR, ASR, SUNRISE_TRANSITION}`, (c) specific top/bottom hex values for each phase to lock the design tokens. *(Origin: PR #12)*
 
 - [ ] **[T4]** `android/shared-logic/src/test/java/com/aynama/prayertimes/shared/QiblaCalculatorTest.kt:48` — Pole/antimeridian tests assert only `bearing in [0, 360)` — never the actual expected bearing. Pole singularity (`atan2(0,0)=0`) and antimeridian crossing (`dLng` wraps) are exactly where a sign or modulo bug would produce a wrong-but-in-range value and pass. **Fix:** Strengthen pole/antimeridian tests: assert specific great-circle bearings; add `bearingTo(Double.NaN, 0.0).isNaN()` and `bearingTo(Double.POSITIVE_INFINITY, 0.0).isNaN()` guards. *(Origin: PR #12)*
 
-- [ ] **[T5]** `QiblaViewModel.kt:211` — `cachedTimes` keyed by `LocalDate.now()` — hidden system-clock dependency. No test pins the clock, so a midnight-crossing during `postUpdate` silently recomputes; no test asserts cache invalidates at day rollover or that two calls within the same day reuse the cache. **Fix:** Inject a `Clock` or `() -> LocalDate` into `QiblaViewModel`; add tests for (1) two `postUpdate` calls with same fixed date hit cache once (verify `adhan.getPrayerTimes` called once via spy/fake), (2) date rollover triggers recomputation, (3) profile change nulls `cachedTimes`. *(Origin: PR #12)*
+- [ ] **[T5]** `QiblaViewModel.kt:194` — The `Clock` is now injected, and `QiblaViewModelTest` covers the same-day cache hit and cache clearing on profile change. Still untested: a date rollover (the clock advancing past midnight between two sensor frames) triggering exactly one recomputation. **Fix:** Add that test with a mutable fake `Clock`. *(Origin: PR #12; narrowed at the 2026-09-23 design-doc sync)*
 
 ### Adversarial / Cross-cutting
 
@@ -70,7 +64,7 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ### Maintainability
 
-- [ ] **[M1]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerViewModel.kt:84` — `val today = LocalDate.now()` captured inside `flatMapLatest`'s lambda — only re-evaluated when profile list re-emits. ViewModel surviving past midnight will keep stale `today`/`historyStart` values, causing incorrect "today" routing and the history window to stop sliding forward. Same hidden-clock dependency as Qibla T5. **Fix:** Inject `Clock` or `() -> LocalDate` into `TrackerViewModel`; trigger recomputation on date rollover (e.g. via a `clockFlow` similar to HomeViewModel) so `today`/`historyStart` advance without waiting for profile re-emit. *(Origin: PR #13)*
+- [ ] **[M1]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerViewModel.kt:87` — A `Clock` is now injected, but `today` and `historyStart` are still captured inside `flatMapLatest`, so they only update when the default profile re-emits. A ViewModel that survives past midnight keeps yesterday as "today": today's rows point at the wrong date and the history window stops sliding. (`TrackerScreen.kt:76` and `HomeScreen.kt:104` also `remember { LocalDate.now() }` for the sheet date.) **Fix:** Drive recomputation from a date-rollover flow, like HomeViewModel's `clockFlow`, so `today` and `historyStart` advance on their own. *(Origin: PR #13; narrowed at the 2026-09-23 design-doc sync)*
 
 - [ ] **[M2]** `android/app/src/main/java/com/aynama/prayertimes/tracker/TrackerViewModel.kt:72` — `prayerTimesCache: MutableMap<Pair<Long, LocalDate>, PrayerTimesResult>` grows unbounded across the ViewModel's lifetime. Bounded in practice by the 4-week window × profile count, but never evicts stale `(profileId, date)` keys after profile changes or window slides. **Fix:** Either evict entries whose date is outside `[historyStart, today]` after each window recompute, or replace with an LRU bounded by `28 × maxProfiles`. *(Origin: PR #13)*
 
@@ -82,7 +76,7 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ### Testing
 
-- [ ] **[T1]** `android/app/src/test/java/com/aynama/prayertimes/tracker/TrackerViewModelTest.kt` — Tests cover only pure helpers (`weekLabel`, in-line prayedCount predicate). No tests for `buildUiState`, `buildWeekSections`, `buildDayState`, `buildAggregate`, `markPrayer`, `toggleExpansion`, the flow chain, or the `Empty` branch. Regressions in week-section grouping, today-row construction, or expansion state will land silently. **Fix:** Add JVM tests with a fake `ProfileRepository`/`QazaRepository` that drive the ViewModel through Loaded/Empty transitions; assert week sections, aggregate text, expanded rows, and that `markPrayer` writes through to repository. Inject `Clock` (per M1) and a deterministic `AdhanWrapper` so prayer-time strings can be asserted. *(Origin: PR #13)*
+- [ ] **[T1]** `android/app/src/test/java/com/aynama/prayertimes/tracker/TrackerViewModelTest.kt` — Two ViewModel-driven tests now exist, covering the current-week aggregate and today-row tappability, with an injected `Clock`. Still untested: week-section grouping across several weeks, `toggleExpansion` and expanded rows, `markPrayer` writing through to the repository, and the `Empty` branch. **Fix:** Extend the existing fake-repository harness to cover those. *(Origin: PR #13; narrowed at the 2026-09-23 design-doc sync)*
 
 - [ ] **[T2]** `android/app/src/main/java/com/aynama/prayertimes/home/HomeViewModel.kt:128` — Newly added `markPrayer(profileId, prayer, date, status)` has zero direct tests. Repository call is one line, but it's the entry point for the Home ribbon's tap-to-mark flow and silently ignores failures (no exception channel). **Fix:** Add a unit test with a fake `QazaRepository` asserting `markPrayer` is called with the expected args; consider exposing a `Result`/error flow if user-facing failure feedback is desired later. *(Origin: PR #13)*
 
@@ -128,7 +122,7 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 - [ ] **[M10]** `SettingsScreen.kt:107-113,292-300` — Delete actions (both swipe-to-dismiss and the "Delete profile" button in the edit sheet) fire immediately without confirmation. Easy accidental loss of a manually-tuned profile with custom calculation method + madhab. **Fix:** Wrap `vm.delete(profile)` in an `AlertDialog` confirmation: title "Delete '${profile.name}'?", body "This will also cancel scheduled notifications for this profile.", confirm/cancel buttons. *(Origin: PR #15)*
 
-- [ ] **[M11]** `AndroidManifest.xml:13` — Declared `ACCESS_COARSE_LOCATION` only, but `getGpsLocation` tries `LocationManager.GPS_PROVIDER` in its fallback list. On Android 12+, coarse permission with GPS_PROVIDER returns "fudged" coordinates (~150m accuracy). Fine for prayer-time accuracy (`adhan-java` clamps lat/lng to 4 decimals anyway) but means the GPS_PROVIDER branch never actually gives better results than NETWORK_PROVIDER. Dead code path. **Fix:** Drop GPS_PROVIDER from the providers list (NETWORK_PROVIDER is sufficient for coarse) — OR — request `ACCESS_FINE_LOCATION` if precise GPS coords are wanted. *(Origin: PR #15)*
+- [ ] **[M11]** `SettingsScreen.kt:750-764` — The manifest now declares `ACCESS_FINE_LOCATION` too, and Qibla requests it. But the profile sheet still requests only `ACCESS_COARSE_LOCATION` (`SettingsScreen.kt:552-560`) while `getGpsLocation` also tries `GPS_PROVIDER`. With coarse-only, that branch returns the same fudged fix as `NETWORK_PROVIDER`. `location/CurrentLocationProvider.kt` already picks providers by granted permission and asks for a fresh fix. **Fix:** Use `AndroidCurrentLocationProvider` in the profile sheet; this also resolves M1. *(Origin: PR #15; updated at the 2026-09-23 design-doc sync)*
 
 ### Testing
 
@@ -190,12 +184,6 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ### Adversarial / Cross-cutting
 
-- [ ] **[A1]** `NotificationSettingsViewModel.kt:32` — `NotificationSettingsUiState.permissionGranted` defaults to `true`. On first composition, the Switch renders enabled; `loadPrefs()` (called in `init`) then re-reads `NotificationManagerCompat` and flips to "Enable in Settings →" if permission is denied. Brief flash of wrong UI on cold open. **Fix:** Read `NotificationManagerCompat.from(context).areNotificationsEnabled()` synchronously when constructing the initial state value (or make `permissionGranted: Boolean?` with `null = loading` and gate the row on non-null). *(Origin: PR #16)*
-
-- [ ] **[A2]** `NotificationSettingsScreen.kt:263` — `PrayerToggleRow.clickable(enabled = !permissionGranted)` makes the row tappable ONLY when permission is denied (to launch settings). When permission is granted, only the Switch's narrow hit area accepts taps — users tapping anywhere else on the row see nothing happen. iOS-style "tap row to toggle" expectation violated. **Fix:** Make the entire row clickable when permission is granted, calling `onToggle(!row.enabled)`; keep the existing settings-launch behavior when denied. *(Origin: PR #16)*
-
-- [ ] **[A3]** `NotificationSettingsScreen.kt:290-295` — Chevron `>` icon rendered after the Switch in every `PrayerToggleRow`. The row doesn't navigate — chevron implies "tap to drill in" but there's no destination. Misleading affordance. **Fix:** Drop the chevron entirely from `PrayerToggleRow`, OR wire it to a future per-prayer drill-in (custom adhan voice per prayer, per-prayer offset, etc.) if that's planned. *(Origin: PR #16)*
-
 - [ ] **[A4]** `SettingsScreen.kt:101-104` — `NotificationsEntryRow` placed at the TOP of the LazyColumn, above the "Profiles" header. Profiles is the primary content of the Settings screen; promoting Notifications above it changes the screen's information hierarchy. Reconsider — Notifications might fit better below Profiles, or in a dedicated bottom-of-screen "Preferences" group with future entries (Theme, Language, About). *(Origin: PR #16)*
 
 - [ ] **[A5]** `NotificationSettingsScreen.kt:279-289,363-373` — Switches have no a11y content description that includes the prayer name. TalkBack reads "Switch, On" / "Switch, Off" with no context. Users navigating with screen readers can't tell which prayer the focused Switch belongs to without backing up to read the preceding label. **Fix:** Wrap each Switch with `Modifier.semantics { contentDescription = "${row.name} notifications, ${if (row.enabled) "on" else "off"}" }` (or use `Modifier.toggleable` with a `Role.Switch` + onClickLabel for proper semantics). *(Origin: PR #16)*
@@ -225,8 +213,6 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 - [ ] **[N1]** `android/app/src/main/java/com/aynama/prayertimes/notifications/NotificationSettingsScreen.kt` — Developer comments left in the vibration/prayer-index wiring block: `// Vibration sheet — keep local state since we replaced the onClick placeholder above` and `// Actually wire vibration properly:` precede `val selectedIndex = state.selectedPrayerIndex`. Dead commentary. **Fix:** Remove the two comment lines. *(Origin: PR #17, /review 2026-05-23)*
 
 - [ ] **[N2]** `android/app/src/main/java/com/aynama/prayertimes/notifications/PrayerDetailSheet.kt:274` — `val valueColor = if (isActive) InkMuted else InkMuted` — both branches produce the same value. Dead branch. **Fix:** Replace with `val valueColor = InkMuted`. *(Origin: PR #17, /review 2026-05-23)*
-
-- [ ] **[N3]** `android/app/src/main/java/com/aynama/prayertimes/notifications/PrayerDetailSheet.kt:102` — Prayer name header uses `displaySmall`; the TODOS.md note says the intended style is `display-md`. **Fix:** Align to the spec — change `displaySmall` to `displayMedium` (or the equivalent opsz token once M8 from PR #12 is resolved). *(Origin: PR #17, /review 2026-05-23)*
 
 - [ ] **[N4]** `android/app/src/main/java/com/aynama/prayertimes/notifications/AlarmScheduler.kt` — `cancelForProfile` iterates `0 until REQUEST_CODE_MULTIPLIER` (= 20) to cancel PendingIntents, but the highest slot actually used is 14 (early-reminder base index 10 + prayer index 4). The bound is a hard constant, not derived from `EARLY_REMINDER_BASE_INDEX + MAX_PRAYER_INDEX`. If slot layout changes, the cancel loop and the constant will drift silently. **Fix:** Replace the literal `20` upper bound with `EARLY_REMINDER_BASE_INDEX + PRAYER_NAMES.size` so the cancel range is always exactly the set of possible slots. *(Origin: PR #17, /review 2026-05-23)*
 
@@ -259,6 +245,197 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 ### Maintainability
 
 - [ ] **[M12]** `android/app/src/main/java/com/aynama/prayertimes/widgets/PrayerWidget.kt` — Prayer identity is still a bare `String` shared between `scheduleRows()`, `timelineEvents()`, and the renderer. PR #21 introduced `SUNRISE_NAME` to stop the highlight logic drifting, but the other five names remain duplicated literals across the two builders. **Fix:** introduce a `PrayerId` enum (FAJR, SUNRISE, DHUHR, ASR, MAGHRIB, ISHA) carried by both `TimelineEvent` and `WidgetScheduleRow`, with display names resolved at render time; matching becomes compiler-checked and localisable. *(Origin: PR #21, /review 2026-08-06)*
+
+---
+
+## From design-doc sync — Android v1 vs DESIGN.md (2026-09-23)
+
+The Android v1 code was read end to end against DESIGN.md, which was then re-baselined. Where the app deliberately changed the design, the spec was updated. Where the app breaks a DESIGN.md rule, the rule stayed and the breach is listed here. DESIGN.md §21 is the index. When you fix one, delete it here **and** its row in DESIGN.md §21.
+
+How the evidence was gathered:
+- **Contrast:** WCAG 2.x relative luminance.
+- **Material 3 fallbacks:** read from the Compose Material 3 token sources (`ColorLightTokens`, `ColorDarkTokens`, `PaletteTokens`, `TypefaceTokens`, component tokens).
+- **Fonts:** the bundled TTFs were parsed (cmap, hmtx, GSUB, fvar, OS/2 tables).
+- **ICU:** run on the JVM with ICU4J 74.2.
+- **Not screenshotted:** nothing could be run on a device or emulator here. Items that depend on rendering say so.
+
+### Colour & contrast
+
+- [ ] **[DS1]** `android/app/src/main/java/com/aynama/prayertimes/ui/theme/AynamaTheme.kt:17-45` — Only 12 Material colour roles are set. Every other role falls back to Material's baseline palette:
+  - light: `surfaceContainer` `#F3EDF7`, `surfaceContainerLow` `#F7F2FA`, `surfaceContainerHigh` `#ECE6F0`, `surfaceContainerHighest` `#E6E0E9`, `secondaryContainer` `#E8DEF8`, `secondary` `#625B71`, `tertiaryContainer` `#FFD8E4`, `errorContainer` `#F9DEDC`
+  - dark: `#211F26`, `#1D1B20`, `#4A4458`, `#633B48`
+
+  These tint the navigation bar's container, active pill and selected label (`NavGraph.kt:56`), every `ModalBottomSheet`, the calculation-method dropdown, the time-picker dialog (lavender dial, pink AM/PM), and the swipe-to-delete background (`SettingsScreen.kt:143`). That breaks DESIGN.md §10's "no purple/indigo". Separately, `onPrimary` is parchment in light mode, which is 2.99:1 on saffron.
+
+  **Fix:** Set every role in both schemes from the tokens: `surfaceContainer*` as parchment/ink steps, `secondaryContainer` as parchment-muted, `tertiary*` from the saffron family, `error*` from a new destructive pair (DS19). Make `onPrimary` ink in light mode. Add a JVM test that fails if any role still equals its Material baseline value. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS2]** Saffron (`#B87A2E`) text on parchment is **2.99:1** — below AA at every size. It appears here:
+  - `MarkPrayerSheet.kt:112` — the selected option
+  - `NotificationSettingsScreen.kt:271` — profile picker name
+  - `NotificationSettingsScreen.kt:353` — "Enable in Settings →"
+  - `NotificationSettingsScreen.kt:582` — vibration sheet
+  - `PrayerDetailSheet.kt:219` — "Preview adhan"
+  - `PrayerDetailSheet.kt:335` — "OK"
+  - `PrayerDetailSheet.kt:387` and `:441` — offset and early-reminder sheets
+  - `WidgetConfigureActivity.kt:199,206` — via `colorScheme.primary`
+  - Material defaults that use `primary` as text: the "Change" `TextButton` (`SettingsScreen.kt:508`) and focused `OutlinedTextField` labels
+  - widgets: `widget_next_prayer.xml:23`, `widget_next_prayer_dated.xml:66`, and the 4×2 highlight at `PrayerWidget.kt:538-553`
+
+  The Qibla screen already does this right: it uses `SaffronInk` (4.92:1) on light phases.
+
+  **Fix:** Use `SaffronInk` for saffron text on light surfaces. Add `aynama_saffron_ink` to `colors.xml` for the widgets. Override text colours on Material components that default to `primary`, but keep saffron for fills. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS3]** `HomeScreen.kt:326-337` and `:237-243`, with `GradientColors.kt:5-12` — Timeline text is 20 sp at weight 500, which is body size, so it needs 4.5:1. Estimated at row positions on a ~700 dp pager, it fails in these places:
+  - **Asr phase:** passed rows and the Sunrise row in `ink-muted`, about 2.4–2.8:1. The Qaḍā line (ink at 60%) is about 2.75:1.
+  - **Sunrise phase:** about 3.9–4.1:1.
+  - **Dhuhr phase:** the Qaḍā line, 4.17:1.
+  - **Fajr and Maghrib:** the current row in saffron, about 4.36:1.
+
+  DESIGN.md §3 has the full table.
+
+  **Fix:** Give each phase muted and current colours that pass against the gradient under each row — for example, ink at full opacity with the ✓ for passed rows on Asr, and a darker accent on Fajr and Maghrib. Or put a quiet scrim behind the ribbon. Add a JVM contrast test over phase × row position. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS4]** Dark mode: utilitarian screens hard-code light-theme colours.
+  - `PrayerDetailSheet.kt:104` sets the sheet header to `Ink`, which is about 1:1 on the dark sheet — invisible.
+  - `AdhanPickerScreen.kt:116` (labels) and `:151` (radio stroke) use `Ink` on an ink background — invisible.
+  - `InkMuted` is used for secondary text on ink (3.02:1) across the Tracker, Notifications, the profile sheet's time-zone sub-label, and the mark sheet.
+  - The Ramadan Imsak tint (`NotificationSettingsScreen.kt:471`) puts `ParchmentMuted` behind parchment text: 1.37:1.
+
+  **Fix:** Use `colorScheme.onSurface` and `onSurfaceVariant` rather than token constants on utilitarian screens. Add a dark-mode Compose or screenshot test. *(Origin: design-doc sync 2026-09-23)*
+
+### Typography
+
+- [ ] **[DS5]** `AynamaTypography.kt:47-96` — Only 8 of Material's 15 type slots are defined. `headlineLarge`, `headlineSmall`, `titleLarge`, `titleMedium`, `titleSmall`, `labelLarge` and `labelSmall` fall back to `FontFamily.SansSerif` — Roboto on stock Android. Where that shows:
+  - **`labelLarge`** styles every `Button`, `TextButton`, `OutlinedButton` and `DropdownMenuItem`. So Roboto renders in "Save", "Create profile", "Delete profile", "Use current location", "Change", Shāfiʻī/Ḥanafī, "OK"/"Cancel", the widget-config "Cancel", and the method list.
+  - **`labelSmall`** is used directly at `SettingsScreen.kt:205,213` (the Hijri adjustment buttons) and `PrayerDetailSheet.kt:148` ("ALERT TIME").
+  - **`titleMedium`** styles the time picker's AM/PM.
+
+  That breaks DESIGN.md §4 and §10.
+
+  **Fix:** Define all 15 slots from the tokens. For example, `labelLarge` as IBM Plex Sans 500 at 15 sp, `labelSmall` as Plex 500 at 11 sp with tracking, `titleMedium` as Plex 500 at 16 sp. Move `mono-num` out of `labelMedium` (DS20). *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS9]** `HomeScreen.kt:210`, `QiblaScreen.kt:377`, and the widget `Chronometer`s — The bundled `fraunces.ttf` has **proportional** figures: at the default instance, "1" is 1024/2000 em and "0" is 1461. The file also has no `tnum` feature in GSUB. So `fontFeatureSettings = "tnum"` does nothing, and the centred countdown hero re-centres each time its digits change: every minute, then every second in the final minute. That breaks DESIGN.md §4's "must not drift". IBM Plex Sans digits are already tabular (all 600/1000 em), so the Plex `tnum` settings are redundant but harmless.
+
+  **Fix:** Set changing numerals in IBM Plex Sans, or bundle a Fraunces build with tabular figures. Remove the no-op `tnum` settings, or leave a comment saying why they do nothing. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS10]** `res/layout/widget_*.xml` (e.g. `widget_next_prayer.xml:19`, `:44`) — RemoteViews `TextView`s load `@font/fraunces` without variation settings, so they get the file's default instance: wght 900 (Black) at opsz 9. Its `usWeightClass` is 900, so `textStyle="bold"` adds nothing. DESIGN.md §4 uses Fraunces 400/500. This is the expected platform behaviour but unverified on a device.
+
+  **Fix:** Check on a device. If confirmed, bundle static Fraunces instances for widgets — for example 500 at opsz 20 and 32. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS20]** `AynamaTypography.kt:90-95` and `NavGraph.kt:49-55` — `mono-num` sits in Material's `labelMedium` slot, which Material also uses for navigation-bar labels. So nav labels render at 17 sp against Material's 12 sp default, which is what led to capping nav font scale at 1.3× (PR #12 A6). `mono-num` also lacks the tabular setting its name promises; that's harmless for IBM Plex Sans.
+
+  **Fix:** Make `mono-num` a named style outside Material's slots, and give `labelMedium` a nav-appropriate size. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS23]** Inconsistent transliteration:
+  - `HomeScreen.kt:239` says "Qaḍā"; `MarkPrayerSheet.kt:77` says "Qada"; entity names say "Qaza".
+  - `NotificationSettingsScreen.kt:486` says "Ramadan Imsak"; `HomeScreen.kt:517` says "Ramaḍān Mubārak".
+
+  **Fix:** Pick one form per term (DESIGN.md §4, Copy & transliteration) and apply it through `strings.xml` (PR #14 L1). *(Origin: design-doc sync 2026-09-23)*
+
+### Composition, iconography & motion
+
+- [ ] **[DS6]** `HomeScreen.kt:358-373` (and `:228-235`) — The prayer timeline has no vertical rule and no moving tick; "current" is a static 8 dp dot. That's DESIGN.md §9's second deliberate departure, and TODOS Phase 2 had it checked off.
+
+  **Fix:** Build it: a 1.5 dp rule in the muted token through the mark column, and a tick placed between the current and next rows by the elapsed fraction of that interval. Use the existing 1 s clock, and move the tick at most once a minute. Otherwise, amend §9 through the DESIGN.md §14 process. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS8]** `AndroidManifest.xml:15-20` and `res/values/themes.xml:3` — The app has no `android:icon` or `android:roundIcon`, so the launcher, recents, system settings and the Android 12+ splash show the platform's default icon. The window theme is `android:Theme.Material.NoActionBar`, so the launch window before Compose draws is the platform's dark grey, not `ink`.
+
+  **Fix:** Design an adaptive launcher icon with a monochrome layer (DESIGN.md §6). Give `Theme.Aynama` window and splash colours from the tokens. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS17]** `HomeScreen.kt:544` — The empty-state Kaaba mark is the 🕋 emoji, which renders in the system colour-emoji font as a black cube with a gold band. DESIGN.md §6 asks for a custom abstract Kaaba mark and forbids gold ornament.
+
+  **Fix:** Draw the mark as a vector in token colours. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS18]** `NavGraph.kt:74-79` and `MainActivity.kt:29` — `Scaffold`'s default `contentWindowInsets` (`WindowInsets.systemBarsForVisualComponents`) pads the `NavHost` below the status bar. The time-of-day surface stops there, and the strip shows `colorScheme.background` — parchment in light mode, even above the dark Isha surface. That breaks DESIGN.md §11's "status bar matches current surface". The code is certain; the visual effect hasn't been screenshotted.
+
+  **Fix:** Pass `contentWindowInsets = WindowInsets(0)`. Let Home and Qibla draw behind the bar and pad only their content. Set the status-bar icon appearance per phase from `isLightPhase`. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS19]** `QiblaScreen.kt:513,523`, `HomeScreen.kt:510`, `SettingsScreen.kt:143,455` — Colours outside the token set: the calibration amber (`#7A5800` with `#FFF3CD`), the Ramadan banner's oxblood (`#6B2E2A`, a gradient stop reused), and Material's baseline error red for deleting.
+
+  **Fix:** Add named tokens — for example `caution`, `oxblood`, `destructive` — checked against ink and parchment, or map these to existing tokens. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS21]** `NavGraph.kt:34-39` and `:59` — Nav icons are the filled `Icons.Default` set in both states; DESIGN.md §6 wants stroke icons, filled only for the active tab. Also, `selected = currentRoute == screen.route` leaves no tab selected on `settings/notifications` and `settings/notifications/adhan`.
+
+  **Fix:** Use outlined icons for unselected tabs and filled for the selected one. Match selection against the destination hierarchy. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS22]** `res/drawable/ic_notification.xml` — The notification small icon is a crescent (two circles combined even-odd). That's next to the crescent-and-star motif DESIGN.md §6 and §10 forbid, and hard to read (PR #14 V1).
+
+  **Fix:** Decide the glyph (for example the Qibla arrow or an abstract Kaaba mark) and draw a monochrome version. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS26]** `HomeScreen.kt:142-149` — The Ramadan banner is overlaid 8 dp from the top, so while it shows it covers the header line (profile · method, Hijri date) and the top of the countdown hero.
+
+  **Fix:** Put it in the column above the header so it pushes content down, or dock it above the page dots. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS28]** `HomeScreen.kt:208-224`, and reduced motion is checked nowhere — DESIGN.md §8's 400 ms prayer-transition cross-fade isn't implemented: the hero and timeline text swap instantly at each boundary. There's no app-level reduced-motion handling either (§12).
+
+  **Fix:** Use `AnimatedContent`/`Crossfade` keyed on the next prayer. Honour the system's remove-animations setting by shortening or skipping the 3 s surface fade. *(Origin: design-doc sync 2026-09-23)*
+
+### Behaviour & states
+
+- [ ] **[DS7]** `RamadanDetector.kt:39-40` and `SettingsScreen.kt:439-441` — **The Hijri adjustment lapses on the wrong day.**
+  - **+1:** set for Ramadan, it lapses on the user's own 1 Shawwāl, because the adjusted date has left Ramadan. The app then falls back to the calculated calendar, where that day is still 30 Ramaḍān. So on Eid, Home shows the Imsak row, the Ramadan banner and "30 Ramaḍān". If this is the "Alerts for" profile, the scheduler also arms an Imsak alarm for Eid morning.
+  - **−1:** set on the calculated 1 Ramadan, it's pinned to Shaʻbān and lapses the next day, so Ramadan's end is never delayed.
+
+  `RamadanDetectionTest.effectiveOffset_newPerceivedMonth_resetsToZero` pins the lapse itself, but nothing checks the resulting Ramadan state. This is religious correctness, so treat it as high severity.
+
+  **Fix:** Choose the rule. One option: keep the offset until the user changes it. Another: lapse only once both the calculated and adjusted dates have left the pinned month, and never re-enter Ramadan after the adjusted Ramadan ends. Add tests asserting `isRamadan` is false on the user's Eid for both +1 and −1. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS11]** `RamadanDetector.kt:58-63` — `IslamicCalendar(TimeZone)` without `setCalculationType` lets ICU pick the variant from the device locale's region, via CLDR calendar preferences. Saudi-region locales get `islamic-umalqura`; every other region gets `islamic-civil`. That was checked with ICU4J 74.2 for US, GB, SA, AE, EG, PK, ID, MY, TR, IR, QA, KW and BD.
+  - The two variants gave different dates on 655 of 1,095 days in 2025–2027, and disagreed on whether it was Ramadan on 2 days.
+  - So the same profile shows different Hijri dates, and can show different Ramadan windows, on different phones. The ±2 adjustment is relative to whichever variant the device picked.
+  - `architecture-design.md` said "Umm al-Qura by default".
+
+  **Fix:** Choose a calculation type explicitly, document it in DESIGN.md §18, and optionally make it a per-profile setting. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS12]** `QiblaViewModel.kt:219,244` and `TrackerViewModel.kt:87,243` — Qibla computes prayer times in the device zone and takes its phase from device-local time. Tracker computes its scheduled times and "today" in the device zone. Home, alarms and widgets use `profile.effectiveZoneId()`. With "Use location time zone" on and the device somewhere else, Qibla's surface and the Tracker's times disagree with Home.
+
+  **Fix:** Use `effectiveZoneId()` for both the times and "now" in both ViewModels. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS13]** Time formats disagree. The same time reads "4:14 PM" on Home and "16:14" in Notifications.
+  - Always 12-hour ("h:mm a"): Home (`HomeViewModel.kt:114`) and Tracker (`TrackerViewModel.kt:75`).
+  - Always 24-hour ("HH:mm"): Notifications, including the detail-sheet header (`NotificationSettingsViewModel.kt:26`).
+  - Always 12-hour: the fixed-time row (`PrayerDetailSheet.kt:61-72`, PR #17 N6).
+  - Follow the device's 12/24-hour setting: the widgets (`PrayerWidget.kt:280-283`) and the time picker.
+
+  **Fix:** Use one shared formatter that honours `DateFormat.is24HourFormat` and the locale. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS14]** `NotificationHelper.kt:67-103`, `PrayerAlarmReceiver.kt:33-44`, `AdhanService.kt:36-38` — Alerts as delivered:
+  - **(a)** Prayer notifications have no content intent, so tapping one does nothing and `setAutoCancel` never fires.
+  - **(b)** Imsak alarms use the prayer template ("It is time for Imsak prayer") and start the adhan service.
+  - **(c)** The ongoing "Adhan · Playing…" notification has no stop action.
+  - **(d)** Every voice plays the system notification sound; there's no bundled adhan audio, and previews show a toast.
+
+  **Fix:**
+  - (a) Add a content intent that opens Home.
+  - (b) Give Imsak its own copy (e.g. "Imsak — Fajr in 10 minutes") and no adhan.
+  - (c) Add a "Stop" action.
+  - (d) Ship the adhan assets, or hide the voice choice until they exist.
+
+  *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS15]** `MarkPrayerSheet.kt:70-87` and `TrackerScreen.kt:342-348` — Two problems in the mark sheet and history squares:
+  - "I prayed this" (on time) is offered for any date. DESIGN.md §16 allows it only within the prayer's window and greys it out for past days.
+  - `MISSED`, `INTENTION_TO_MAKEUP` and unmarked all render as the same empty square.
+
+  **Fix:** Decide the rule. If it stays, disable "on time" outside the window, and give "missed" a mark distinct from "unmarked". *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS16]** `NotificationSettingsViewModel.kt:193-213` — If the "Alerts for" profile has no computable times (polar day or night), `loadPrayerTimes` returns at line 213, before it sets `profiles`, `notificationProfile` or `prayerRows` (lines 223-247). The result: PRAYERS is empty, the profile row shows "—", and the Profile Picker opens with no rows, so the user can't switch away from this screen. The code comment says the rows stay "without a clock value"; in fact they don't render at all.
+
+  **Fix:** Set `profiles` and `notificationProfile` before computing times. On failure, build the rows with "--:--". *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS24]** `HomeScreen.kt:581-607` and `HomeViewModel.kt:159` — Home's error state shows "Something went wrong" and the raw exception message. There's no cause-specific copy and no recovery action, which the interaction-states table in `architecture-design.md` requires.
+
+  **Fix:** Map known failures to a plain-language cause with one action, and log the exception rather than displaying it. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS25]** `QiblaScreen.kt:508-527` and `HomeScreen.kt:500` — Two TalkBack gaps:
+  - The calibration banner isn't a live region, so TalkBack users aren't told calibration is needed. `architecture-design.md` asks for a live-region announcement.
+  - Each page dot is a separate focus stop that announces "Page N", duplicating the pager's own page semantics.
+
+  **Fix:** Set `liveRegion = Polite` on the banner. Give the dot row a single description, such as "Page 2 of 4", with `clearAndSetSemantics`. *(Origin: design-doc sync 2026-09-23)*
+
+- [ ] **[DS27]** `TrackerScreen.kt:251-256` and `:270` — `DayRow`'s today branch ("Today · Sep 23" in saffron) never runs, because history ends at yesterday (`TrackerViewModel.kt:167-170`).
+
+  **Fix:** Delete the branch, which also removes a saffron-text use (DS2). *(Origin: design-doc sync 2026-09-23)*
 
 ---
 

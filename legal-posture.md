@@ -4,6 +4,8 @@ Sub-spec of `architecture-design.md`. Covers license obligations for all bundled
 
 ## Code: Adhan library (Batoul Apps, Apache 2.0)
 
+> The licence is still to be verified. The adhan2-jvm POM says MIT, and the adhan 1.2.1 POM has no licence tag (TODOS.md, Supply-chain). Confirm it before relying on the obligations below.
+
 **Obligation (Apache 2.0 §4):**
 - Include full Apache 2.0 license text with distribution.
 - Preserve copyright, patent, trademark, and attribution notices.
@@ -17,6 +19,26 @@ Sub-spec of `architecture-design.md`. Covers license obligations for all bundled
 - If we modify Adhan source, mark the modification in the file header and in `CHANGES.md` per Apache §4(b).
 
 **Strategy:** ship unmodified Adhan releases when possible. Prefer raising issues/PRs upstream over forking. If we must fork, make the fork public and named clearly (`aynama-prayer-times/adhan-kotlin-fork`).
+
+## Fonts (bundled in Android v1)
+
+| Font | File | Copyright (from the font's `name` table) | Licence |
+|---|---|---|---|
+| Fraunces (variable) | `android/app/src/main/res/font/fraunces.ttf` | "Copyright 2020 The Fraunces Project Authors (github.com/undercasetype/Fraunces)" | SIL Open Font License 1.1 |
+| IBM Plex Sans (variable) | `android/app/src/main/res/font/ibm_plex_sans.ttf` | "Copyright 2019 IBM Corp. All rights reserved." | SIL Open Font License 1.1 |
+
+The copyright and licence notices (name IDs 0, 13, 14) were read directly from the bundled files on 2026-09-23.
+
+**What OFL 1.1 requires** (licence text at the URL embedded in both fonts: <https://scripts.sil.org/OFL>):
+- The fonts may be bundled and redistributed with the app, but not sold on their own.
+- Each copy must carry the copyright notice and the licence. Machine-readable metadata inside the font counts only "as long as those fields can be easily viewed by the user". A TTF buried in an APK arguably isn't easily viewable.
+- Modified versions may not use any Reserved Font Name. Subsetting or instancing — for example, making static widget weights (DS10 in `REVIEW-FINDINGS.md`) — creates a modified version, so check each font's Reserved Font Names before doing that.
+
+**Implementation:**
+- Add both fonts, with the full OFL 1.1 text, to the About / licences screen.
+- Keep the TTFs unmodified.
+
+Tracks 2–4 (IBM Plex Sans Arabic, KFGQPC Uthman Taha Naskh, Amiri Quran) aren't bundled yet. Check their licences when they are; KFGQPC's terms in particular are still unverified.
 
 ## Text: Quran (Arabic script)
 
@@ -62,14 +84,14 @@ Sub-spec of `architecture-design.md`. Covers license obligations for all bundled
 
 ## License of this project
 
-- **Code:** MIT or Apache 2.0 (choose before first public release; lean Apache 2.0 to match Adhan upstream and simplify derivative compliance).
+- **Code:** Apache License 2.0 — decided; `LICENSE` in the repo root (adopted 2026-04-24, commit `77ef0c6`).
 - **Test vectors:** CC0 or MIT — they're factual data, should be permissive to encourage adoption.
 - **Documentation:** CC BY 4.0.
 
 ## Blocks on first public release
 
 - [ ] Adhan NOTICE / LICENSE files vendored.
-- [ ] About screen with Adhan + Tanzil attribution.
+- [ ] About screen with Adhan + Tanzil attribution — plus Fraunces and IBM Plex Sans (OFL 1.1). Android v1 has no About screen yet.
 - [ ] Google Play listing includes license note.
-- [ ] Chosen project license (MIT vs Apache 2.0) decided and `LICENSE` file in repo root.
+- [x] Chosen project license decided (Apache 2.0) and `LICENSE` file in repo root.
 - [ ] Trademark clearance on "aynama" (moved to TODOS.md).
