@@ -22,18 +22,23 @@ fun interface CurrentLocationProvider {
     suspend fun current(): Pair<Double, Double>?
 }
 
+// Before Android 12, GPS_PROVIDER needs FINE. From 12 on, COARSE (the user's "Approximate") may use
+// it too and gets a blurred fix, which is the only fix there is when network location is turned off.
+internal fun locationProviders(hasFine: Boolean, sdkInt: Int): List<String> =
+    if (hasFine || sdkInt >= Build.VERSION_CODES.S) {
+        listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
+    } else {
+        listOf(LocationManager.NETWORK_PROVIDER)
+    }
+
 class AndroidCurrentLocationProvider(context: Context) : CurrentLocationProvider {
 
     private val appContext = context.applicationContext
     private val lm = appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
-    // GPS_PROVIDER requires FINE permission on API 31+; NETWORK_PROVIDER works with COARSE.
-    private val coarseProviders = listOf(LocationManager.NETWORK_PROVIDER)
-    private val fineProviders = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-
     override suspend fun current(): Pair<Double, Double>? {
         if (!hasCoarsePermission()) return null
-        val providers = if (hasFinePermission()) fineProviders else coarseProviders
+        val providers = locationProviders(hasFinePermission(), Build.VERSION.SDK_INT)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             for (provider in providers) {
