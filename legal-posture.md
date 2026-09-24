@@ -2,21 +2,18 @@
 
 Sub-spec of `architecture-design.md`. Covers license obligations for all bundled code and text.
 
-## Code: Adhan library (Batoul Apps, Apache 2.0)
+## Code: Adhan library (Batoul Apps, MIT)
 
-> The licence is still to be verified. The adhan2-jvm POM says MIT, and the adhan 1.2.1 POM has no licence tag (TODOS.md, Supply-chain). Confirm it before relying on the obligations below.
+> Verified 2026-09-24: `batoulapps/adhan-java` (the repo is now `batoulapps/adhan-kotlin`) and `batoulapps/adhan-swift` both ship the MIT License, © 2016 Batoul Apps. The adhan 1.2.1 POM has no licence tag, so the upstream `LICENSE` governs.
 
-**Obligation (Apache 2.0 §4):**
-- Include full Apache 2.0 license text with distribution.
-- Preserve copyright, patent, trademark, and attribution notices.
-- Propagate `NOTICE` file contents (if any) into derivative work.
-- State changes if the library is modified.
+**Obligation (MIT):**
+- Include the copyright notice and the MIT permission notice in all copies or substantial portions of the library.
 
 **Implementation:**
-- Copy `LICENSE` and `NOTICE` from upstream Adhan repos (Adhan-Kotlin, Adhan-Swift) into `/third_party/adhan-kotlin/` and `/third_party/adhan-swift/`.
-- In-app About screen: "Powered by Adhan by Batoul Apps — Apache License 2.0. [View license]."
+- Copy `LICENSE` from the upstream Adhan repos (Adhan-Kotlin, Adhan-Swift) into `/third_party/adhan-kotlin/` and `/third_party/adhan-swift/`.
+- In-app About screen: "Powered by Adhan by Batoul Apps — MIT License. [View license]."
 - Google Play / App Store listings: attribution in the description or linked docs page.
-- If we modify Adhan source, mark the modification in the file header and in `CHANGES.md` per Apache §4(b).
+- If we modify Adhan source, keep the MIT notice in the modified files.
 
 **Strategy:** ship unmodified Adhan releases when possible. Prefer raising issues/PRs upstream over forking. If we must fork, make the fork public and named clearly (`aynama-prayer-times/adhan-kotlin-fork`).
 
@@ -31,12 +28,12 @@ The copyright and licence notices (name IDs 0, 13, 14) were read directly from t
 
 **What OFL 1.1 requires** (licence text at the URL embedded in both fonts: <https://scripts.sil.org/OFL>):
 - The fonts may be bundled and redistributed with the app, but not sold on their own.
-- Each copy must carry the copyright notice and the licence. Machine-readable metadata inside the font counts only "as long as those fields can be easily viewed by the user". A TTF buried in an APK arguably isn't easily viewable.
-- Modified versions may not use any Reserved Font Name. Subsetting or instancing — for example, making static widget weights (DS10 in `REVIEW-FINDINGS.md`) — creates a modified version, so check each font's Reserved Font Names before doing that.
+- Each copy must carry the copyright notice and the licence. Machine-readable metadata inside the font counts only "as long as those fields can be easily viewed by the user". A TTF buried in an APK arguably isn't easily viewable. In any case, both fonts' name ID 13 holds only a one-line pointer to the licence, not its text, so the metadata can't satisfy this on its own: ship the OFL text.
+- Modified versions may not use any Reserved Font Name. Subsetting or instancing — for example, making static widget weights (DS10 in `REVIEW-FINDINGS.md`) — creates a modified version. IBM Plex's licence reserves the name "Plex", so a modified Plex must be renamed; Fraunces's licence reserves no name.
 
 **Implementation:**
 - Add both fonts, with the full OFL 1.1 text, to the About / licences screen.
-- Keep the TTFs unmodified.
+- Keep the bundled TTFs unmodified. Static instances derived for widgets (DS10) are modified versions: fine for Fraunces, which reserves no name, as long as they stay under OFL 1.1.
 
 Tracks 2–4 (IBM Plex Sans Arabic, KFGQPC Uthman Taha Naskh, Amiri Quran) aren't bundled yet. Check their licences when they are; KFGQPC's terms in particular are still unverified.
 
@@ -90,7 +87,7 @@ Tracks 2–4 (IBM Plex Sans Arabic, KFGQPC Uthman Taha Naskh, Amiri Quran) aren'
 
 ## Blocks on first public release
 
-- [ ] Adhan NOTICE / LICENSE files vendored.
+- [ ] Adhan `LICENSE` files vendored (MIT).
 - [ ] About screen with Adhan + Tanzil attribution — plus Fraunces and IBM Plex Sans (OFL 1.1). Android v1 has no About screen yet.
 - [ ] Google Play listing includes license note.
 - [x] Chosen project license decided (Apache 2.0) and `LICENSE` file in repo root.

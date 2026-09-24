@@ -40,6 +40,8 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 - [ ] **[T4]** `android/shared-logic/src/test/java/com/aynama/prayertimes/shared/QiblaCalculatorTest.kt:48` — Pole/antimeridian tests assert only `bearing in [0, 360)` — never the actual expected bearing. Pole singularity (`atan2(0,0)=0`) and antimeridian crossing (`dLng` wraps) are exactly where a sign or modulo bug would produce a wrong-but-in-range value and pass. **Fix:** Strengthen pole/antimeridian tests: assert specific great-circle bearings; add `bearingTo(Double.NaN, 0.0).isNaN()` and `bearingTo(Double.POSITIVE_INFINITY, 0.0).isNaN()` guards. *(Origin: PR #12)*
 
+- [ ] **[T1]** `QiblaViewModel.kt:121-123,226` — `QiblaViewModelTest` now covers most of the original T1, but not two cases. (a) A profile change while profile A's times are still being fetched: the test lets A's fetch finish before switching, so `timesJob?.cancel()` and the `capturedProfileId` guard never run. (b) Declination: every test stubs `GeomagneticField.declination` to 0f. **Fix:** On a `StandardTestDispatcher`, switch profile mid-fetch and assert A's result neither fills the cache nor emits `Ready` for B; assert a non-zero declination shifts the emitted azimuth. *(Origin: PR #12; narrowed at the 2026-09-24 review)*
+
 - [ ] **[T5]** `QiblaViewModel.kt:194` — The `Clock` is now injected, and `QiblaViewModelTest` covers the same-day cache hit and cache clearing on profile change. Still untested: a date rollover (the clock advancing past midnight between two sensor frames) triggering exactly one recomputation. **Fix:** Add that test with a mutable fake `Clock`. *(Origin: PR #12; narrowed at the 2026-09-23 design-doc sync)*
 
 ### Adversarial / Cross-cutting
@@ -102,7 +104,7 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ### Maintainability
 
-- [ ] **[M1]** `android/app/src/main/java/com/aynama/prayertimes/settings/SettingsScreen.kt:538-552` — `getGpsLocation` uses `LocationManager.getLastKnownLocation()`, a known-unreliable API. Returns `null` when no app has recently requested location (very common on fresh devices), returns stale data (could be hours/days old), and on Android 12+ with COARSE-only permission returns "fudged" coordinates for `GPS_PROVIDER`. Users on rarely-used devices will frequently get null with no feedback. **Fix:** Add `com.google.android.gms:play-services-location`, replace with `FusedLocationProviderClient.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, CancellationTokenSource().token)` (returns a fresh fix, not last-known). *(Origin: PR #15, /review 2026-05-16)*
+- [ ] **[M1]** `android/app/src/main/java/com/aynama/prayertimes/settings/SettingsScreen.kt:538-552` — `getGpsLocation` uses `LocationManager.getLastKnownLocation()`, a known-unreliable API. Returns `null` when no app has recently requested location (very common on fresh devices), returns stale data (could be hours/days old), and on Android 12+ with COARSE-only permission returns "fudged" coordinates for `GPS_PROVIDER`. Users on rarely-used devices will frequently get null with no feedback. **Fix:** Use `location/CurrentLocationProvider.kt` (`AndroidCurrentLocationProvider`), which asks the platform for a fresh fix without Play services and keeps the app F-Droid-compatible (see PR #15 M11). *(Origin: PR #15, /review 2026-05-16; fix updated at the 2026-09-24 review)*
 
 - [ ] **[M2]** `SettingsScreen.kt:397-402` — GPS silent failure. Tap "Use current location" → `isSearching = false` fires immediately, then `onGpsRequested()` launches async. If `getGpsLocation()` returns null (no provider enabled, no last-known fix), the lambda quietly does nothing and the user is left staring at the "selected" UI with the previous (or empty) label. No Snackbar, no toast, no error state. Combines with M1 — already-flaky API made invisible by no error path. **Fix:** Convert `onGpsRequested` to suspend or return `Boolean`/`Result`; set `isSearching = false` only on success; on null, surface a Snackbar ("Location unavailable. Try search instead.") and keep the search UI visible. *(Origin: PR #15)*
 
@@ -122,11 +124,11 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 - [ ] **[M10]** `SettingsScreen.kt:107-113,292-300` — Delete actions (both swipe-to-dismiss and the "Delete profile" button in the edit sheet) fire immediately without confirmation. Easy accidental loss of a manually-tuned profile with custom calculation method + madhab. **Fix:** Wrap `vm.delete(profile)` in an `AlertDialog` confirmation: title "Delete '${profile.name}'?", body "This will also cancel scheduled notifications for this profile.", confirm/cancel buttons. *(Origin: PR #15)*
 
-- [ ] **[M11]** `SettingsScreen.kt:750-764` — The manifest now declares `ACCESS_FINE_LOCATION` too, and Qibla requests it. But the profile sheet still requests only `ACCESS_COARSE_LOCATION` (`SettingsScreen.kt:552-560`) while `getGpsLocation` also tries `GPS_PROVIDER`. With coarse-only, that branch returns the same fudged fix as `NETWORK_PROVIDER`. `location/CurrentLocationProvider.kt` already picks providers by granted permission and asks for a fresh fix. **Fix:** Use `AndroidCurrentLocationProvider` in the profile sheet; this also resolves M1. *(Origin: PR #15; updated at the 2026-09-23 design-doc sync)*
+- [ ] **[M11]** `SettingsScreen.kt:750-764` — The manifest now declares `ACCESS_FINE_LOCATION` too, and Qibla requests it. But the profile sheet still requests only `ACCESS_COARSE_LOCATION` (`SettingsScreen.kt:552-560`) while `getGpsLocation` also tries `GPS_PROVIDER`. With coarse-only, that branch returns a fudged fix on Android 12+ and throws a swallowed `SecurityException` on Android 8–11 (`SettingsScreen.kt:759`), so it never beats `NETWORK_PROVIDER`. `location/CurrentLocationProvider.kt` already picks providers by granted permission and asks for a fresh fix. **Fix:** Use `AndroidCurrentLocationProvider` in the profile sheet; this also resolves M1. *(Origin: PR #15; updated at the 2026-09-23 design-doc sync)*
 
 ### Testing
 
-- [ ] **[T1]** `settings/SettingsViewModel.kt` — Zero tests. Insert path computes sortOrder + schedules alarm, update path schedules alarm, delete path cancels alarm. All untested. Regressions in sortOrder math, alarm scheduling on edit, or alarm cancellation on delete will land silently. **Fix:** JVM unit test with a fake `ProfileRepository` and a spy `AlarmScheduler` (extract its scheduling API behind an interface or test the static functions via the static-mock pattern); assert (a) insert assigns sortOrder = profiles.size, calls `scheduleForProfile` with the new id; (b) update calls `scheduleForProfile` with the updated profile; (c) delete calls `cancelForProfile(profile.id)`. *(Origin: PR #15)*
+- [ ] **[T1]** `settings/SettingsViewModel.kt` — Zero tests. Insert path computes sortOrder + schedules alarm, update path schedules alarm, delete path cancels alarm. All untested. Regressions in sortOrder math, alarm scheduling on edit, or alarm cancellation on delete will land silently. **Fix:** JVM unit test with a fake `ProfileRepository` and a spy `AlarmScheduler` (extract its scheduling API behind an interface or test the static functions via the static-mock pattern); assert (a) insert assigns sortOrder = profiles.size, calls `scheduleForProfile` with the new id; (b) update calls `scheduleForProfile` with the updated profile; (c) delete cancels the deleted profile's alarms, which today it doesn't (PR #34 A2). *(Origin: PR #15)*
 
 - [ ] **[T2]** `SettingsScreen.kt:485-491,554-572` — `buildCityLabel`, `formatCoord`, `CalculationMethodKey.displayName`, `AsrMadhab.displayName` are pure functions with zero tests. Mechanical but easy regressions (a renamed enum value, a swapped fallback chain). **Fix:** JVM unit tests asserting (a) `buildCityLabel` prefers `locality + countryName`, falls back through subAdminArea → adminArea, then `getAddressLine(0)`, then formatted coords; (b) `formatCoord(51.5074)` returns `"51.5074"`; (c) both `displayName()` extensions are total (every enum entry produces a non-empty, non-default string). *(Origin: PR #15)*
 
@@ -156,7 +158,7 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 - [ ] **[M3]** `AlarmScheduler.kt:55-58` — `scheduleForProfile` hardcodes the SharedPreferences name `"aynama_prefs"` and constructs a fresh `NotificationPreferences` per call, bypassing `AynamaApplication.notificationPreferences`. Two instances coexist for the same backing store. **Fix:** Accept `NotificationPreferences` as a parameter on `scheduleAll`/`scheduleForProfile`, or read it from `context.applicationContext as AynamaApplication`. Eliminate the literal string. *(Origin: PR #16)*
 
-- [ ] **[M4]** `NotificationSettingsViewModel.kt:107-142` — `loadPrayerTimes()` runs only inside `init`. It doesn't refresh on day rollover (the times shown become stale at midnight), profile changes (no `observeAll().collect` subscription, only `.first()`), or screen resume. Same hidden-clock dependency as Qibla T5 and Tracker M1. **Fix:** Inject `Clock` / `() -> LocalDate` per the cross-cutting fix; subscribe to `repo.observeAll()` via `flatMapLatest` and recompute `prayerRows` on each emission; trigger refresh on `ON_RESUME` in addition to the existing `refreshPermission`/`refreshFromPrefs` calls. *(Origin: PR #16)*
+- [ ] **[M4]** `NotificationSettingsViewModel.kt:107-142` — `loadPrayerTimes()` runs only inside `init`. It doesn't refresh on day rollover (the times shown become stale at midnight), profile changes (no `observeAll().collect` subscription, only `.first()`), or screen resume. **Fix:** Inject a `Clock` and recompute on date rollover, as HomeViewModel's `clockFlow` does; subscribe to `repo.observeAll()` via `flatMapLatest` and recompute `prayerRows` on each emission; trigger refresh on `ON_RESUME` in addition to the existing `refreshPermission`/`refreshFromPrefs` calls. *(Origin: PR #16)*
 
 - [ ] **[M5]** `NotificationSettingsViewModel.kt:109,146` — Both `loadPrayerTimes()` and `rescheduleAll()` use `repo.observeAll().first()` instead of subscribing. Adding a profile in Settings while NotificationSettings is on the back stack doesn't update displayed times or rescheduled alarms until the user navigates back. **Fix:** Restructure as a single Flow chain that subscribes once and reacts to profile changes, prefs changes, and date rollover. *(Origin: PR #16)*
 
@@ -212,7 +214,7 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 - [ ] **[N1]** `android/app/src/main/java/com/aynama/prayertimes/notifications/NotificationSettingsScreen.kt` — Developer comments left in the vibration/prayer-index wiring block: `// Vibration sheet — keep local state since we replaced the onClick placeholder above` and `// Actually wire vibration properly:` precede `val selectedIndex = state.selectedPrayerIndex`. Dead commentary. **Fix:** Remove the two comment lines. *(Origin: PR #17, /review 2026-05-23)*
 
-- [ ] **[N2]** `android/app/src/main/java/com/aynama/prayertimes/notifications/PrayerDetailSheet.kt:274` — `val valueColor = if (isActive) InkMuted else InkMuted` — both branches produce the same value. Dead branch. **Fix:** Replace with `val valueColor = InkMuted`. *(Origin: PR #17, /review 2026-05-23)*
+- [ ] **[N2]** `android/app/src/main/java/com/aynama/prayertimes/notifications/PrayerDetailSheet.kt:274` — `val valueColor = if (isActive) InkMuted else InkMuted` — both branches produce the same value. Dead branch. **Fix:** Replace with `val valueColor = InkMuted`, unless the §15 sign-off keeps April's rule (active value `ink`), in which case use `if (isActive) Ink else InkMuted`. *(Origin: PR #17, /review 2026-05-23)*
 
 - [ ] **[N4]** `android/app/src/main/java/com/aynama/prayertimes/notifications/AlarmScheduler.kt` — `cancelForProfile` iterates `0 until REQUEST_CODE_MULTIPLIER` (= 20) to cancel PendingIntents, but the highest slot actually used is 14 (early-reminder base index 10 + prayer index 4). The bound is a hard constant, not derived from `EARLY_REMINDER_BASE_INDEX + MAX_PRAYER_INDEX`. If slot layout changes, the cancel loop and the constant will drift silently. **Fix:** Replace the literal `20` upper bound with `EARLY_REMINDER_BASE_INDEX + PRAYER_NAMES.size` so the cancel range is always exactly the set of possible slots. *(Origin: PR #17, /review 2026-05-23)*
 
@@ -250,7 +252,7 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ## From design-doc sync — Android v1 vs DESIGN.md (2026-09-23)
 
-The Android v1 code was read end to end against DESIGN.md, which was then re-baselined. Where the app deliberately changed the design, the spec was updated. Where the app breaks a DESIGN.md rule, the rule stayed and the breach is listed here. DESIGN.md §21 is the index. When you fix one, delete it here **and** its row in DESIGN.md §21.
+The Android v1 code was read end to end against DESIGN.md, which was then re-baselined. Where the app deliberately changed the design, the spec was updated. Where the app breaks a DESIGN.md rule, the rule stayed and the breach is listed here. DESIGN.md §21 is the index. When you fix one, first grep the docs for its ID (`grep -rnw 'DS7' --include='*.md' .`) and update every sentence that describes the defect as current, including TODOS.md items and architecture-design.md notes. Then delete the finding here and remove its ID from the §21 row, deleting the row once no IDs remain.
 
 How the evidence was gathered:
 - **Contrast:** WCAG 2.x relative luminance.
@@ -277,9 +279,9 @@ How the evidence was gathered:
   - `PrayerDetailSheet.kt:219` — "Preview adhan"
   - `PrayerDetailSheet.kt:335` — "OK"
   - `PrayerDetailSheet.kt:387` and `:441` — offset and early-reminder sheets
-  - `WidgetConfigureActivity.kt:199,206` — via `colorScheme.primary`
+  - `WidgetConfigureActivity.kt:199,206` — via `colorScheme.primary`, and its "Cancel" `TextButton` (`:170-175`)
   - Material defaults that use `primary` as text: the "Change" `TextButton` (`SettingsScreen.kt:508`) and focused `OutlinedTextField` labels
-  - widgets: `widget_next_prayer.xml:23`, `widget_next_prayer_dated.xml:66`, and the 4×2 highlight at `PrayerWidget.kt:538-553`
+  - widgets: `widget_next_prayer.xml:23`, `widget_next_prayer_dated.xml:66`, and the 4×2 column highlight at `PrayerWidget.kt:552-553` (the 4×2's Sunrise highlight, `:538-539`, sits on the ink band at 4.85:1 and passes)
 
   The Qibla screen already does this right: it uses `SaffronInk` (4.92:1) on light phases.
 
@@ -293,7 +295,7 @@ How the evidence was gathered:
 
   DESIGN.md §3 has the full table.
 
-  **Fix:** Give each phase muted and current colours that pass against the gradient under each row — for example, ink at full opacity with the ✓ for passed rows on Asr, and a darker accent on Fajr and Maghrib. Or put a quiet scrim behind the ribbon. Add a JVM contrast test over phase × row position. *(Origin: design-doc sync 2026-09-23)*
+  **Fix:** Give each phase muted and current colours that pass against the gradient under each row — for example, ink at full opacity with the ✓ for passed rows on Asr, and a lighter accent on Fajr and Maghrib (those gradients are dark, so a darker accent would lower contrast). Sunrise and a passed Imsak use the muted token too (`HomeScreen.kt:397-398`, `:429-431`); if they switch to ink, Sunrise, which has no mark, reads like an upcoming prayer, so give it another cue. Or put a quiet scrim behind the ribbon. Add a JVM contrast test over phase × row position. *(Origin: design-doc sync 2026-09-23)*
 
 - [ ] **[DS4]** Dark mode: utilitarian screens hard-code light-theme colours.
   - `PrayerDetailSheet.kt:104` sets the sheet header to `Ink`, which is about 1:1 on the dark sheet — invisible.
@@ -314,7 +316,7 @@ How the evidence was gathered:
 
   **Fix:** Define all 15 slots from the tokens. For example, `labelLarge` as IBM Plex Sans 500 at 15 sp, `labelSmall` as Plex 500 at 11 sp with tracking, `titleMedium` as Plex 500 at 16 sp. Move `mono-num` out of `labelMedium` (DS20). *(Origin: design-doc sync 2026-09-23)*
 
-- [ ] **[DS9]** `HomeScreen.kt:210`, `QiblaScreen.kt:377`, and the widget `Chronometer`s — The bundled `fraunces.ttf` has **proportional** figures: at the default instance, "1" is 1024/2000 em and "0" is 1461. The file also has no `tnum` feature in GSUB. So `fontFeatureSettings = "tnum"` does nothing, and the centred countdown hero re-centres each time its digits change: every minute, then every second in the final minute. That breaks DESIGN.md §4's "must not drift". IBM Plex Sans digits are already tabular (all 600/1000 em), so the Plex `tnum` settings are redundant but harmless.
+- [ ] **[DS9]** `HomeScreen.kt:210` and the widget `Chronometer`s — The bundled `fraunces.ttf` has **proportional** figures: at the default instance, "1" is 1024/2000 em and "0" is 1461. The file also has no `tnum` feature in GSUB. So `fontFeatureSettings = "tnum"` does nothing, and the centred countdown hero re-centres each time its digits change: every minute, then every second in the final minute. That breaks DESIGN.md §4's "must not drift". IBM Plex Sans digits are already tabular (all 600/1000 em), so the Plex `tnum` settings are redundant but harmless. The Qibla degree readout (`QiblaScreen.kt:377`) also carries a no-op `tnum`, but it shows the fixed Qibla bearing, so it doesn't change on screen.
 
   **Fix:** Set changing numerals in IBM Plex Sans, or bundle a Fraunces build with tabular figures. Remove the no-op `tnum` settings, or leave a comment saying why they do nothing. *(Origin: design-doc sync 2026-09-23)*
 
@@ -348,7 +350,7 @@ How the evidence was gathered:
 
 - [ ] **[DS18]** `NavGraph.kt:74-79` and `MainActivity.kt:29` — `Scaffold`'s default `contentWindowInsets` (`WindowInsets.systemBarsForVisualComponents`) pads the `NavHost` below the status bar. The time-of-day surface stops there, and the strip shows `colorScheme.background` — parchment in light mode, even above the dark Isha surface. That breaks DESIGN.md §11's "status bar matches current surface". The code is certain; the visual effect hasn't been screenshotted.
 
-  **Fix:** Pass `contentWindowInsets = WindowInsets(0)`. Let Home and Qibla draw behind the bar and pad only their content. Set the status-bar icon appearance per phase from `isLightPhase`. *(Origin: design-doc sync 2026-09-23)*
+  **Fix:** Pass `contentWindowInsets = WindowInsets(0)`. Let Home and Qibla draw behind the bar and pad only their content. Screens without a top app bar (Tracker, Settings) then need their own status-bar padding. Set the status-bar icon appearance per phase from `isLightPhase`. *(Origin: design-doc sync 2026-09-23)*
 
 - [ ] **[DS19]** `QiblaScreen.kt:513,523`, `HomeScreen.kt:510`, `SettingsScreen.kt:143,455` — Colours outside the token set: the calibration amber (`#7A5800` with `#FFF3CD`), the Ramadan banner's oxblood (`#6B2E2A`, a gradient stop reused), and Material's baseline error red for deleting.
 
@@ -366,19 +368,20 @@ How the evidence was gathered:
 
   **Fix:** Put it in the column above the header so it pushes content down, or dock it above the page dots. *(Origin: design-doc sync 2026-09-23)*
 
-- [ ] **[DS28]** `HomeScreen.kt:208-224`, and reduced motion is checked nowhere — DESIGN.md §8's 400 ms prayer-transition cross-fade isn't implemented: the hero and timeline text swap instantly at each boundary. There's no app-level reduced-motion handling either (§12).
+- [ ] **[DS28]** `HomeScreen.kt:208-224`, and reduced motion is checked nowhere — DESIGN.md §8's 400 ms prayer-transition cross-fade isn't implemented: the hero and timeline text swap instantly at each boundary. There's no app-level reduced-motion handling either (§12). And the text colour flips the moment the phase changes while the surface takes 3 s to fade (`HomeScreen.kt:98-101`), so for a moment ink text sits on a still-dark surface, or parchment on a light one.
 
-  **Fix:** Use `AnimatedContent`/`Crossfade` keyed on the next prayer. Honour the system's remove-animations setting by shortening or skipping the 3 s surface fade. *(Origin: design-doc sync 2026-09-23)*
+  **Fix:** Use `AnimatedContent`/`Crossfade` keyed on the next prayer. Compose already scales its animations by the system animator duration scale, so "Remove animations" snaps the 3 s fade; what's missing is §12's 150 ms reduced-motion cross-fade. Animate the text colour with the surface. *(Origin: design-doc sync 2026-09-23)*
 
 ### Behaviour & states
 
 - [ ] **[DS7]** `RamadanDetector.kt:39-40` and `SettingsScreen.kt:439-441` — **The Hijri adjustment lapses on the wrong day.**
   - **+1:** set for Ramadan, it lapses on the user's own 1 Shawwāl, because the adjusted date has left Ramadan. The app then falls back to the calculated calendar, where that day is still 30 Ramaḍān. So on Eid, Home shows the Imsak row, the Ramadan banner and "30 Ramaḍān". If this is the "Alerts for" profile, the scheduler also arms an Imsak alarm for Eid morning.
   - **−1:** set on the calculated 1 Ramadan, it's pinned to Shaʻbān and lapses the next day, so Ramadan's end is never delayed.
+  - **+1 saved before the first fast:** the evening a sighting is announced, the adjusted date (today + 1) is still the calculated last day of Shaʻbān, so Save pins the offset to Shaʻbān (`SettingsScreen.kt:439-440`). It lapses at midnight, on the user's own 1 Ramaḍān, where the calculated calendar still says Shaʻbān: the first fast day gets no Ramadan state and no Imsak alarm. Saving +1 anywhere in Shaʻbān does the same. Only a +1 saved on or after the user's 1 Ramaḍān is pinned to Ramaḍān, and that one hits the Eid case above.
 
-  `RamadanDetectionTest.effectiveOffset_newPerceivedMonth_resetsToZero` pins the lapse itself, but nothing checks the resulting Ramadan state. This is religious correctness, so treat it as high severity.
+  The existing tests check the pieces on inputs production never combines: `offset1_lastCalcDay_returnsFalse` checks Eid with the raw +1 (production has already lapsed it to 0), `effectiveOffset_newPerceivedMonth_resetsToZero` pins the lapse itself, and the −1 test uses a Ramaḍān anchor that a −1 saved on the calculated 1 Ramadan doesn't get. Nothing checks the composed Ramadan state. This is religious correctness, so treat it as high severity.
 
-  **Fix:** Choose the rule. One option: keep the offset until the user changes it. Another: lapse only once both the calculated and adjusted dates have left the pinned month, and never re-enter Ramadan after the adjusted Ramadan ends. Add tests asserting `isRamadan` is false on the user's Eid for both +1 and −1. *(Origin: design-doc sync 2026-09-23)*
+  **Fix:** Choose the rule, after settling DS11: the offset is relative to whichever calendar the device picked. Keeping the offset until the user changes it handles every case above. Lapsing "once both the calculated and adjusted dates have left the pinned month" does not: pinned to Shaʻbān, +1 then holds on the first fast day but drops on the next (so "1 Ramaḍān" shows twice) and Eid still shows Ramadan, and −1 drops on the calculated 2 Ramaḍān, so Ramadan's end still isn't delayed. Any automatic expiry needs explicit start and end boundaries. Test through the production path, `isRamadanWithOffset(d, effectiveHijriOffset(offset, key, d, zone), zone)`, with `key` computed as `SettingsScreen.kt:439-440` does: +1 saved on 2024-03-09 → Ramadan on 2024-03-10; +1 anchored to Ramaḍān 1445 → not Ramadan on 2024-04-09; −1 saved on 2024-03-11 → Ramadan on 2024-04-10. *(Origin: design-doc sync 2026-09-23; cases added at the 2026-09-24 review)*
 
 - [ ] **[DS11]** `RamadanDetector.kt:58-63` — `IslamicCalendar(TimeZone)` without `setCalculationType` lets ICU pick the variant from the device locale's region, via CLDR calendar preferences. Saudi-region locales get `islamic-umalqura`; every other region gets `islamic-civil`. That was checked with ICU4J 74.2 for US, GB, SA, AE, EG, PK, ID, MY, TR, IR, QA, KW and BD.
   - The two variants gave different dates on 655 of 1,095 days in 2025–2027, and disagreed on whether it was Ramadan on 2 days.
@@ -387,9 +390,15 @@ How the evidence was gathered:
 
   **Fix:** Choose a calculation type explicitly, document it in DESIGN.md §18, and optionally make it a per-profile setting. *(Origin: design-doc sync 2026-09-23)*
 
-- [ ] **[DS12]** `QiblaViewModel.kt:219,244` and `TrackerViewModel.kt:87,243` — Qibla computes prayer times in the device zone and takes its phase from device-local time. Tracker computes its scheduled times and "today" in the device zone. Home, alarms and widgets use `profile.effectiveZoneId()`. With "Use location time zone" on and the device somewhere else, Qibla's surface and the Tracker's times disagree with Home.
+- [ ] **[DS12]** `QiblaViewModel.kt:219,244`, `TrackerViewModel.kt:87,243`, `HomeViewModel.kt:140,146`, `NotificationSettingsViewModel.kt:198` and `AlarmScheduler.kt:170-173` — Several places use the device zone where the profile's applies:
+  - Qibla computes prayer times in the device zone and takes its phase from device-local time.
+  - Tracker computes its scheduled times and "today" in the device zone.
+  - Home (`HomeViewModel.kt:140,146`) and the Notifications screen (`NotificationSettingsViewModel.kt:198`) pass the device's `LocalDate.now()` to the calculation. Home's phase, Hijri date and Ramadan state use the profile's date (`:205-212`), so between the two midnights it shows the wrong day's times.
+  - The notification rollover alarm fires at device midnight (`AlarmScheduler.kt:170-173`), but each day's alarms are built for the profile's date (`:58-62`). Prayers between the profile's midnight and the device's are never armed unless the app is opened or a widget's rollover alarm re-runs `scheduleAll` (`PrayerWidgetUpdateReceiver.kt:23`). For a profile a few hours behind the device zone, that can be most of the day's alarms.
 
-  **Fix:** Use `effectiveZoneId()` for both the times and "now" in both ViewModels. *(Origin: design-doc sync 2026-09-23)*
+  Widgets and the alarm times themselves use `profile.effectiveZoneId()`. With "Use location time zone" on (the default for new profiles) and the device somewhere else, these disagree with Home and with each other.
+
+  **Fix:** Use `effectiveZoneId()` for both the times and "now" in both ViewModels and for Home's date, and arm the rollover at the notification profile's next midnight. Fix DS32 first, or this spreads its wrong zones to Qibla and the Tracker. *(Origin: design-doc sync 2026-09-23; Home and the alarm rollover added at the 2026-09-24 review)*
 
 - [ ] **[DS13]** Time formats disagree. The same time reads "4:14 PM" on Home and "16:14" in Notifications.
   - Always 12-hour ("h:mm a"): Home (`HomeViewModel.kt:114`) and Tracker (`TrackerViewModel.kt:75`).
@@ -404,6 +413,7 @@ How the evidence was gathered:
   - **(b)** Imsak alarms use the prayer template ("It is time for Imsak prayer") and start the adhan service.
   - **(c)** The ongoing "Adhan · Playing…" notification has no stop action.
   - **(d)** Every voice plays the system notification sound; there's no bundled adhan audio, and previews show a toast.
+  - **(e) Unverified, check on a device:** the app's own vibration (`NotificationHelper.kt:64`) is a background `vibrate()` with no usage attribute, which Android may ignore for a background app, so voice None with vibration Always could give a silent, still alert. And when exact alarms aren't allowed, the fallback alarm's receiver still calls `startForegroundService` (`PrayerAlarmReceiver.kt:38-43`), even for voice None; Android 12+ blocks that from the background unless the app is exempt from battery optimisation.
 
   **Fix:**
   - (a) Add a content intent that opens Home.
@@ -419,9 +429,9 @@ How the evidence was gathered:
 
   **Fix:** Decide the rule. If it stays, disable "on time" outside the window, and give "missed" a mark distinct from "unmarked". *(Origin: design-doc sync 2026-09-23)*
 
-- [ ] **[DS16]** `NotificationSettingsViewModel.kt:193-213` — If the "Alerts for" profile has no computable times (polar day or night), `loadPrayerTimes` returns at line 213, before it sets `profiles`, `notificationProfile` or `prayerRows` (lines 223-247). The result: PRAYERS is empty, the profile row shows "—", and the Profile Picker opens with no rows, so the user can't switch away from this screen. The code comment says the rows stay "without a clock value"; in fact they don't render at all.
+- [ ] **[DS16]** `NotificationSettingsViewModel.kt:193-213` — If the "Alerts for" profile has no computable times (polar day or night), `loadPrayerTimes` returns at line 213, before it sets `profiles`, `notificationProfile` or `prayerRows` (lines 223-247). The result: PRAYERS is empty, the profile row shows "—", and the Profile Picker opens with no rows, so the user can't switch away from this screen. The code comment says the rows stay "without a clock value"; in fact they don't render at all. Switching "Alerts for" to such a profile from inside the screen is worse: the new profile is stored, then `loadPrayerTimes` returns early, so PRAYERS keeps the previous profile's rows under the new name while every toggle, offset or fixed time the user changes is saved to the new profile (`:171-179`).
 
-  **Fix:** Set `profiles` and `notificationProfile` before computing times. On failure, build the rows with "--:--". *(Origin: design-doc sync 2026-09-23)*
+  **Fix:** Set `profiles` and `notificationProfile` before computing times. On failure, build the rows with "--:--", except fixed-time rows, which should show their configured time. The scheduler has the same blind spot: `buildAlarmSchedule` needs Adhan times before it builds any alarm (`AlarmScheduler.kt:120`, `:233-243`), so even fixed-time alerts, which don't depend on the sun, are dropped on polar days. Decide that with PR #21 C1. *(Origin: design-doc sync 2026-09-23; fixed-time rows added at the 2026-09-24 review)*
 
 - [ ] **[DS24]** `HomeScreen.kt:581-607` and `HomeViewModel.kt:159` — Home's error state shows "Something went wrong" and the raw exception message. There's no cause-specific copy and no recovery action, which the interaction-states table in `architecture-design.md` requires.
 
@@ -437,6 +447,46 @@ How the evidence was gathered:
 
   **Fix:** Delete the branch, which also removes a saffron-text use (DS2). *(Origin: design-doc sync 2026-09-23)*
 
+- [ ] **[DS29]** `HomeScreen.kt:346-356` — Home's timeline rows, the main way to mark a prayer, have no minimum height. Each is as tall as its text (the `title` line height, 25 sp), and `Arrangement.SpaceEvenly` (`:230`) spaces the rows without enlarging them, so the tap target is about 25 dp, not the 48 dp DESIGN.md §12 requires.
+
+  **Fix:** Give tappable rows `Modifier.heightIn(min = 48.dp)`, keeping the even spacing. *(Origin: 2026-09-24 review)*
+
+- [ ] **[DS30]** `TrackerViewModel.kt:99,125,210` — On a polar day for the default profile, `cachedPrayerTimes` throws and `.catch` turns it into `Empty`, so the Tracker says "Create a profile to track prayers" to someone who has one. `.catch` also ends the flow, so the Tracker stays empty until its ViewModel is recreated, even after the polar day. DESIGN.md §20 doesn't list this state.
+
+  **Fix:** Catch `PrayerTimesUnavailableException` per day, show the ledger without times, and say why, as Home's per-page state does. *(Origin: 2026-09-24 review)*
+
+- [ ] **[DS31]** `HomeViewModel.kt:247-257,327-337` — The after-midnight-Isha logic only runs when Isha's clock time is earlier than Fajr's (`times.isha < times.fajr`). Near the June solstice at about 50°N and above, adhan's default `MIDDLE_OF_THE_NIGHT` rule puts Fajr and that night's Isha at the same clock time: London, MWL, 2026-06-21 gives Fajr 01:02 and Isha 01:02 the next night. The guard then doesn't fire and `indexOfLast` picks Isha, so from about 1 AM Home shows Isha as current and Fajr, Dhuhr, Asr and Maghrib as passed. Passed rows are tappable, so the user can mark Asr and Maghrib before they happen. The surface also jumps to Isha at Maghrib. The debug seed profiles are in London. Still true on `agent-main`, whose ribbon keeps the same guard.
+
+  **Fix:** Carry dates or instants through the ribbon and phase functions, as the widgets and `agent-main`'s countdown do, instead of comparing `LocalTime`s. Add a `HomeRibbonStateTest` built from real London 2026-06-21 MWL output, not the synthetic 00:25 Isha. *(Origin: 2026-09-24 review)*
+
+- [ ] **[DS32]** `SettingsScreen.kt:681-688` — City search detects a location's time zone by picking, among the country's zones, the one whose raw offset is closest to longitude ÷ 15. That's an hour off for some major cities: Madrid and Barcelona get `Atlantic/Canary`, Lisbon `Atlantic/Azores`, Detroit, Atlanta and Columbus a US Central zone, Calgary and Edmonton `America/Vancouver`, and Surabaya WITA. With "Use location time zone" on by default, Home, the widgets and the Notifications rows then label every prayer an hour early or late against the local clock. The countdown and the alarm instants stay right, but someone reading Madrid's Dhuhr off the timeline would pray an hour before it starts. Same code on `agent-main` (`ProfileFormSheet.kt:525-532`).
+
+  **Fix:** Resolve the zone from the coordinates with a zone-boundary lookup, not offset proximity. Until then, keep "Use location time zone" off by default. Fix this before DS12, whose fix would spread the wrong zones to Qibla and the Tracker. *(Origin: 2026-09-24 review)*
+
+- [ ] **[DS33]** `QiblaScreen.kt:94,103` — Qibla requests `ACCESS_FINE_LOCATION` on its own. Android says to request fine and coarse together: that's what shows the Precise/Approximate choice, a fine-only request logs "ACCESS_FINE_LOCATION must be requested with ACCESS_COARSE_LOCATION" for apps targeting Android 12+, and some Android 12 releases ignore it (<https://developer.android.com/develop/sensors-and-location/location/permissions/runtime>). When it's ignored, Qibla gets live location only if coarse was already granted through the profile sheet; otherwise it points from the default profile's saved city without saying so, so a traveller gets the bearing from home. Still true on `agent-main`.
+
+  **Fix:** Request both with `RequestMultiplePermissions`, and show which location the bearing uses when it falls back to a profile. *(Origin: 2026-09-24 review)*
+
+- [ ] **[DS34]** `HomeScreen.kt:159` vs `TrackerViewModel.kt:84,92` — Home saves a mark under the profile page it was made on; the Tracker shows only the default (first) profile's marks. A prayer marked on any other Home page never appears in the Tracker's Today rows, history, weekly line or outstanding count, and each Home page counts only its own marks. Deleting a profile also deletes its marks (`QazaEntry` cascades), with no confirmation (PR #15 M10).
+
+  **Fix:** Decide the model: marks belong to the person rather than the location profile (store them once, or migrate), or Home always marks against the Tracker's profile. Document it in §5 and §16, and mention the deleted history in M10's delete dialog. *(Origin: 2026-09-24 review)*
+
+- [ ] **[DS35]** `NotificationSettingsViewModel.kt:121-160` — Changing a prayer's offset, alert mode or fixed time updates those fields and re-arms the alarm, but not the row's `time`, which only `loadPrayerTimes` computes (`:231-235`). The Notifications row and the detail sheet's "Today · {time}" keep the old alert time until the screen is recreated: the sheet can read "+10 min" over "Today · 04:21" while the alarm is set for 04:31.
+
+  **Fix:** Keep the calculated prayer time in `PrayerRowData` and derive the displayed alert time in one place, recomputing it in each setter. *(Origin: 2026-09-24 review)*
+
+## From PR #34 — design-doc sync review (`/review` 2026-09-24)
+
+Code defects found while checking the sync's claims. Each contradicts `architecture-design.md`'s notification notes.
+
+### Adversarial / Cross-cutting
+
+- [ ] **[A1]** `AlarmScheduler.kt:154-162` vs `:188-193` — `cancelForProfile` looks up each `PendingIntent` with an `Intent` that has no action, but `submitAlarm` arms them with `ACTION_PRAYER_ALARM`. `PendingIntent` matching compares the action, so the `FLAG_NO_CREATE` lookup finds nothing and nothing is cancelled. Turning the master switch off, turning a prayer or early reminder off, or switching "Alerts for" leaves the day's remaining alarms armed, and `PrayerAlarmReceiver` fires them without re-checking the settings. **Fix:** Build the `Intent` in one function used by both, as `PrayerWidgetScheduler.updateIntent` does, and test at the `AlarmManager` level. *(Origin: PR #34 review. Fixed on `agent-main` by #27; delete this when that lands on `main`.)*
+
+- [ ] **[A2]** `SettingsViewModel.kt:43-50` — Deleting a profile deletes it, then calls `scheduleAll` with the remaining profiles, and `scheduleAll` only cancels alarms for the profiles it's given. The deleted profile's alarms are never cancelled: if it was the "Alerts for" profile, its remaining alarms still fire today, alongside the new default profile's. Still true on `agent-main`. **Fix:** Call `AlarmScheduler.cancelForProfile(context, profile.id)` before deleting, and cover it in PR #15 T1. *(Origin: PR #34 review)*
+
+- [ ] **[A3]** `MainActivity.kt:31-38` — The battery-optimisation exemption is asked for only from the notification-permission result, and that permission is only requested on Android 13+ when it's missing. So Android 8–12 (minSdk is 26) never see the prompt, and neither do Android 13+ users who had already allowed notifications — including most of the aggressive-OEM devices the prompt exists for. Still true on `agent-main`. **Fix:** Call `requestBatteryOptExemptionOnce()` directly on Android 12 and below, and when notifications are already allowed. *(Origin: PR #34 review)*
+
 ---
 
 ## Workflow
@@ -444,3 +494,4 @@ How the evidence was gathered:
 - When you address a finding, **delete its line** rather than checking it off — keeps the file scoped to open work.
 - New `/review` runs append a section under `## From PR #N — ...` with the same structure.
 - IDs (M1, P1, T1, A1, etc.) are stable per-PR; reference them in commit messages or follow-up PR titles for traceability.
+- Design-doc syncs append `## From design-doc sync — <scope> (<date>)`. DS IDs are one sequence across syncs and are never reused (next: DS36); they can be cited bare. Cite per-PR IDs as `PR #N <ID>`, for example PR #21 C1.

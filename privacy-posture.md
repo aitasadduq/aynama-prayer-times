@@ -30,7 +30,7 @@ Sub-spec of `architecture-design.md`. Covers data collection, retention, and reg
 
 ## GDPR Art. 9 compliance
 
-Religious belief is special-category data. Since we never send it off-device, Art. 9 processing conditions do not apply beyond the user's own consent to install. In-app affordances required:
+Religious belief is special-category data. Since we never send it off-device, Art. 9 processing conditions do not apply beyond the user's own consent to install. *(Android v1 can send data off the device through the platform geocoder and Auto Backup — see "Two routes off the device" below — so revisit this reasoning once those are decided.)* In-app affordances required:
 
 - **Data export:** JSON dump of profiles + Qaza history + settings. One-tap from Settings.
 - **Data delete:** Clear all profiles / clear Qaza / factory reset. Each as separate option.
@@ -73,7 +73,7 @@ Required manifest entries:
 - `POST_NOTIFICATIONS` runtime permission (API 33+).
 - `USE_EXACT_ALARM` — declared in manifest (no user grant required). Prayer apps qualify under the alarm/clock exemption. Inexact alarms are unacceptable for prayer notification timing. Play Console requires exact alarm category declaration.
 - `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — coarse is sufficient for prayer time calculation (<1 arcminute error); prefer coarse.
-- Play Store **Data Safety form:** tick "No data collected" + "No data shared." Declare `SCHEDULE_EXACT_ALARM` usage reason in Play Console.
+- Play Store **Data Safety form:** tick "No data collected" + "No data shared." *(Android v1: only once the Auto Backup and geocoder decisions below are made.)* Declare `SCHEDULE_EXACT_ALARM` usage reason in Play Console.
 
 **Android v1 manifest (2026-09-23):**
 
@@ -82,14 +82,14 @@ Required manifest entries:
 - `USE_EXACT_ALARM` and `SCHEDULE_EXACT_ALARM` — the app falls back to inexact alarms when exact alarms aren't allowed.
 - `RECEIVE_BOOT_COMPLETED`, `VIBRATE`.
 - `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE` — for adhan playback.
-- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — requested once, right after notifications are allowed.
-- `ACCESS_COARSE_LOCATION` **and** `ACCESS_FINE_LOCATION`. The profile sheet's "Use current location" asks for coarse. The Qibla screen asks for **fine** on first open; Android 12+ lets the user choose approximate. So "prefer coarse" holds for profiles, but not for Qibla.
+- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — requested once, right after notifications are allowed; so only on Android 13+ after a fresh grant (PR #34 A3).
+- `ACCESS_COARSE_LOCATION` **and** `ACCESS_FINE_LOCATION`. The profile sheet's "Use current location" asks for coarse. The Qibla screen asks for **fine** alone on first open. Android offers the approximate choice only when both are requested together, and some Android 12 releases ignore a fine-only request (DS33). So "prefer coarse" holds for profiles, but not for Qibla.
 
 *Not declared:* `INTERNET`, so the app can't open network connections itself. Confirm with the merged manifest (`:app:processReleaseMainManifest`) that no dependency adds it back.
 
 *Two routes off the device, both through system services:*
 1. **Location search and reverse geocoding** use the platform `Geocoder`, which delegates to a backend service outside the Android framework (Android reference: <https://developer.android.com/reference/android/location/Geocoder>). On most devices that backend is a network service, so the typed city query and the chosen coordinates can leave the device. Disclose this in the privacy page and the Data Safety review. Without a backend (for example, some de-Googled devices), search returns nothing.
-2. **Android Auto Backup** is on: `android:allowBackup="true"`, with no backup or data-extraction rules. Auto Backup uploads app data — including databases and shared preferences — to the user's Google Drive backup (Android guide: <https://developer.android.com/identity/data/autobackup>). That would carry Qaza history and profiles off the device, which contradicts "Qaza history stays on-device" above. Decide before release: turn backup off, exclude the database, or document it as a user-controlled backup.
+2. **Android Auto Backup** is on: `android:allowBackup="true"`, with no backup or data-extraction rules. Auto Backup uploads app data — including databases and shared preferences — to the user's Google Drive backup (Android guide: <https://developer.android.com/identity/data/autobackup>). The same data also moves to a new phone in a device-to-device transfer, and on some manufacturers' devices `allowBackup="false"` stops the Google Drive backup but not that transfer (Android 12 behaviour changes: <https://developer.android.com/about/versions/12/behavior-changes-12>). Excluding `aynama.db` from both takes `android:dataExtractionRules` on Android 12+ and `android:fullBackupContent` below it. A restore would also bring back the one-time battery-prompt flag in `aynama_prefs` (`MainActivity.kt:59`), so a restored phone is never asked for the battery-optimisation exemption. The cloud backup would carry Qaza history and profiles off the device, which contradicts "Qaza history stays on-device" above. Decide before release: turn backup off, exclude the database, or document it as a user-controlled backup.
 
 ## Analytics posture
 
@@ -120,6 +120,6 @@ Plausible stack later: Umami or PostHog self-hosted, event counts only, no user-
 - [ ] Data export + delete affordances implemented.
 - [ ] Location permission copy reviewed for clarity + tone.
 - [ ] Zero third-party analytics SDKs in v1 build (verified via dependency audit).
-- [ ] Decide Android Auto Backup: turn off `allowBackup`, or add data-extraction rules that exclude `aynama.db`, or disclose it.
+- [ ] Decide Android Auto Backup: turn off `allowBackup` (on some devices that doesn't stop device-to-device transfer), or add `dataExtractionRules` and `fullBackupContent` that exclude `aynama.db`, or disclose it.
 - [ ] Disclose geocoder use for location search in the privacy page and the Data Safety form.
 - [ ] Qaza tracking opt-in, as specified above, or revise that requirement.

@@ -6,7 +6,7 @@ Context: Design session initiated from aitasadduq/camunda-backup-dr repo, but th
 Status: APPROVED
 Mode: Builder
 
-> **Sync note (2026-09-23).** Android v1 Phases 0–7 are built. This document is still the architecture and decision record, but several UX specs below were superseded while building. Each superseded passage now carries an **Android v1:** note saying what shipped. For anything visual, `DESIGN.md` is the source of truth; its §21 lists where the app still breaks a design rule, with findings in `REVIEW-FINDINGS.md` (DS1–DS28).
+> **Sync note (2026-09-23).** Android v1 Phases 0–7 are built. This document is still the architecture and decision record, but several UX specs below were superseded while building. Each superseded passage now carries an **Android v1:** note saying what shipped. For anything visual, `DESIGN.md` is the source of truth; its §21 lists where the app still breaks a design rule, with findings in `REVIEW-FINDINGS.md` (the DS findings).
 
 ## Problem Statement
 
@@ -35,7 +35,7 @@ The key architectural decision: whether to share business logic across platforms
 3. **Qaza countdown:** built as the Home countdown to the next event. Sunrise counts as an event, marking the end of Fajr.
 4. **Widgets:** four Glance widgets (see Widget Specs).
 5. **Notifications:** built with one global adhan voice. No adhan audio is bundled yet; the system notification sound stands in.
-6. **Prayer tracker:** planned for v3 (#12), built in Android v1 as the Tracker tab.
+- **Prayer tracker (v3 feature 12):** built in Android v1 as the Tracker tab.
 
 ### v2 — WearOS Integration
 6. **WearOS app** — all prayer times list, next prayer display, qibla compass, quick tasbeeh
@@ -366,9 +366,9 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 > **Correction (2026-09-23).** The paragraph above is wrong on three counts.
 > 1. **Adhan's default isn't what it says.** adhan-java 1.2.1 defaults `CalculationParameters.highLatitudeRule` to `MIDDLE_OF_THE_NIGHT` (checked in the 1.2.1 source). `AdhanWrapper` never overrides it, so that's what ships.
 > 2. **"Angle-based" and "1/7th of the night" are different rules.** In adhan they are `TWILIGHT_ANGLE` and `SEVENTH_OF_THE_NIGHT`.
-> 3. **No rule helps on days with no sunrise.** Inside the polar circles, adhan returns no times at all. That starts between 65.5°N and 65.75°N around the June solstice and hits Tromsø on 118 days in 2026, under every rule and every method (`REVIEW-FINDINGS.md` C1).
+> 3. **No rule helps on days with no sunrise.** Inside the polar circles, adhan returns no times at all. That starts between 65.5°N and 65.75°N around the June solstice and hits Tromsø on 118 days in 2026, under every rule and every method (`REVIEW-FINDINGS.md` PR #21 C1).
 >
-> Android v1 shows such a profile as a per-page "No prayer times today" state. Its widgets show "No times here", and it gets no alarms. Choosing a convention for those days — nearest latitude, nearest day, or fixed proportions — is still open (C1). No high-latitude test vectors exist yet.
+> Android v1 shows such a profile as a per-page "No prayer times today" state. Its widgets show "No times here", and it gets no alarms. Choosing a convention for those days — nearest latitude, nearest day, or fixed proportions — is still open (PR #21 C1). No high-latitude test vectors exist yet.
 
 ### Interaction State Coverage
 
@@ -417,7 +417,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 - Alarms are armed for **one profile only**, the "Alerts for" profile, which defaults to the first profile.
 - Per prayer, for that profile: on/off; alert time as an offset (−15 to +15 min) or a fixed clock time; and an optional early reminder 5, 10 or 15 min before.
 - Imsak (Fajr − 10 min) is armed only during Ramadan.
-- A master switch turns everything off.
+- A master switch turns everything off. On `main` it doesn't yet: `cancelForProfile` never matches an armed alarm, so switching off leaves the day's remaining alarms armed (PR #34 A1; fixed on `agent-main` by #27).
 
 *Sound and vibration — global, not per prayer*
 - Adhan voice: Makkah, Madinah, Egyptian, Turkish, Al-Aqsa, or None.
@@ -428,7 +428,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 *Scheduling*
 - `setExactAndAllowWhileIdle` via `USE_EXACT_ALARM`.
 - `SCHEDULE_EXACT_ALARM` is also declared. When exact alarms aren't allowed, the app falls back to `setAndAllowWhileIdle`.
-- Every alarm is rescheduled on app open, at midnight, on boot, on a time-zone change, and — new here — on `TIME_SET`.
+- Every alarm is rescheduled on app open, at the device's midnight (not the profile's; DS12), on boot, on a time-zone change, and — new here — on `TIME_SET`.
 - Widget rollover alarms are armed separately, per widget-bound profile.
 - A profile with no computable times loses its alarms and is logged; it can't crash the scheduler.
 
@@ -438,7 +438,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 
 *Permissions*
 - The notification permission is requested on first launch.
-- The battery-optimisation exemption is requested once, right after that permission is granted.
+- The battery-optimisation exemption is requested once, right after that permission is granted: only on Android 13+ after a fresh grant, never on Android 8–12 (PR #34 A3).
 
 ### Data Persistence
 
@@ -467,7 +467,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 
 - **Prayer time caching:** `Adhan.calculatePrayers()` must be called once per day per profile (not on every second/minute tick). Cache the `PrayerTimes` result in memory, invalidate only on: day rollover, profile change, or timezone change. The countdown UI computes `nextPrayer.time - now` in memory — cheap.
 - **Room on background thread:** All Room queries via `Flow<T>` observed in ViewModels. No synchronous Room calls on the main thread. Profile switching triggers a `Flow` emission, not a blocking query.
-- **Sensor sampling for Qibla:** Register `SensorManager` listener only while Qibla screen is visible. Unregister in `onPause()`. 20Hz sampling rate (`SENSOR_DELAY_UI`) is sufficient.
+- **Sensor sampling for Qibla:** Register `SensorManager` listener only while Qibla screen is visible. Unregister in `onPause()`. ~16 Hz sampling (`SENSOR_DELAY_UI`, 60 ms) is sufficient.
 
 ## Premises
 
@@ -575,7 +575,7 @@ Each JSON test file follows a structure like:
 {
   "method": "MWL",
   "tolerance_minutes": 1,
-  "reference": "praytimes.org + adhan-swift cross-validation",
+  "reference": "adhan 1.2.1 (AdhanWrapperTest goldens)",
   "cases": [
     {
       "input": {
@@ -666,9 +666,9 @@ Both the Kotlin (wrapper around Adhan-Kotlin) and Swift (wrapper around Adhan-Sw
 9. **Set up CI for test vectors + reproducible builds** — Android CI validated against vectors; F-Droid reproducible-build setup from day 1. Note: Play Store submission at v1 launch; F-Droid listing goes live when F-Droid review completes (typically weeks to months after submission, not simultaneous).
 
 **Status (2026-09-23):**
-- **Done:** 1 (monorepo, in part), 5, 6, 7 (live Chronometer countdown) and 8.
+- **Done:** 1 (monorepo, in part), 5, 6 (with a direct rotation matrix and the rotation-vector sensor, not the remap; TODOS T7), 7 (live Chronometer countdown) and 8.
 - **2, in part:** Adhan is a Gradle dependency (`com.batoulapps.adhan:adhan:1.2.1`), but the SHA-256 verification metadata isn't committed and Adhan-Swift isn't set up.
-- **3, not in this repo:** there's no generator.
+- **3, not on `main`:** the PR #8 generator (`scripts/generate_vectors.py`, `scripts/test_generator.py`) was merged into the `t3-test-vector-schema` branch only.
 - **4, in part:** the wrapper is built, but its tests use hard-coded Makkah values, not vectors.
 - **9, not started:** no CI workflows.
 
@@ -706,6 +706,7 @@ Every codepath in the implementation plan requires a test. Framework: JUnit 4 + 
 - **JVM tests:** `AdhanWrapperTest` (Makkah goldens, validation, polar unavailability), `QiblaCalculatorTest`, `QiblaSensorStateTest`, `SensorAccuracyTest`, `HomeRibbonStateTest`, `AlarmSchedulerTest`, `NotificationHelperTest`, `RamadanDetectorTest`, `QiblaViewModelTest`, `TrackerViewModelTest`, `PrayerWidgetTest`.
 - **Instrumented tests:** `ProfileRepositoryTest`, `QazaTrackerTest`, `RamadanDetectionTest` (Hijri offset and lapse).
 - **Not present:** the E2E `AlarmFiresWhileClosedTest` and `AlarmRestoredAfterRebootTest`. `android/scripts/widget-rollover-test.sh` is a manual emulator check of widget rollovers.
+- **Required cases still missing from files that exist:** `AdhanWrapperTest` tests MWL only, with no vector loop and no 23:59/00:00 boundary; `AlarmSchedulerTest` tests the pure builder, not `scheduleAll()`, idempotency or the midnight reschedule; `QazaTrackerTest` calls `autoMarkMissed()` directly, with no next-prayer trigger; and no test covers the app-level polar paths (Home's unavailable page, the widgets' "No times here", the scheduler's log-and-skip).
 - **CI:** no GitHub Actions workflows exist yet.
 
 ## Reviewer Concerns

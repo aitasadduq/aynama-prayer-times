@@ -43,7 +43,7 @@ Read [DESIGN.md](DESIGN.md) before any UI work. Hard rules are non-negotiable. D
 
 ## Contributing
 
-All code changes require corresponding tests in the same PR. Before opening a pull request, run the unit tests from `android/` with `./gradlew test`. The shared test-vector suite isn't set up yet.
+All code changes require corresponding tests in the same PR. Before opening a pull request, run the unit tests from `android/` with `./gradlew test` and, with an emulator or device attached, `./gradlew connectedAndroidTest`: the Room and Hijri-offset tests are instrumented. The shared test-vector suite isn't set up yet.
 
 ## License
 

@@ -2,7 +2,7 @@
 
 Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/projects/aitasadduq-aynama-prayer-times/ceo-plans/`.
 
-> **Sync note (2026-09-23).** The Android v1 checklist below was re-checked against the code. Items that were ticked but aren't in the app are now unticked, with a short note saying what actually shipped. Design gaps found in the same pass are tracked as DS1–DS28 in `REVIEW-FINDINGS.md`; DESIGN.md §21 is the index.
+> **Sync note (2026-09-23).** The Android v1 checklist below was re-checked against the code. Items that were ticked but aren't in the app are now unticked, with a short note saying what actually shipped. Design gaps found in the same pass are tracked as DS findings in `REVIEW-FINDINGS.md`; DESIGN.md §21 is the index.
 
 ## Design TODOs (from /plan-design-review, 2026-04-18)
 
@@ -14,23 +14,33 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 - [x] ~~**Design-doc sync against Android v1.**~~ → **COMPLETE 2026-09-23.** DESIGN.md was re-baselined: §3 contrast was recomputed, and §19 (widgets), §20 (states) and §21 (conformance) were added. `architecture-design.md`, README and the posture docs were updated.
 
-- [ ] **Sign off the spec changes the sync recorded** (DESIGN.md §14 requires explicit discussion for §3, §4, §5):
-  - the centred countdown hero
-  - the surface stepping per phase (not continuous)
-  - passed rows in the muted token at full opacity
-  - an ink current-row on light phases
-  - the Qibla panels
-  - the −2…+2 Hijri adjustment
-  - location time zone on by default
-  - master-off hiding every Notifications section
-  - sheets opening fully expanded
+- [ ] **Sign off the spec changes the sync recorded** (DESIGN.md §14 requires explicit discussion for §3, §4, §5 and §9). This is the one list; DESIGN.md points here.
+  - §5: the centred countdown hero. `agent-main`'s DESIGN.md §19 says the opposite: "Never centred".
+  - §3, §8: the surface stepping per phase (not continuous)
+  - §5: passed rows in the muted token at full opacity. This still fails AA on the Asr and Sunrise gradients (DS3).
+  - §5: the current row in ink on light phases (saffron on dark ones still fails AA on the Fajr and Maghrib gradients, DS3)
+  - §5: the Qibla panels
+  - §5: no profile-switcher chip or card stack; swiping is the only way to switch
+  - §5: the Ramadan banner no longer mentions Imsak or links to notification settings
+  - §5: utilitarian screens use a 16 dp top margin (April: 32 dp)
+  - §3: `saffron-ink` as the accent for text and thin strokes on light surfaces, and `ink` labels on saffron fills
+  - §4: numbers that change in place are set in IBM Plex Sans. This contradicts §4's own `display-xl` row, which keeps the hero in Fraunces, so decide it with DS9.
+  - §8: widget countdowns ticking H:MM:SS every second, as an exception to minute granularity
+  - §18: the −2…+2 Hijri adjustment
+  - §17: location time zone on by default. Hold this until DS32 is fixed: city search picks the wrong zone for Madrid, Lisbon, Detroit and others, so the default labels their times an hour off.
+  - §17: Muslim World League as the default method (the plan said ISNA). The default changes users' prayer times.
+  - §15: master-off hiding every Notifications section
+  - §15: prayer names stay `ink` when their alert is off (April: `ink-muted`)
+  - §15: the alert-time value is `ink-muted` in both rows (April: `ink` when active). The code's dead branch (PR #17 N2) produced this; confirm it's wanted before N2's fix cements it.
+  - §15, §17: sheets opening fully expanded
+  - §19: four widgets instead of three sizes
 
 ## Design decisions raised by the 2026-09-23 sync
 
 - [ ] **Moving sundial tick (DS6).** Build the vertical rule and the moving tick, or formally amend DESIGN.md §9. It's one of the Two Deliberate Departures.
-- [ ] **Hijri adjustment lapse rule (DS7).** With +1, the app shows Ramadan, with an Imsak alarm, on the user's Eid. Decide what should happen when the adjusted month ends.
+- [ ] **Hijri adjustment lapse rule (DS7).** With +1, the app shows Ramadan, with an Imsak alarm, on the user's Eid, and a +1 saved the evening before the first fast misses the first day entirely. Decide what should happen when the adjusted month ends.
 - [ ] **Hijri calendar variant (DS11).** ICU picks Umm al-Qura or civil from the device's region. Pin one explicitly.
-- [ ] **Polar-day convention** (REVIEW-FINDINGS C1). Nearest latitude, nearest day, or fixed proportions.
+- [ ] **Polar-day convention** (REVIEW-FINDINGS PR #21 C1). Nearest latitude, nearest day, or fixed proportions.
 - [ ] **"Prayed on time" for past days (DS15).** Enforce the DESIGN.md §16 window, or drop the rule.
 - [ ] **Countdown numerals (DS9).** Move the hero to IBM Plex Sans (tabular), or bundle a Fraunces build with tabular figures.
 - [ ] **Notification and launcher icons (DS8, DS22).** The crescent placeholder sits next to a forbidden motif.
@@ -73,7 +83,7 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Engineering TODOs (from /plan-eng-review, 2026-04-21)
 
-- [x] ~~**Vector generator self-tests.**~~ → **COMPLETE** (`scripts/test_generator.py`, 9 tests pass). Golden values corrected to Adhan 1.2.1 actual output (arch-design.md had stale PrayTimes.py values): fajr=05:10, sunrise=06:24, dhuhr=12:29, asr_shafii=15:53, asr_hanafi=16:50, maghrib=18:32, isha=19:42. ~~`architecture-design.md` golden values table needs updating separately.~~ *(Updated 2026-09-23. Note: `scripts/test_generator.py` isn't in this repository.)*
+- [x] ~~**Vector generator self-tests.**~~ → **COMPLETE** (`scripts/test_generator.py`, 9 tests pass). Golden values corrected to Adhan 1.2.1 actual output (arch-design.md had stale PrayTimes.py values): fajr=05:10, sunrise=06:24, dhuhr=12:29, asr_shafii=15:53, asr_hanafi=16:50, maghrib=18:32, isha=19:42. ~~`architecture-design.md` golden values table needs updating separately.~~ *(Updated 2026-09-23. Note: `scripts/test_generator.py` isn't on `main`; PR #8 merged it into the `t3-test-vector-schema` branch only.)*
 
 - [ ] **Run all test vectors in CI.** ~~Load all 12 cities from `test-vectors/schema.json`~~ — `schema.json` is a JSON Schema and never contained any cities; the twelve now exist, defined in `scripts/adhan-parity/cases.json` and generated into `test-vectors/prayer-times/*.json` (Phase 3A). **iOS side is done** — `VectorParityTests` loops all twelve under `swift test`. **Android side remains:** replace the hardcoded Makkah-only tests in `AdhanWrapperTest.kt` with a file-driven loop over the same directory, and wire it into `android.yml`. Required v1 gate (before launch) to catch Adhan upstream regressions.
 
@@ -142,7 +152,7 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Supply-chain / security
 
-- [ ] **Verify Adhan license (MIT vs Apache 2.0).** Check `LICENSE` file in batoulapps/adhan-java + batoulapps/adhan-swift on GitHub. Update `legal-posture.md` compliance framework accordingly — MIT = copyright notice only; Apache 2.0 = NOTICE file + state-changes. Maven POM for adhan2-jvm says MIT; adhan:1.2.1 POM tag is empty. Blocks first public release. (flagged /plan-eng-review 2026-04-19)
+- [x] ~~**Verify Adhan license (MIT vs Apache 2.0).**~~ → **VERIFIED 2026-09-24: MIT.** `batoulapps/adhan-java` (the repo is now `batoulapps/adhan-kotlin`) and `batoulapps/adhan-swift` both ship the MIT License, © 2016 Batoul Apps; `legal-posture.md` updated. (flagged /plan-eng-review 2026-04-19)
 
 - [ ] `gradle --write-verification-metadata sha256` after first build; commit `gradle/verification-metadata.xml`.
 - [ ] Dependency audit: zero third-party analytics SDKs in v1 (verify with `./gradlew :app:dependencies`).
@@ -262,7 +272,7 @@ Phases run in dependency order. Each phase should be a separate PR. Scaffold (Ph
 - [x] `AynamaTypography` — Fraunces + IBM Plex Sans, 8 scale slots *(the other 7 Material slots fall back to Roboto — DS5)*
 - [x] `NavGraph` — 4-tab bottom nav (Home, Qibla, Tracker, Settings), placeholder screens
 - [x] `AdhanWrapper` — Adhan 1.2.1, both Shafi'i and Hanafi Asr, `java.time.LocalTime`
-- [x] `AdhanWrapperTest` — 9 tests passing (Makkah golden values, validation)
+- [x] `AdhanWrapperTest` — 15 tests (Makkah goldens, validation, polar unavailability, determinism)
 - [x] Font files bundled (`fraunces.ttf`, `ibm_plex_sans.ttf`)
 
 ---
@@ -291,7 +301,7 @@ Prerequisite for Home, Tracker, Settings, Notifications. Implement Room before b
 
 **Tests**
 - [x] `ProfileRepositoryTest` — in-memory Room DB; create/update/delete/read; GPS constraint; Qaza cascade on profile delete
-- [x] `QazaTrackerTest` — TypeConverter for status enum; mark-as-prayed write; auto-mark-as-missed after next prayer starts; outstanding-count query
+- [x] `QazaTrackerTest` — TypeConverter for status enum; mark-as-prayed write; `autoMarkMissed()` inserts MISSED only when no entry exists (nothing calls it on a schedule; see Repository layer); outstanding-count query
       (both existed but had never run: `shared-logic` named AndroidJUnitRunner without
       depending on it, so the instrumentation crashed on start. Fixed in the Phase 2 gate;
       16 tests now execute.)
@@ -348,7 +358,7 @@ Depends on: Phase 1 (ProfileRepository for active profile + prayer times for gra
 - [x] `QiblaViewModel` — registers `SensorManager` listener in `onResume`, unregisters in `onPause`
 - [x] `SENSOR_DELAY_UI` (~16 Hz) sampling rate; `LP_ALPHA = 0.15` tuned for ~6-sample (~300 ms) settling. UI rate chosen over GAME for power; convergence acceptable during normal turning.
 - [x] Direct rotation matrix (no `remapCoordinateSystem`) for tilt-stable flat-phone bearing (T7)
-- [x] Bearing from device coordinates to Kaaba (21.4225°N, 39.8262°E) — *uses the live device location when permission is granted (asked for on first open), otherwise the default profile*
+- [x] Bearing from device coordinates to Kaaba (21.4225°N, 39.8262°E) — *uses the live device location when permission is granted (asked for on first open), otherwise the default profile. The request asks for fine alone, which some Android 12 releases ignore (DS33).*
 - [x] Accuracy state: `HIGH` / `MEDIUM` / `LOW` / `UNRELIABLE`
 
 **UI (DESIGN.md §5)**
@@ -396,7 +406,7 @@ Depends on: Phase 1 (Room).
 - [x] Squares, not circles (avoids §10 anti-patterns)
 - [x] Row height: 56pt minimum
 - [x] Tap day row → expands inline with individual prayer rows + scheduled times
-- [x] Soft aggregate line: "42 of 45 prayers on time this week" — IBM Plex `body-sm`, ink-muted, under "This week"
+- [x] Soft aggregate line: "12 of 17 prayers on time this week" — IBM Plex `body-sm`, ink-muted, under "This week"
 - [x] No calendar grid, no heat-map, no streak hero, no gamification copy
 
 **Accessibility**
@@ -417,11 +427,11 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 - [x] Foreground service for adhan audio declared
 
 **AlarmScheduler**
-- [x] `scheduleAll(profiles)` — exact alarms via `AlarmManager.setExactAndAllowWhileIdle`, for the "Alerts for" profile only (plus early reminders)
+- [x] `scheduleAll(profiles)` — exact alarms via `AlarmManager.setExactAndAllowWhileIdle` (inexact `setAndAllowWhileIdle` when exact alarms aren't allowed), for the "Alerts for" profile only (plus early reminders)
 - [x] Imsak alarm = Fajr −10 min, scheduled only during Hijri Ramadan
 - [x] Idempotent: calling `scheduleAll()` twice produces no duplicate alarms
 - [x] Reschedule on app open/resume (covers gaps from background kill)
-- [x] Daily midnight reschedule (advance to next day's times)
+- [x] Daily midnight reschedule (advance to next day's times) — *at the device's midnight, so a notification profile in another zone misses the alarms between the two midnights unless a widget or an app open re-arms them (DS12)*
 
 **BroadcastReceivers**
 - [x] `BootReceiver` — `BOOT_COMPLETED` → `scheduleAll()` for all active profiles
@@ -432,7 +442,7 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 - [ ] Adhan audio assets bundled: Makkah, Madinah, Egyptian, Turkish, Al-Aqsa, Silent — **not bundled.** `AdhanService` plays the system notification sound for any voice except None and stops after 30 s (DS14).
 
 **OEM battery optimization**
-- [x] `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent immediately after notification permission granted
+- [x] `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent immediately after notification permission granted — *Android 13+ only; Android 8–12 are never asked (PR #34 A3)*
 - [x] One-time prompt; do not re-prompt
 
 **Tests**
@@ -567,7 +577,7 @@ Depends on: all phases (run after each PR, gate on `main` merge).
 Run before Play Store submission.
 
 **Supply chain**
-- [ ] Verify Adhan license in `batoulapps/adhan-java` GitHub; update `legal-posture.md`
+- [x] ~~Verify Adhan license in `batoulapps/adhan-java` GitHub; update `legal-posture.md`~~ → MIT (2026-09-24)
 - [ ] `./gradlew --write-verification-metadata sha256`; commit `gradle/verification-metadata.xml`
 - [ ] `./gradlew :app:dependencies` — confirm zero third-party analytics SDKs
 
