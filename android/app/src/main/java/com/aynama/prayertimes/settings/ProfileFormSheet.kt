@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.shared.CalculationMethodKey
+import com.aynama.prayertimes.shared.LocationTimeZone
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
@@ -151,7 +152,7 @@ internal fun ProfileFormSheet(
                 val tz = when {
                     initial.timezone.isNotBlank() -> initial.timezone
                     initial.isGps -> ZoneId.systemDefault().id
-                    address != null -> detectTimezoneForLocation(address.countryCode, initial.longitude)
+                    address != null -> LocationTimeZone.detect(address.countryCode, initial.latitude, initial.longitude)
                     else -> ""
                 }
                 label to tz
@@ -375,7 +376,7 @@ private fun LocationSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                val tz = detectTimezoneForLocation(address.countryCode, address.longitude)
+                                val tz = LocationTimeZone.detect(address.countryCode, address.latitude, address.longitude)
                                 onLocationSelected(address.latitude, address.longitude, cityLabel, tz)
                                 isSearching = false
                                 query = ""
@@ -516,23 +517,6 @@ private fun LocationTimezoneToggle(
                 uncheckedThumbColor = Parchment,
             ),
         )
-    }
-}
-
-private fun detectTimezoneForLocation(countryCode: String?, longitude: Double): String {
-    if (countryCode.isNullOrBlank()) return ""
-    return try {
-        val ids = android.icu.util.TimeZone.getAvailableIDs(countryCode)
-        if (ids.isEmpty()) return ""
-        if (ids.size == 1) return ids[0]
-        // Longitude gives an approximate raw UTC offset. Within the country's timezone list
-        // this is accurate enough to resolve the correct zone for nearly all major cities.
-        val approxOffsetMs = (longitude / 15.0 * 3_600_000).toInt()
-        ids.minByOrNull { id ->
-            kotlin.math.abs(android.icu.util.TimeZone.getTimeZone(id).rawOffset - approxOffsetMs)
-        } ?: ids[0]
-    } catch (_: Exception) {
-        ""
     }
 }
 
