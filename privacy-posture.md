@@ -61,7 +61,7 @@ Required manifest entries:
 
 - `POST_NOTIFICATIONS` runtime permission (API 33+).
 - `USE_EXACT_ALARM` — declared in manifest (no user grant required). Prayer apps qualify under the alarm/clock exemption. Inexact alarms are unacceptable for prayer notification timing. Play Console requires exact alarm category declaration.
-- `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — coarse is sufficient for prayer time calculation (<1 arcminute error); prefer coarse.
+- `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — coarse is sufficient for prayer time calculation (<1 arcminute error) and for Qibla; prefer coarse. The profile sheet's "Use current location" asks for coarse only. The Qibla screen asks for both in one request, which is how Android 12+ offers Precise or Approximate (fine on its own is ignored on some Android 12 releases); either answer works.
 - Play Store **Data Safety form:** tick "No data collected" + "No data shared." Declare `SCHEDULE_EXACT_ALARM` usage reason in Play Console.
 
 ## Analytics posture

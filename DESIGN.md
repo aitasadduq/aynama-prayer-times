@@ -204,6 +204,7 @@ Watch scales defined separately in §7.
 - Above the rose: a small alignment hint in IBM Plex `caption` — "Turn right 12°" / "— Aligned —" (saffron when aligned).
 - Below the rose: degree readout in Fraunces `display-md` (e.g. `227°`) and distance in IBM Plex `body-sm` (e.g. `4,832 km to the Kaaba`). Optional secondary chip shows the Qibla bearing. No North bearing readout — North stays a whisper (the single "N" glyph on the ring), never a number.
 - Calibration banner (amber, persistent) at bottom when sensor accuracy < HIGH.
+- Location: the bearing comes from the device's current location when location permission is granted, otherwise from the default profile's saved coordinates. First open asks for fine and coarse location in one request, so Android 12+ offers Precise or Approximate. Either works; the bearing barely changes across a city. Nothing on screen says when the bearing comes from the profile.
 - No cardinal N/E/S/W *ring*. No concentric circles. No 3D Kaaba render. No tick marks. No degree graduations on the ring.
 - Reads as a letterpress print with a single ruled circle, not a cockpit.
 
