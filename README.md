@@ -14,23 +14,24 @@ Open-source Muslim prayer times & spiritual companion app for Android, iOS, Wear
 
 | Platform | Status |
 |---|---|
-| Android (phone + widgets) | v1 — in development. Built so far: prayer times with multiple profiles, Qibla, prayer tracker, notifications, four home-screen widgets |
-| WearOS | v2 — not started |
-| iOS (phone + widgets) | v3 — not started |
+| Android (phone + widgets) | v1 — in development. Built so far: prayer times with multiple profiles, Qibla, prayer tracker, notifications, four home-screen widgets, an optional live countdown notification |
+| WearOS | v2 — in progress: watch app, complications and tile, with profiles synced from the phone |
+| iOS (phone + widgets) | v3 — started: the shared prayer-time logic is ported to Swift (`ios/SharedLogic`); no app yet |
 | watchOS | v3 — not started |
 
 ## Architecture
 
-Independent native projects, validated by shared JSON test vectors. Prayer time math is handled by [Adhan](https://github.com/batoulapps/adhan-kotlin) (Batoul Apps) on both platforms: `com.batoulapps.adhan:adhan:1.2.1` on Android. The vectors aren't generated or run in CI yet; today the Android tests check Adhan against hard-coded Makkah values.
+Independent native projects, validated by shared JSON test vectors. Prayer time math is handled by [Adhan](https://github.com/batoulapps/adhan-kotlin) (Batoul Apps) on both platforms: `com.batoulapps.adhan:adhan:1.2.1` on Android and Adhan-Swift 1.5.0 on iOS. The vectors in `test-vectors/prayer-times/` are generated from Adhan-Kotlin by `scripts/adhan-parity/generate.py`; CI checks them against the schema and runs the Swift tests against them. The Android tests still check Adhan against hard-coded Makkah values.
 
 ```
 aynama/
-├── test-vectors/          ← JSON contract between platforms (schema only so far)
+├── test-vectors/          ← JSON contract between platforms: schema + generated vectors
 ├── android/
 │   ├── app/               ← Kotlin + Jetpack Compose phone app, incl. Glance widgets
-│   └── shared-logic/      ← Adhan wrapper, Qibla maths, Room database
-├── ios/                   ← Swift + SwiftUI (planned)
-└── scripts/               ← test vector generator (planned)
+│   ├── shared-logic/      ← Adhan wrapper, countdown timeline, Qibla maths, Room database
+│   └── wear/              ← WearOS app, complications and tile
+├── ios/SharedLogic/       ← Swift package: Adhan-Swift wrapper and the shared-logic ports
+└── scripts/               ← test-vector generator and validator
 ```
 
 See [architecture-design.md](architecture-design.md) for the full spec.
@@ -39,11 +40,11 @@ See [architecture-design.md](architecture-design.md) for the full spec.
 
 The design system is editorial and warm — Fraunces + IBM Plex, parchment and ink, saffron accent. Two deliberate departures from the prayer app genre: a vertical prayer timeline instead of circular countdown rings, and a typographic arrow instead of a compass-with-needle.
 
-Read [DESIGN.md](DESIGN.md) before any UI work. Hard rules are non-negotiable. DESIGN.md §21 lists where the Android app doesn't meet them yet.
+Read [DESIGN.md](DESIGN.md) before any UI work. Hard rules are non-negotiable. DESIGN.md §27 lists where the Android app doesn't meet them yet.
 
 ## Contributing
 
-All code changes require corresponding tests in the same PR. Before opening a pull request, run the unit tests from `android/` with `./gradlew test` and, with an emulator or device attached, `./gradlew connectedAndroidTest`: the Room and Hijri-offset tests are instrumented. The shared test-vector suite isn't set up yet.
+All code changes require corresponding tests in the same PR. Before opening a pull request, run the unit tests from `android/` with `./gradlew test` and, with an emulator or device attached, the instrumented tests (Room, Hijri offset, alarm delivery, widget binding). `:app` and `:wear` share an application ID, so run `./gradlew :app:connectedAndroidTest :shared-logic:connectedAndroidTest` on a phone and `./gradlew :wear:connectedAndroidTest` on a Wear OS emulator, picking each with `ANDROID_SERIAL`. For the Swift package, run `swift test` in `ios/SharedLogic`.
 
 ## License
 
