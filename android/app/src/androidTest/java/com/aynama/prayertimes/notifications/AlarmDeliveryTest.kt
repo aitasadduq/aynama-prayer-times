@@ -171,6 +171,15 @@ class AlarmDeliveryTest {
     }
 
     @Test
+    fun anAlertsProfileWithAnUnknownZoneCannotThrowOutOfScheduleAll() = runBlocking {
+        // The midnight rollover now reads the profile's zone. scheduleAll runs on every resume
+        // with no exception handler, so a throw here would crash the app on every launch.
+        app.profileRepository.update(profile.copy(timezone = "Not/AZone"))
+
+        AlarmScheduler.scheduleAll(context, app.profileRepository.observeAll().first())
+    }
+
+    @Test
     fun anArmedAlarmFiresAndReachesTheShade() {
         notificationManager.cancelAll()
         val notificationId = (profile.id * REQUEST_CODE_MULTIPLIER + PRAYER_INDEX_DHUHR).toInt()

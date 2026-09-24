@@ -86,6 +86,14 @@ internal fun schedulingDate(profile: Profile, instant: Instant = Instant.now()):
     instant.atZone(profile.effectiveZoneId()).toLocalDate()
 
 // Pure function — tested without Android runtime.
+// The rollover must land at the midnight of the zone the day's alarms were built in. At the
+// device's midnight instead, no alarm is armed for any prayer between the two midnights: a
+// London device with a New York profile re-arms at 19:00 New York time, finds the rest of
+// that day already past, and never arms the next Fajr, Dhuhr or Asr.
+internal fun nextRolloverEpochMs(zone: ZoneId, instant: Instant = Instant.now()): Long =
+    instant.atZone(zone).toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+
+// Pure function — tested without Android runtime.
 // savedProfileId: value of NotificationPreferences.notificationProfileId (-1 = unset).
 fun resolveNotificationProfile(savedProfileId: Long, profiles: List<Profile>): Profile? {
     if (profiles.isEmpty()) return null
@@ -129,7 +137,8 @@ object AlarmScheduler {
         // start and resume, boot, timezone change, prayer rollover, settings change.
         runCatching { LiveNotificationScheduler.refreshAndArm(context) }
             .onFailure { Log.w(TAG, "live notification refresh failed", it) }
-        scheduleMidnightReschedule(context)
+        val rolloverZone = profile?.let { runCatching { it.effectiveZoneId() }.getOrNull() }
+        scheduleMidnightReschedule(context, rolloverZone ?: ZoneId.systemDefault())
     }
 
     // Private on purpose: this arms notification alarms only. Callers that reach for it
@@ -205,11 +214,8 @@ object AlarmScheduler {
     private fun alarmIntent(context: Context): Intent =
         Intent(context, PrayerAlarmReceiver::class.java).setAction(ACTION_PRAYER_ALARM)
 
-    fun scheduleMidnightReschedule(context: Context) {
-        val midnight = LocalDate.now().plusDays(1)
-            .atStartOfDay(ZoneId.systemDefault())
-            .toInstant()
-            .toEpochMilli()
+    private fun scheduleMidnightReschedule(context: Context, zone: ZoneId) {
+        val midnight = nextRolloverEpochMs(zone)
         val intent = Intent(context, BootReceiver::class.java).setAction(ACTION_MIDNIGHT_RESCHEDULE)
         val pi = PendingIntent.getBroadcast(
             context, MIDNIGHT_REQUEST_CODE, intent,
