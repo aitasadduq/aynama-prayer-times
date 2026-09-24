@@ -50,6 +50,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -321,7 +322,10 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
             ) {
                 BearingReadout(
                     degrees = qiblaDeg,
-                    distanceLabel = "$formattedDistance km to the Kaaba",
+                    // Naming the profile is the only sign the bearing isn't from where the user is.
+                    distanceLabel = state.fromProfile
+                        ?.let { "$formattedDistance km from $it to the Kaaba" }
+                        ?: "$formattedDistance km to the Kaaba",
                     boxBg = boxBg,
                     boxFg = boxFg,
                     boxFgMuted = boxFgMuted,
@@ -389,7 +393,8 @@ private fun BearingReadout(
                     fontFamily = IbmPlexSans,
                     fontWeight = FontWeight.Normal,
                     fontSize = 14.sp,
-                    lineHeight = 14.sp,
+                    lineHeight = 20.sp,
+                    textAlign = TextAlign.Center,
                 ),
                 color = boxFgMuted,
             )

@@ -415,6 +415,7 @@ class QiblaViewModelTest {
         assert(ready.qiblaBearing in 56f..60f) {
             "expected NYC bearing ~58° from live location, got ${ready.qiblaBearing}"
         }
+        assert(ready.fromProfile == null) { "a live fix must not name the profile, got ${ready.fromProfile}" }
     }
 
     @Test
@@ -436,6 +437,8 @@ class QiblaViewModelTest {
         assert(ready.qiblaBearing in 117f..121f) {
             "expected London bearing ~119° fallback, got ${ready.qiblaBearing}"
         }
+        // The screen names the profile, so the user can tell the bearing isn't from where they are.
+        assert(ready.fromProfile == "Profile1") { "expected the fallback to name Profile1, got ${ready.fromProfile}" }
     }
 
     // ---------- Lifecycle ----------
