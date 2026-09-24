@@ -90,6 +90,8 @@ class QiblaViewModel(
     // Single-flight prayer-times job. Cancelled on profile change so a stale coroutine
     // can't write the old profile's times into the new profile's cache slot.
     private var timesJob: Job? = null
+    // Location fetch for the current resume; cancelled on pause so no GPS work outlives the screen.
+    private var locationJob: Job? = null
 
     // LP filter + unwrap state. Single-threaded (sensor thread only).
     private val sensorState = QiblaSensorState()
@@ -166,10 +168,13 @@ class QiblaViewModel(
     }
 
     private fun fetchCurrentLocation() {
-        viewModelScope.launch {
-            val location = locationProvider.current() ?: return@launch
-            liveLocation = location
-            // Recompute from the fresh fix; the next sensor frame emits with the new bearing.
+        // Single-flight: an older request finishing late must not overwrite a newer one.
+        locationJob?.cancel()
+        locationJob = viewModelScope.launch {
+            // Null clears an earlier fix, so a city the user has left falls back to the profile,
+            // which the screen names, rather than passing for where they are now.
+            liveLocation = locationProvider.current()
+            // The next sensor frame emits with the new bearing.
             recomputeGeo()
         }
     }
@@ -186,6 +191,7 @@ class QiblaViewModel(
 
     fun stop() {
         sensorManager.unregisterListener(sensorListener)
+        locationJob?.cancel()
     }
 
     override fun onCleared() {

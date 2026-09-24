@@ -7,6 +7,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.os.Build
 import android.os.CancellationSignal
+import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -16,7 +17,8 @@ import kotlin.coroutines.resume
  * Returns the device's current latitude/longitude, or null when location is unavailable
  * (permission not granted, no provider enabled, no fix). Intentionally uses the platform
  * [LocationManager] only — no Google Play Services — to keep the app F-Droid-compatible.
- * Coarse accuracy is sufficient: the Qibla bearing is effectively constant within a city.
+ * Coarse accuracy is sufficient: the Qibla bearing is effectively constant within a city,
+ * except within a few kilometres of the Kaaba, where only a precise fix points true.
  */
 fun interface CurrentLocationProvider {
     suspend fun current(): Pair<Double, Double>?
@@ -30,6 +32,13 @@ internal fun locationProviders(hasFine: Boolean, sdkInt: Int): List<String> =
     } else {
         listOf(LocationManager.NETWORK_PROVIDER)
     }
+
+// A last-known fix can be days old and from another country. Past this age it counts as no fix,
+// so Qibla falls back to the profile and names it, rather than pointing from an old place.
+private const val MAX_LAST_KNOWN_AGE_NANOS = 60L * 60 * 1_000_000_000
+
+internal fun isRecentFix(fixElapsedNanos: Long, nowElapsedNanos: Long): Boolean =
+    nowElapsedNanos - fixElapsedNanos <= MAX_LAST_KNOWN_AGE_NANOS
 
 class AndroidCurrentLocationProvider(context: Context) : CurrentLocationProvider {
 
@@ -83,6 +92,7 @@ class AndroidCurrentLocationProvider(context: Context) : CurrentLocationProvider
         try {
             @Suppress("MissingPermission")
             lm.getLastKnownLocation(provider)
+                ?.takeIf { isRecentFix(it.elapsedRealtimeNanos, SystemClock.elapsedRealtimeNanos()) }
         } catch (_: Exception) {
             null
         }

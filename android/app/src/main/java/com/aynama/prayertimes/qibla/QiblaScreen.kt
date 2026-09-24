@@ -51,6 +51,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -397,6 +398,9 @@ private fun BearingReadout(
                     textAlign = TextAlign.Center,
                 ),
                 color = boxFgMuted,
+                // Profile names have no length limit; two lines keep the compass its room.
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
