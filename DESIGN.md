@@ -1,12 +1,12 @@
 # aynama-prayer-times — Design System
 
-**Status:** v1. Governs all UI decisions across iOS, Android, watchOS, WearOS. Re-baselined on 2026-09-23 against the shipped Android v1 (Phases 0–7).
+**Status:** v1. Governs all UI decisions across iOS, Android, watchOS, WearOS. Re-baselined in September 2026 against Android v1 as built on `agent-main`.
 **Aesthetic:** Contemplative editorial. Warm. Hospitable. Unhurried.
 **Stance:** Hybrid — reverent hero, utilitarian tools.
 
 Every UI decision in this repo traces back to this document. If a new surface contradicts something here, update this file first, then the code.
 
-> **How to read this revision.** Android v1 is the first built surface, and this file now describes it. Where the app deliberately moved away from the April 2026 spec, the spec now follows the app. That covers the centred countdown hero, the stepped surface cycle, the Qibla panels, the four widgets, the ±2-day Hijri adjustment, and location time zone being on by default. Where the app breaks a hard rule (contrast, no Roboto, tabular numerals, no purple), **the rule stands**, and the breach is listed in §21 with a finding ID (`DS…`) tracked in `REVIEW-FINDINGS.md`. "Android v1" means the code on `main` at the time of this sync. Android dp and sp map 1:1 onto the pt values used in the platform-neutral tables.
+> **How to read this revision.** Android v1 is the first built surface, and this file now describes it. Where the app deliberately moved away from the April 2026 spec, the spec now follows the app. That covers the stepped surface cycle, the Qibla panels, the four widgets, the ±2-day Hijri adjustment, and location time zone being on by default. Where the app breaks a hard rule (contrast, no Roboto, tabular numerals), **the rule stands**, and the breach is listed in §27 with a finding ID (`DS…`) tracked in `REVIEW-FINDINGS.md`. "Android v1" means the code on `agent-main` at `5eeed05`: Android, WearOS and iOS work merges there, and `main` is behind it. §19–§24 are that branch's specs; the sync added §25–§27. Android dp and sp map 1:1 onto the pt values used in the platform-neutral tables.
 
 ---
 
@@ -36,7 +36,7 @@ Two modes. The surface tells you which one you're in.
 - The widget configuration screen
 - Later: Zakat calculator, Quran reader (text is sacred; the UI serving it is not)
 
-**Glanceable surfaces** (fixed palette, no cycle): home-screen widgets (§19), system notifications (§15), and later the watch (§7).
+**Glanceable surfaces** (fixed palette, no cycle): home-screen widgets (§25), system notifications (§15, §22), and the watch (§7).
 
 Contemplative surfaces carry the time-of-day cycle. Utilitarian surfaces stay on a stable neutral. Do not bleed one into the other.
 
@@ -75,8 +75,8 @@ Each phase is a vertical two-stop gradient. The phase comes from the active prof
 | Maghrib (sunset) | Maghrib → Isha | `#6B2E2A` | `#1C1A17` | parchment | Oxblood into ink. |
 
 - When Isha falls after midnight (high latitudes in summer), Maghrib holds until Isha. Near the June solstice at about 50°N and up this breaks: Isha and Fajr land on the same clock time (DS31).
-- A profile with no computable times (§20) and the add-profile page both use the Isha surface.
-- Home evaluates the phase in the profile's effective time zone (§17). Qibla uses the device zone (DS12).
+- A profile with no computable times (§26) uses the Isha surface.
+- Home and Qibla evaluate the phase in the profile's effective time zone (§17).
 
 Utilitarian screens ignore this cycle. They stay on `parchment` when the system is in light mode and on `ink` in dark mode.
 
@@ -115,7 +115,7 @@ The April table misstated three pairs: ink on parchment (listed 13.8:1, actually
 
 Tracked as DS3. Any new colour must be checked against ink, parchment, and every gradient stop it can sit on.
 
-**Not yet audited: non-text contrast** (WCAG 1.4.11: 3:1 for control boundaries and meaningful graphics). Likely failures: `parchment-muted` on parchment (1.37:1) for switch-off tracks, empty tracker squares and outlined-button borders; and the saffron page dot and Qibla arrow against the Asr gradient, whose bottom stop is saffron.
+**Not yet audited: non-text contrast** (WCAG 1.4.11: 3:1 for control boundaries and meaningful graphics). Likely failures: `parchment-muted` on parchment (1.37:1) for switch-off tracks, empty tracker squares and outlined-button borders; and the saffron page dot, the saffron Add profile FAB and the Qibla arrow against the Asr gradient, whose bottom stop is saffron.
 
 ### Colours outside the token set (in use)
 
@@ -125,7 +125,6 @@ Tracked as DS3. Any new colour must be checked against ink, parchment, and every
 | `#6B2E2A` at 90% | Ramadan banner on Home | Reuses the Maghrib oxblood stop; parchment text 6.7:1. Promote to a token or drop (DS19). |
 | `#7A5800` at 90% with `#FFF3CD` text | Qibla calibration banner | Off-palette caution pair, 4.8–6.5:1 (DS19). |
 | Material baseline error `#B3261E`, error container `#F9DEDC` | Delete profile button and swipe-to-delete background | Off-palette (DS19). |
-| Material baseline lavender, purple-grey and pink | Nav bar, bottom sheets, menus, dialog, time picker | **Hard-rule breach** (DS1). See below. |
 
 ### Android: Material 3 colour roles
 
@@ -133,24 +132,22 @@ Android maps the tokens onto Material 3 colour roles in `ui/theme/AynamaTheme.kt
 
 | Role | Light | Dark |
 |---|---|---|
-| primary | saffron | saffron |
-| onPrimary | parchment ✗ (2.99:1 on saffron) | ink |
+| primary / onPrimary | saffron / parchment ✗ (2.99:1) | saffron / ink |
 | primaryContainer / onPrimaryContainer | parchment-muted / ink | saffron-ink / parchment |
-| background, surface | parchment | ink |
-| onBackground, onSurface | ink | parchment |
+| secondary, tertiary / their on- roles | saffron-ink / parchment | saffron / ink |
+| secondaryContainer, tertiaryContainer / their on- roles | parchment-muted / ink | ink-muted / parchment |
+| background, surface / onBackground, onSurface | parchment / ink | ink / parchment |
 | surfaceVariant / onSurfaceVariant | parchment-muted / ink-muted | ink-muted / parchment-muted |
+| surfaceContainerLowest, surfaceContainerLow, surfaceContainer | parchment | ink |
+| surfaceContainerHigh, surfaceContainerHighest | parchment-muted | ink-muted |
+| surfaceBright / surfaceDim | parchment / parchment-muted | ink-muted / ink |
+| inverseSurface / inverseOnSurface | ink / parchment | parchment / ink |
+| inversePrimary / surfaceTint | saffron / saffron | saffron-ink / saffron |
 | outline / outlineVariant | ink-muted / parchment-muted | ink-muted / ink-muted |
+| scrim | ink | ink |
+| error roles | Material's baseline red (DS19) | Material's baseline red (DS19) |
 
-Every other role is unset: `secondary*`, `tertiary*`, `surfaceContainer*`, `inverse*`, `error*`, `scrim`, and the rest. Unset roles fall back to Material's baseline palette. In light mode that's `surfaceContainer` `#F3EDF7`, `surfaceContainerLow` `#F7F2FA`, `secondaryContainer` `#E8DEF8`, `secondary` `#625B71` and `tertiaryContainer` `#FFD8E4`. In dark mode it's `#211F26`, `#1D1B20`, `#4A4458` and `#633B48`. (Values checked against the Compose Material 3 token sources: `tokens/ColorLightTokens.kt`, `ColorDarkTokens.kt`, `PaletteTokens.kt`.)
-
-These components read the unset roles:
-- the navigation bar (container, active indicator, selected label)
-- every `ModalBottomSheet`
-- the calculation-method dropdown
-- the time-picker dialog, whose dial is lavender and whose AM/PM selector (12-hour mode) is pink
-- the swipe-to-delete background
-
-**Rule:** define every Material role from the tokens, and never leave a Material default in place. Set `onPrimary` to `ink` in light mode too. Tracked as DS1.
+Every role except `error` has been mapped from the tokens since the Phase 2 validation gate (#27). One contrast gap remains: light `onPrimary` is parchment, 2.99:1 on saffron. The app's filled buttons and FABs override it with ink, so it shows only where a Material component reads the role itself, such as the selected number on the time picker's dial. **Rule:** set it to `ink`, as dark mode does. Tracked as DS1.
 
 ### Every Material role must be assigned
 
@@ -169,7 +166,7 @@ rendered lavender on every screen of the app, in both themes, until the Phase 2 
 - **surfaceContainer ladder** — Material's elevation tones flattened onto parchment/ink and
   their muted partners. The palette has no tint scale to climb, and §2 asks utilitarian
   surfaces to stay on one stable ground.
-- **error** — the system red, as above. The only colour in the app from outside the palette.
+- **error** — Material's baseline red, listed above with the other colours from outside the token set (DS19).
 
 When adding a Material component, check which roles it reads before assuming it inherits.
 
@@ -213,7 +210,7 @@ Every time display uses tabular figures. **Non-negotiable — prayer times must 
 - **IBM Plex Sans:** figures are tabular by default. Every digit is 600/1000 em, so Plex times never drift. The file has no `tnum` feature, so `fontFeatureSettings = "tnum"` in code does nothing (and nothing is needed).
 - **Fraunces:** figures are **proportional**. At the default instance, "1" is 1024/2000 em and "0" is 1461. The file has no `tnum` feature either, so Fraunces cannot set a number that changes in place without drifting.
 
-Android v1 sets two changing numbers in Fraunces anyway: the Home countdown hero and the widget countdowns. The hero is centred, so each change re-centres the whole line (DS9). The Qibla degree readout is also Fraunces with a no-op `tnum`, but it shows the fixed Qibla bearing, so it doesn't change on screen.
+Android v1 sets two changing numbers in Fraunces anyway: the Home countdown hero and the widget countdowns. The hero is left-aligned and changes every second (§19), so whenever a digit changes width, every character after it shifts (DS9). The Qibla degree readout is also Fraunces with a no-op `tnum`, but it shows the fixed Qibla bearing, so it doesn't change on screen.
 
 **Rule until DS9 is resolved:** numbers that change in place are set in IBM Plex Sans. Fraunces numerals are for numbers that don't change on screen. The alternative is to bundle a Fraunces build that has tabular figures.
 
@@ -222,8 +219,8 @@ Android v1 sets two changing numbers in Fraunces anyway: the Home countdown hero
 | Token | Size / line height | Font | Material 3 slot (Android) | Used for |
 |---|---|---|---|---|
 | `display-xl` | 72 / 1.0 | Fraunces 400, opsz 144 | `displayLarge` | Home countdown hero |
-| `display-lg` | 48 / 1.05 | Fraunces 500, opsz 96 | `displayMedium` | "+" on the add-profile page, empty-state mark |
-| `display-md` | 32 / 1.1 | Fraunces 500, opsz 48 | `displaySmall` | Next-prayer line, sheet titles, "Profiles", "No prayer times today" |
+| `display-lg` | 48 / 1.05 | Fraunces 500, opsz 96 | `displayMedium` | Empty-state mark |
+| `display-md` | 32 / 1.1 | Fraunces 500, opsz 48 | `displaySmall` | The prayer line under the countdown, sheet titles, "Profiles", "No prayer times today" |
 | `title` | 20 / 1.25 | Fraunces 500, opsz 20 | `headlineMedium` | Timeline prayer names, section and week headers, profile names, picker titles |
 | `body-lg` | 17 / 1.45 | IBM Plex Sans 400 | `bodyLarge` | Tracker "Today" rows, mark-sheet options, text-field input |
 | `body` | 15 / 1.45 | IBM Plex Sans 400 | `bodyMedium` | Default UI, row labels |
@@ -253,9 +250,9 @@ Code builds these ad hoc. PR #12 M8 asks for them to become named styles.
 
 ### Copy & transliteration
 
-- Prayer names are plain: Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha, Imsak.
+- Prayer names are plain: Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha, Imsak, and Jumuah for Friday's Dhuhr (§20).
 - Scholarly transliteration (macrons, underdots, ʻayn) is used for Hijri months ("Rabīʻ II", "Dhu al-Ḥijjah"), madhab names ("Shāfiʻī", "Ḥanafī"), "Umm al-Qurā", and the greeting "Ramaḍān Mubārak".
-- It isn't consistent yet: Home says "Qaḍā", the mark sheet says "Qada", the code says "Qaza", and Notifications says "Ramadan Imsak" (DS23). Pick one form per word and apply it everywhere.
+- It isn't consistent yet: Home says "Qaḍā", the mark sheet says "Qada", the code says "Qaza", Notifications says "Ramadan Imsak", and §20's heading says "Jumu'ah" where the app shows "Jumuah" (DS23). Pick one form per word and apply it everywhere.
 - Tone: calm and declarative. No exclamation marks, no encouragement copy (§16 copy rules apply app-wide).
 
 ### Rules
@@ -273,7 +270,7 @@ Code builds these ad hoc. PR #12 M8 asks for them to become named styles.
 
 - A bottom navigation bar with four tabs: **Prayers** (Home, renamed from "Home" in May 2026), **Qibla**, **Tracker**, **Settings**.
 - Notifications and Adhan voice are pushed routes inside the Settings tab.
-- The bar uses Material's default container and indicator colours (DS1) and filled icons (DS21). Labels are capped at 1.3× font scale.
+- The bar is parchment with a parchment-muted indicator (ink and ink-muted in dark mode), and uses filled icons (DS21). Labels are capped at 1.3× font scale.
 - On the Notifications and Adhan voice routes, no tab shows as selected, because selection compares exact routes (DS21).
 - Content, including the time-of-day surface, is laid out below the status bar (DS18).
 - Phone only, portrait only. There is no tablet or foldable layout yet.
@@ -286,8 +283,8 @@ Code builds these ad hoc. PR #12 M8 asks for them to become named styles.
 ┌──────────────────────────────────┐
 │ London · MWL     11 Rabīʻ II 1448│  ← body-sm, 70% of foreground
 │                                  │
-│              2h 18m              │  ← display-xl, centred: time to the next event
-│          Asr · 4:14 PM           │  ← display-md, centred: next event and its time
+│ -02:18:07                        │  ← display-xl, left-aligned, signed (§19)
+│ Asr · 4:14 PM                    │  ← display-md: the prayer the countdown refers to
 │                                  │
 │  ✓  Fajr                5:12 AM  │  ← passed: muted token, ✓
 │     Sunrise             6:48 AM  │  ← time reference: muted, no mark
@@ -295,8 +292,8 @@ Code builds these ad hoc. PR #12 M8 asks for them to become named styles.
 │     Asr                 4:14 PM  │  ← upcoming: foreground, no mark
 │     Maghrib             6:57 PM  │
 │     Isha                8:22 PM  │
-│  3 outstanding Qaḍā              │  ← body-sm, 60%; only when > 0
-│               ● • •              │  ← page dots; the last is "Add profile"
+│  3 outstanding Qaḍā          (+) │  ← body-sm, 60%, only when > 0; the Add profile FAB (§21)
+│                ● •               │  ← page dots, one per profile
 └──────────────────────────────────┘
 ```
 
@@ -306,10 +303,10 @@ Code builds these ad hoc. PR #12 M8 asks for them to become named styles.
 - Both are `body-sm` at 70% of the foreground, on one line, truncated with an ellipsis.
 
 **Hero**
-- The countdown is the largest thing on screen: `display-xl`, centred. It was left-aligned until 2026-05-29.
-- It counts to the next event, **Sunrise included**. Between Fajr and sunrise it counts to Sunrise, when Fajr's time ends; this is v1 feature #3, "time until the prayer becomes Qaḍā".
-- Format: "2h 18m", then "18m", then "42s" in the final minute.
-- Below it, "{next} · {time}" in `display-md`, centred.
+- The countdown is the largest thing on screen: `display-xl`, left-aligned, following §19. It reads "-02:18:07" while counting down to an event, and "00:15:42", with no sign, for the first 30 minutes after a prayer begins. (`main` has centred it since 2026-05-29; #22 restored the left alignment on `agent-main`.)
+- It counts to the next event, **Sunrise included**. Between Fajr and sunrise it counts to Sunrise, when Fajr's time ends; this is v1 feature #3, "time until the prayer becomes Qaḍā". Sunrise never counts up (§19).
+- If no event can be found on one side of now, it shows `--:--:--`.
+- Below it, in `display-md` and also left-aligned: the prayer the countdown refers to and that prayer's time, "Asr · 4:14 PM". While counting up, that's the prayer that has just begun.
 
 **Timeline rows**
 
@@ -321,9 +318,11 @@ Six rows (seven in Ramadan) are spread evenly over the remaining height. Each ro
 - **Sunrise:** muted, no mark.
 - **Imsak:** Ramadan only, the first row, at Fajr − 10 min. Foreground until it passes, then muted. No mark.
 
+On Friday the Dhuhr row reads Jumuah (§20).
+
 Edge cases:
 - After Isha, Isha stays current until midnight. From midnight to Fajr, the new day's rows are all upcoming.
-- When Isha falls after midnight, Maghrib stays current until Isha. That holds only while Isha's clock time is earlier than Fajr's. Near the June solstice at about 50°N and up, adhan's default rule puts both at the middle of the night (London, 21 June: 01:02), so Home shows Isha as current, and Dhuhr, Asr and Maghrib as passed and markable, from about 1 AM (DS31).
+- When Isha falls after midnight, Maghrib stays current until Isha. That holds only while Isha's clock time is earlier than Fajr's. Near the June solstice at about 50°N and up, adhan's default rule puts both at the middle of the night (London, 21 June: 01:02), so Home shows Isha as current, and Dhuhr, Asr and Maghrib as passed and markable, from about 1 AM, while the countdown counts up from Fajr (DS31).
 
 Interaction:
 - Tapping a passed or current prayer opens the mark-prayer sheet for today (§16).
@@ -340,8 +339,9 @@ Never on this list: coloured left borders, cards per row, or row background fill
 ### Multi-profile pager (weather-app metaphor)
 
 - There is one page per profile, in creation order (there's no reordering UI yet).
-- After them comes an **Add profile** page: "+" in `display-lg` over "Add profile". Tapping it opens Settings.
-- Dots sit under the pager. The selected dot is 8 dp `saffron`; the others are 5 dp at 30% of the foreground, 6 dp apart. The add page gets a dot too.
+- There's no add page. A saffron **Add profile** FAB at the bottom right opens the profile sheet in place (§21).
+- The FAB floats 56 dp above the bottom edge, on the side where the timeline's times are right-aligned, and nothing pads the timeline to clear it. On shorter phones it likely covers part of the Isha row's time. Not checked on a device (DS37).
+- Dots sit under the pager, one per profile. The selected dot is 8 dp `saffron`; the others are 5 dp at 30% of the foreground, 6 dp apart.
 - The whole screen takes the active page's phase surface. Paging between profiles in different phases cross-fades over 3 s.
 - Paging never changes the structure; only the times, labels and surface change.
 - Swiping is the only way to switch profiles. The April "tap reveals a card stack" switcher and its "[Profile: Home ▾]" chip were not built.
@@ -353,7 +353,9 @@ Which profile each surface uses:
 | Home | Every profile (the pager) |
 | Qibla, Tracker | The *default profile*: the GPS-flagged one, otherwise the first. v1 never sets the GPS flag, so in practice the first profile. |
 | Notifications | The "Alerts for" profile (§15) |
-| Widgets | Each widget's own profile (§19) |
+| Widgets | Each widget's own profile (§25) |
+| Live notification | The "Alerts for" profile (§22) |
+| Watch | Every profile, mirrored from the phone. The watch opens on the "Alerts for" profile, and its complications and tile show that one (§7). |
 
 ### Ramadan on Home
 
@@ -392,7 +394,7 @@ Which profile each surface uses:
 - Panel text is parchment or ink. Muted text is parchment at 65%, or `ink-muted`. The accent is `saffron` on dark panels and `saffron-ink` on light ones.
 - On light phases the parchment panels nearly vanish into the top of the gradient (1.00–1.08:1). PR #21 D1 tracks this.
 
-**Title panel.** Full width, with a 16 dp side margin. It holds "Qibla" (Qibla title style) and, in the accent colour, the current phase as an eyebrow ("DHUHR").
+**Title panel.** Full width, with a 16 dp side margin. It holds "Qibla" (Qibla title style) and, in the accent colour, the current phase as an eyebrow ("DHUHR", or "JUMUAH" on a Friday afternoon, §20).
 
 **Rose (280 dp).** It rotates by the negative of the device heading, on a spring (damping 0.8, stiffness 100), so its contents hold still in the world.
 - **Ring:** a single circle, 28 dp stroke, 126 dp radius, in the panel colour. It is a frame: no graduations, no ticks, no progress.
@@ -424,10 +426,10 @@ Which profile each surface uses:
 
 ### Countdown screen
 
-Not built in Android v1; the Home hero is the countdown surface. The spec is kept for watch and iOS:
-- Prayer name in `display-lg`, top.
-- Time-until in `display-xl`, centre. §4 Numerals applies.
-- Adhan time in `body-lg`, bottom.
+Not built in Android v1; the Home hero is the countdown surface. The spec is kept for the watch and iOS:
+- Time-until in Fraunces `display-xl`, for example `-00:12:35`. Format and direction follow §19; §4 Numerals applies.
+- The prayer name below it in Fraunces `display-md`, with the prayer's own clock time.
+- The adhan trigger time in IBM Plex `body-lg`, at the bottom.
 - Time-of-day surface behind.
 
 ### Utilitarian screens (Settings, Notifications, Tracker, sheets)
@@ -461,7 +463,7 @@ Not built in Android v1; the Home hero is the countdown surface. The spec is kep
 - Switch: `saffron` track when on, `parchment-muted` track when off, `parchment` thumb.
 - Segmented choices (Asr school, Hijri adjustment): a row of equal-width buttons. The selected one is filled saffron with an ink label; the others are outlined.
 
-**Sheets.** Material `ModalBottomSheet` with its default 28 dp top corners and drag handle. The container colour is currently Material's default (DS1).
+**Sheets.** Material `ModalBottomSheet` with its default 28 dp top corners and drag handle, on `surfaceContainerLow`: parchment, or ink in dark mode.
 
 ---
 
@@ -487,7 +489,7 @@ Not built in Android v1; the Home hero is the countdown surface. The spec is kep
 
 ## 7. Watch Scale (watchOS + WearOS)
 
-**Status:** not started. WearOS is v2; watchOS is v3.
+**Status:** WearOS (v2) is in progress on `agent-main`: the watch app, three complication families and a tile are built, and the phone mirrors its profiles to the watch over the Wear Data Layer. watchOS (v3) hasn't started.
 
 **Designed first, not last.** Watch is the primary surface, not an afterthought.
 
@@ -519,7 +521,7 @@ Three state variants:
 
 Fraunces ball-terminal numerals carry the identity even at 12pt. IBM Plex Sans tabular numerals used when space is tighter.
 
-> **Note (2026-09-23).** The bundled Fraunces has proportional figures and no `tnum` feature (§4). A countdown set in it will drift, so settle DS9 before building complications.
+> **WearOS as built.** The watch app bundles no fonts: its screens and tile render in the system font (DS36), and complication text is drawn by the watch face. If Fraunces comes to the watch, settle DS9 first: the bundled build has proportional figures and no `tnum` feature (§4).
 
 ### Tile / watch-face scale (80px–100px)
 
@@ -577,8 +579,8 @@ direction.
 |---|---|---|
 | Surface cycle | Steps at each prayer boundary with a 3 s cross-fade. Paging to a profile in another phase also cross-fades. | ✓ |
 | Prayer-time transitions | 400 ms ease-out cross-fade of the hero and timeline. Never a hard cut. | ✗ The text swaps with no fade; only the surface fades (DS28). |
-| Countdown tick | Minute granularity, then seconds in the final minute. No rolling digits. | ✓ Home re-evaluates every second. |
-| Widget countdown | The system Chronometer shows H:MM:SS (MM:SS under an hour) and ticks every second. That's a RemoteViews constraint, accepted as an exception. | ✓ |
+| Countdown tick | Every second, because the countdown shows seconds (§19). No rolling digits. | ✓ |
+| Widget and live-notification countdowns | The system ticks them every second in its own format; §19's platform exception says what that allows. | ✓ |
 | Qibla rose | Spring physics (damping 0.8, stiffness 100). The raw heading is low-pass filtered, so there's no magnetic-needle jitter. | ✓ |
 | Qibla hint colour | 300 ms tween. | ✓ |
 | Page transitions | Platform defaults: iOS native push; on Android, Navigation Compose with Material predictive back. No custom transitions. | ✓ Navigation Compose defaults, no custom transitions. Predictive back is not declared in the manifest and is untested. |
@@ -621,8 +623,7 @@ Hard rules. A PR that violates any of these gets blocked at review.
 - **No bouncing animations, particle effects, glow pulses, or shimmer loaders.**
 
 **Android v1 breaches:**
-- Material's baseline purples and pinks leak through unset colour roles (DS1).
-- Roboto renders through unset type slots (DS5).
+- Roboto renders through unset type slots (DS5), and the watch app uses the system font throughout (DS36).
 - The crescent notification icon is borderline (DS22).
 
 Everything else on this list holds.
@@ -637,11 +638,11 @@ Everything else on this list holds.
 - Dynamic Type supported through `display-xl` down to `body-sm`.
 
 ### Android
-- **Colour.** Material You colour extraction is **disabled**; the design IS the palette. But unset Material roles fall back to Material's baseline purples (DS1).
+- **Colour.** Material You colour extraction is **disabled**; the design IS the palette. Every Material role except `error` is mapped from the tokens (§3).
 - **Icons.** §6 prefers Material Symbols on utilitarian chrome. Android v1 uses the Compose Material Icons set.
 - **Edge-to-edge** by default. Status bar matches current surface. Android v1 enables edge-to-edge, but the scaffold pads content below the status bar, so the time-of-day surface doesn't reach behind it and the status-bar strip shows the theme background instead (DS18).
 - **Form factor.** Portrait-only phone layout. minSdk 26, targetSdk 36.
-- **Dark mode.** Utilitarian screens follow the system theme and switch to `ink`. Contemplative screens ignore it, because the phase decides. Widgets ignore it (§19).
+- **Dark mode.** Utilitarian screens follow the system theme and switch to `ink`. Contemplative screens ignore it, because the phase decides. Widgets ignore it (§25).
 - **RTL.** `supportsRtl` is on, but no RTL locale ships yet.
 
 ### watchOS
@@ -651,6 +652,7 @@ Everything else on this list holds.
 ### WearOS
 - Tile API for glanceable card. Complication slots per Wear complications spec.
 - Color theme locked — does not adopt system theme.
+- As built on `agent-main`: the three watch tokens (`wear/WearTokens.kt`) on a solid ink field. The watch computes its own prayer times from the profiles the phone publishes.
 
 ---
 
@@ -670,10 +672,10 @@ Everything else on this list holds.
 
 | Element | Announcement |
 |---|---|
-| Home countdown | "Countdown to Asr: 2h 18m" |
+| Home countdown | "Asr in 02:18:07"; while counting up, "Dhuhr began 00:15:42 ago" |
 | Home page | "Profile page 1 of 3: London" |
 | Timeline row | "Fajr 5:12 AM, passed" (or "current", "upcoming"); "Sunrise 6:48 AM"; "Imsak 5:02 AM" |
-| Add page | "Add a new profile" |
+| Add profile FAB | "Add profile" |
 | Page dots | "Page 1", "Page 2", … (DS25) |
 | Qibla rose (polite live region, re-announced every 15° of heading) | "Facing northeast. Qibla is to the southeast — turn right" |
 | Tracker today row | "Mark Fajr prayer", or "Asr prayer, not due yet" |
@@ -683,7 +685,7 @@ Everything else on this list holds.
 | Adhan preview button | "Preview Makkah adhan" |
 | 4×2 widget time | "Asr, 4:14 PM, current" |
 
-The April target — prayer times announced with full context, as in "Dhuhr at 12:47, in 2 hours 18 minutes" — is not met yet. The countdown is read in its abbreviated visual form.
+The April target — prayer times announced with full context, as in "Dhuhr at 12:47, in 2 hours 18 minutes" — is not met yet. The countdown is read as its digits, with words for the direction.
 
 Minimum tap target on the other platforms: 44 × 44 pt (iOS), 44 × 44 pt (watchOS), 48 × 48 dp (WearOS).
 
@@ -733,6 +735,7 @@ Path: `shared/design-tokens.json` — **still to be created.** Until it exists, 
 | `home/GradientColors.kt` | Surface gradients |
 | `res/values/colors.xml` | Widget colours (no `saffron-ink`) |
 | `ui/theme/AynamaTypography.kt` | Type scale |
+| `wear/WearTokens.kt` | The watch's three colours |
 
 Android v1 doesn't follow the scales above:
 - **Radii:** 8 dp (widgets, calibration banner), 12 dp (Ramadan banner, Material's card default), 16 dp (Qibla panels, hint pill), 28 dp (sheet top, Material's default). Only 12 is on the scale.
@@ -752,7 +755,7 @@ This file governs UI decisions. Changes require:
 
 Small tweaks (adjusting a spacing token, adding a new icon) follow this process lightly. Changes to color, typography, composition (§3, §4, §5), or the Two Deliberate Departures (§9) require explicit discussion before merge.
 
-**Re-baselining.** When shipped code has drifted from this file, record each drift in the same PR, either as a spec change (with the reason) or as a §21 gap with a finding. The 2026-09-23 Android sync did this. Its spec changes, to §3, §4, §5, §8 and §15–§19, still need the explicit sign-off that §14 requires. TODOS.md holds the one list to sign off.
+**Re-baselining.** When shipped code has drifted from this file, record each drift in the same PR, either as a spec change (with the reason) or as a §27 gap with a finding. The September 2026 Android sync did this. Its spec changes, to §3, §4, §5, §8, §15–§18 and §25, still need the explicit sign-off that §14 requires. TODOS.md holds the one list to sign off.
 
 ---
 
@@ -766,7 +769,7 @@ Notifications is a utilitarian screen: stable parchment surface, no time-of-day 
 
 **Offset model:** hidden in per-prayer detail, not on the main list. Main list stays scannable.
 
-**Scope:** alarms are scheduled for **one profile at a time**, the "Alerts for" profile. Other profiles get no alarms. Widgets refresh independently for whichever profiles they show (§19).
+**Scope:** alarms are scheduled for **one profile at a time**, the "Alerts for" profile. Other profiles get no alarms. The live notification (§22) follows the same profile. Widgets refresh independently for whichever profiles they show (§25).
 
 ### Information Architecture
 
@@ -784,6 +787,7 @@ Notifications                       ← top app bar: back arrow + "Notifications
     ├── ADHAN
     │   └── Adhan voice       [Makkah  ›]
     └── OTHER
+        ├── Live countdown     [toggle]
         ├── Ramadan Imsak      [toggle]
         └── Vibration          [With sound  ›]
 ```
@@ -820,7 +824,7 @@ No "all-off" guilt banner. It's the user's phone.
 [prayer name]    [alert time]    [toggle]  [›]
 ```
 
-- **Prayer name:** IBM Plex `body`, `ink`.
+- **Prayer name:** IBM Plex `body`, `ink`. Always the canonical name: Dhuhr stays "Dhuhr" on Fridays, because the row governs every day (§20).
 - **Time:** `mono-num`, `ink-muted`. This is the **alert** time — the offset or fixed time applied — not the calculated prayer time. It's always 24-hour ("04:21"), whatever the device setting (DS13). It's computed when the screen opens and isn't refreshed after an edit, so the row and the detail-sheet header keep the old time until the screen is reopened (DS35).
 - **Toggle:** saffron track when on, parchment-muted when off, parchment thumb. Tapping the toggle turns the alert on or off.
 - **Chevron:** `ink-muted`, labelled "{Prayer} notification settings".
@@ -868,6 +872,11 @@ A top app bar with the title "Adhan voice" in `body`.
 Selection is immediate. No "Save" or "Apply" button. Nav-back confirms.
 
 ### Other Section
+
+**Live countdown row** (64 dp, §22):
+- "Live countdown" in `body`, with the caption "Keep the current prayer and its countdown in the shade" in `body-sm`, `ink-muted`, and a switch.
+- Off by default. Like every row below the master toggle, it's hidden while master is off, and master off also removes the notification.
+- The caption is hard-coded `InkMuted`, 3.02:1 in dark mode (DS4).
 
 **Ramadan Imsak row** (64 dp):
 - Label: IBM Plex `body`, `ink` — "Ramadan Imsak"
@@ -922,11 +931,12 @@ The two modes:
 ### Alerts as delivered (Android v1)
 
 **Channels**
-- "Prayer Times": high importance, and silent at the channel level. The app vibrates itself per the vibration setting, with a 400–200–400 ms pattern.
+- "Prayer Times" (`prayer_times_v2`): high importance, and silent at the channel level. The app vibrates itself per the vibration setting, with a 400–200–400 ms pattern.
+- "Live prayer countdown": minimum importance, silent, no badge (§22).
 - "Adhan": low importance, for the playback service.
 
 **Prayer alert**
-- The title is the prayer name; the text is "It is time for {prayer} prayer".
+- The title is the prayer name; the text is "It is time for {prayer} prayer". Friday's Dhuhr is named Jumuah (§20).
 - The small icon is the crescent placeholder (DS22).
 - Tapping the notification does nothing: it has no content intent, so auto-cancel never fires (DS14).
 
@@ -938,6 +948,11 @@ The two modes:
 **Imsak** (during Ramadan, if enabled)
 - Uses the prayer template, so it reads "It is time for Imsak prayer".
 - Starts the adhan service too (DS14).
+
+**Live notification** (§22, opt-in)
+- Ongoing and silent. The title is the prayer, the text "At 1:00 PM" or "Began at 1:00 PM", and the sub-text the profile.
+- The notification's own chronometer counts down to the prayer, then up from it.
+- Tapping it opens Home on that profile. Its times are always 12-hour (DS13).
 
 **Permissions**
 - The notification permission is requested on first launch (Android 13+).
@@ -975,14 +990,14 @@ The two modes:
 
 ### Marking flow
 
-**Primary (same day):** tap a passed or current prayer on the Home timeline (§5). A bottom sheet opens in place; there's no navigation away from Home. From Home the sheet opens with nothing pre-selected, even if the prayer was already marked (PR #13 M5).
+**Primary (same day):** tap a passed or current prayer on the Home timeline (§5). A bottom sheet opens in place; there's no navigation away from Home. From Home the sheet opens with nothing pre-selected, even if the prayer was already marked (PR #13 M5). The mark is saved under the device's date as it was when Home was first shown, not the profile's (DS12, PR #13 M1).
 
-**Today on this screen:** tap a row in the "Today" section.
+**Today on this screen:** tap a row in the "Today" section. The rows are the profile's day, but the mark is saved under the device's date, as from Home (DS12).
 
 **Retroactive (past days — qaḍā and corrections):** tap a day row to expand it inline, then tap one of its prayer rows. The same sheet opens.
 
 **The sheet:**
-- The prayer name in `display-md`, centred. Under it, "Today", "Yesterday" or "Mon, Sep 22" in `body-sm`, `ink-muted`.
+- The prayer name in `display-md`, centred, named for its day (Jumuah on a Friday, §20). Under it, "Today", "Yesterday" or "Mon, Sep 22" in `body-sm`, `ink-muted`, judged against the device's date.
 - Three 56 dp options, each a status square followed by its label in `body-lg`. The current status's label is saffron (DS2).
 - Choosing an option saves it and closes the sheet.
 
@@ -1084,11 +1099,11 @@ Squares, not circles. That keeps clear of circular-ring territory (§10) and rea
 - **Notifications row.** A bell icon, "Notifications" in `body`, and a chevron. It opens §15. It sits above Profiles; PR #16 A4 questions that order.
 - **Profile rows.** The name in `title`. Under it, the coordinates to four decimal places and the method's full name, in `body-sm`, `ink-muted`. The city name isn't stored, so it can't be shown (PR #15 A1).
 - **Actions.** Tapping a row opens the edit sheet. Swiping it right-to-left deletes it immediately over Material's error-container red, with no confirmation (PR #15 M10).
-- **FAB.** The saffron button with an ink "+" opens the create sheet. Home's "Add profile" page and empty-state button both lead here, so creating a profile takes one more tap.
+- **FAB.** The saffron button with an ink "+" opens the create sheet: the same `ProfileFormSheet` that Home's FAB and empty-state button open (§21).
 
 ### Profile sheet (create and edit)
 
-A `ModalBottomSheet` that opens **fully expanded**. The fields scroll, and Save and Delete stay pinned below them. It is a sheet, not the full-screen flow the architecture plan described.
+A `ModalBottomSheet` that opens **fully expanded**. The fields scroll, and Save and Delete stay pinned below them. It replaced the architecture plan's original full-screen flow (§21).
 
 ```
 New profile                                      ← display-md ("Edit profile" when editing)
@@ -1120,7 +1135,7 @@ Home's header uses short names for the same methods: MWL, ISNA, Umm al-Qurā, Eg
 
 **Asr school.** A two-button segmented row, Shāfiʻī or Ḥanafī. The default is Shāfiʻī. Only that madhab's Asr is shown anywhere in the app.
 
-**Save.** Enabled once the profile has a name and a location. It closes the sheet and stays on Settings; the new profile appears last in the Home pager.
+**Save.** Enabled once the profile has a name and a location. It closes the sheet, and the new profile becomes the last page of the Home pager. Opened from Home, the pager then lands on it; opened from Settings, the user stays on Settings.
 
 **Delete.** Only when editing. It works immediately, with no confirmation.
 
@@ -1146,10 +1161,11 @@ Home's header uses short names for the same methods: MWL, ISNA, Umm al-Qurā, Eg
 
 **Behaviour.** With the toggle on, the profile's zone applies to:
 - Home's times, countdown, timeline states, Hijri date and surface phase
-- Notification alarms
+- Qibla's surface phase, and the Tracker's times and "today"
+- Notification alarms and the live notification
 - Widgets
 
-Four places still use the device zone (DS12): the Qibla surface phase; the Tracker's scheduled times and "today"; the date Home and the Notifications screen compute their times for; and the midnight rollover that re-arms notification alarms. With the toggle off, everything uses the device zone.
+Three things still use the device's date (DS12): the date a mark is saved under, from Home or the Tracker; the date the Notifications screen computes its rows for; and the midnight rollover that re-arms notification alarms. With the toggle off, everything uses the device zone.
 
 ---
 
@@ -1212,8 +1228,8 @@ Two Room columns on `Profile` (database version 4):
 ### Context
 
 The countdown is the reason people open the app. It appears on the home screen, on all four
-widgets, in the live notification, and — once those platforms exist — on iOS, watchOS and
-WearOS. Before this spec each surface derived its own version, and they disagreed about what
+widgets, in the live notification, in the WearOS app and complications, and — once those
+platforms exist — on iOS and watchOS. Before this spec each surface derived its own version, and they disagreed about what
 happens in the minutes just after a prayer begins.
 
 One rule now governs all of them, implemented once in
@@ -1241,6 +1257,8 @@ straight on to Dhuhr. Only prayers count up.
 - Hours are not wrapped at 24. A gap longer than a day (possible at high latitudes) reads
   `-31:04:12` rather than silently restarting.
 - Fraunces `display-xl` on the home hero, tabular numerals (`tnum`). Never centred — §5.
+  The bundled Fraunces has no tabular figures, so until DS9 is settled the digits drift
+  (§4 Numerals).
 - The prayer the number refers to is always named next to it. A bare signed number does not
   say whether Dhuhr is coming or has just started.
 
@@ -1325,9 +1343,10 @@ Anywhere a **specific day's prayer** is shown:
 - Home countdown hero and prayer ribbon
 - All four widgets — schedule rows, 4×2 columns, countdown subject, and the 3-letter
   abbreviation (`JUM`, not `DHU`)
-- Prayer notifications and early reminders, including their text
+- Prayer notifications and early reminders, including their text, and the live notification
 - Prayer tracker — today's rows, history rows, and the mark-prayer sheet
-- Watch apps and complications, when those are built
+- The Qibla screen's phase label
+- The WearOS app and complications; watchOS when it's built
 
 ### Where it does not
 
@@ -1524,7 +1543,7 @@ nothing to restore after a reboot: pending notifications survive it, unlike Andr
 
 ---
 
-## 19. Home-Screen Widgets (Android)
+## 25. Home-Screen Widgets (Android)
 
 Four widgets, each picked separately from the launcher's widget list. They are glanceable surfaces: a fixed palette, no time-of-day cycle, and no dark variant.
 
@@ -1533,15 +1552,16 @@ Four widgets, each picked separately from the launcher's widget list. They are g
 - **Body:** `parchment` with 8 dp corners. `ink` bands at the top (dates) and bottom (profile), square on their inner edge.
 - **Type:** Fraunces for prayer names and countdowns; IBM Plex Sans for times, dates and profile names.
   - RemoteViews can't set variation axes, so the widgets likely render Fraunces at the file's default instance — Black (900) at optical size 9 — not the 400/500 weights of §4. Verify on a device (DS10).
-- **Countdown:** a system Chronometer counting down to the next event, Sunrise included. It shows H:MM:SS (MM:SS under an hour) and ticks every second (§8).
+- **Countdown:** a system Chronometer following §19. It counts down to the next event, Sunrise included, with a leading minus, then counts up without a sign for the first 30 minutes after a prayer. The platform owns the format: H:MM:SS, or MM:SS under an hour.
+- **Names** are day-aware: on Friday, Dhuhr reads Jumuah and abbreviates to JUM (§20).
 - **Times** follow the device's 12/24-hour setting.
-- **Tap:** anywhere opens the app on Home.
+- **Tap:** anywhere opens Home on this widget's profile, switching tabs if needed.
 - **Profile:** chosen per widget on the configure screen when the widget is placed, and again through the launcher's reconfigure action. A widget with no choice shows the "Alerts for" profile.
 
 ### The four widgets
 
 **Next Prayer** — 1 × 1, resizes from 40 to 250 dp. A centred stack:
-- next prayer name — Fraunces 18 bold, saffron
+- the countdown's prayer (the next one, or the one that has just begun) — Fraunces 18 bold, saffron
 - its time — IBM Plex Sans 14, ink
 - the countdown — Fraunces 22 bold, ink
 - the profile — IBM Plex Sans 11, ink-muted
@@ -1559,7 +1579,7 @@ Four widgets, each picked separately from the launcher's widget list. They are g
 **Prayer Times** — 4 × 2.
 - Top band: the dates on the left (IBM Plex Sans 16 and 13). On the right, "Sunrise" and its time (13 and 17).
 - Middle: five columns, Fajr to Isha. Name in Fraunces 14, ink, over the time in IBM Plex Sans 14, ink-muted.
-- Bottom band: the countdown (Fraunces 18 bold, saffron), "until Asr" (IBM Plex Sans 13, parchment), and the profile (12, parchment-muted).
+- Bottom band: the countdown (Fraunces 18 bold, saffron), "until Asr", or "since Asr" while counting up (IBM Plex Sans 13, parchment), and the profile (12, parchment-muted).
 
 **Current-event highlight** (Prayer Times only)
 - The current prayer's column turns saffron and bold.
@@ -1573,12 +1593,12 @@ Four widgets, each picked separately from the launcher's widget list. They are g
 | State | Shows |
 |---|---|
 | No profile yet | "Set up profile", "Open aynama" and "--:--". The countdown behaves as in the polar row below. |
-| The profile has no computable times (polar day or night) | "No times here", with "Midnight sun or polar night" where the Hijri date goes. The countdown starts at 0:00 and then runs negative until the next refresh, at most 30 minutes later: the Chronometer doesn't stop at zero (`PrayerWidget.kt:324,343`, `:589-590`). |
+| The profile has no computable times (polar day or night) | "No times here", with "Midnight sun or polar night" where the Hijri date goes. The countdown starts at zero and then runs negative until the next refresh, at most 30 minutes later: the Chronometer doesn't stop at zero, and it shows two minus signs, the widget's and the platform's (`PrayerWidget.kt:333,358`, `:623-626`). |
 
 ### Updates
 
 Widgets re-render:
-- 2 s after each event (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha, and tomorrow's Fajr), for every profile a placed widget shows
+- 2 s after each change of countdown state (every event, and 30 minutes after each prayer), with the next 12 always armed, for every profile a placed widget shows
 - when the time or time zone changes
 - when the app opens
 - every 30 minutes as a backstop
@@ -1594,7 +1614,7 @@ The widget picker shows one generic placeholder image for all four widgets. Andr
 
 ---
 
-## 20. Screen States
+## 26. Screen States
 
 Loading is never a shimmer (§8).
 
@@ -1603,7 +1623,7 @@ Loading is never a shimmer (§8).
 | State | Treatment |
 |---|---|
 | Loading | Plain `ink` surface. |
-| No profiles | `ink` surface, with a Kaaba mark (the emoji placeholder, DS17). "Set up your first prayer profile" in `title`, parchment. "Add a location to see accurate prayer times." in `body`, parchment at 60%. A "Create profile" button, saffron with an ink label, opens Settings. |
+| No profiles | `ink` surface, with a Kaaba mark (the emoji placeholder, DS17). "Set up your first prayer profile" in `title`, parchment. "Add a location to see accurate prayer times." in `body`, parchment at 60%. A "Create profile" button, saffron with an ink label, opens the profile sheet in place (§21). |
 | Error | `ink` surface, "Something went wrong" and the raw exception message. There's no specific cause and no way to recover (DS24). |
 | A page with no times today (polar day or night) | That page only, on the Isha surface. The profile name in `body-sm`. "No prayer times today" in `display-md`. Then, in `body` at 70%: "The sun doesn't fully rise or set at this location today, so there are no times to calculate from. This happens inside the polar circles around midsummer and midwinter. Other profiles are unaffected." |
 
@@ -1632,28 +1652,28 @@ Loading is never a shimmer (§8).
 | Notifications | Permission denied, master off, or a polar profile | §15. |
 | Profile sheet | No location results | Nothing shown. No finding tracks this yet; PR #15 M6 covers the missing loading indicator. |
 | Profile sheet | No location fix | Nothing happens (PR #15 M2). |
-| Widgets | No profile, or no times | §19. |
+| Widgets | No profile, or no times | §25. |
+| Watch | No profiles, or no times | "No profiles yet", saying to open aynama on the phone (or, after a sync, to add a profile there). "No times today" for a polar day. "Phone not seen recently" under the countdown when the sync is stale. |
 
 The empty-state rule from `architecture-design.md` still applies: a small meaningful visual, a plain-language heading, one primary action, and at most one sentence of context.
 
 ---
 
-## 21. Android v1 Conformance
+## 27. Android v1 Conformance
 
 Where the shipped Android app stands against this document's rules. Each gap has a finding in `REVIEW-FINDINGS.md` under "From design-doc sync". When a gap is fixed, follow the closing steps in `REVIEW-FINDINGS.md` in the same PR: update every mention of its ID, delete the finding, and remove the ID from its row here.
 
 | Rule | Status | Finding |
 |---|---|---|
-| §3 / §10 — one palette, no purple | ✗ Material baseline lavender, purple-grey and pink leak through unset colour roles. | DS1 |
-| §3 — AA contrast | ✗ Saffron text on light surfaces. The Home timeline on every phase but Isha (§3 table). Dark-mode colours. | DS2, DS3, DS4 |
-| §4 / §10 — no Roboto | ✗ Every button, menu item and time-picker label, plus two direct `labelSmall` uses. | DS5 |
+| §3 — AA contrast | ✗ Saffron text on light surfaces. The Home timeline on every phase but Isha (§3 table). Dark-mode colours. Light `onPrimary` on saffron. | DS1, DS2, DS3, DS4 |
+| §4 / §10 — no Roboto or system sans | ✗ Every button, menu item and time-picker label, plus two direct `labelSmall` uses. The watch app bundles no fonts. | DS5, DS36 |
 | §9 — the moving sundial tick | ✗ A static dot on the current row. | DS6 |
 | §18 — the Hijri adjustment is correct | ✗ The lapse lands on the wrong day. With +1 the Ramadan state appears on the user's Eid, or is missing on their first fast day; with −1 Ramadan's end is never delayed. | DS7 |
 | §6 — app icon | ✗ No launcher icon; the launch window is platform grey. | DS8 |
 | §4 — tabular numerals | ✗ The Fraunces countdowns drift. IBM Plex times are fine. | DS9 |
 | §4 — Fraunces only at 400/500 | ? Widgets probably render Fraunces Black. | DS10 |
 | §18 — the same Hijri date on every device | ✗ It depends on the device's region. | DS11 |
-| §17 — one time zone per profile everywhere | ~ Qibla, Tracker, the Home and Notifications dates, and the alarm rollover use the device zone. | DS12 |
+| §17 — one time zone per profile everywhere | ~ Mark dates, the Notifications screen's date and the alarm rollover use the device's date. | DS12 |
 | Consistent time format | ✗ Mixed 12-hour and 24-hour. | DS13 |
 | §15 — alerts behave well | ✗ No tap action, no stop action, Imsak treated as a prayer, placeholder audio. | DS14 |
 | §16 — "on time" only within the window; missed distinct from unmarked | ✗ | DS15 |
@@ -1671,12 +1691,13 @@ Where the shipped Android app stands against this document's rules. Each gap has
 | §16 — no dead styling paths | ~ | DS27 |
 | §8 / §12 — transition fades, reduced motion | ✗ | DS28 |
 | §12 — 48 dp touch targets | ✗ Home's timeline rows are about 25 dp tall. | DS29 |
-| §20 — the Tracker survives a polar profile | ✗ It shows its no-profile state. | DS30 |
+| §26 — the Tracker survives a polar profile | ✗ It shows its no-profile state. | DS30 |
 | §5 — Maghrib holds until an after-midnight Isha | ✗ Near the June solstice at about 50°N and up, Isha shows as current from about 1 AM. | DS31 |
 | §17 — the detected location time zone is right | ✗ City search picks a neighbouring zone for some major cities. | DS32 |
 | §5 — Qibla uses the device's location | ✗ The fine-only request may never show a dialog on Android 12+. | DS33 |
 | §16 — the Tracker shows the prayers marked on Home | ✗ Marks on other profile pages never reach it. | DS34 |
 | §15 — rows show the current alert time | ✗ They show the time from when the screen opened. | DS35 |
+| §21 — the FAB stays clear of the content | ? It likely covers part of the Isha time on shorter phones. | DS37 |
 
 ✗ = breach · ~ = partial · ? = unverified or needs a decision
 
@@ -1687,7 +1708,7 @@ Where the shipped Android app stands against this document's rules. Each gap has
 - no shimmer
 - no cards or coloured left borders on rows
 - no streaks or gamification copy
-- dynamic colour off
+- dynamic colour off, and every Material colour role except `error` mapped from the tokens
 - squares, not circles, in the tracker
 - a single quiet Qibla ring
 - 48 dp touch targets on the utilitarian screens
@@ -1704,7 +1725,8 @@ Where the shipped Android app stands against this document's rules. Each gap has
 - 2026-05-23 — §15 per-prayer detail and profile scoping; §17 added (PR #17)
 - 2026-05-25 — §18 added (PR #18)
 - 2026-08-06 — sunrise-phase gradient changed; no North readout on Qibla (PR #21)
-- 2026-09-23 — re-baselined against shipped Android v1 (Phases 0–7).
+- 2026-09-23 — re-baselined against Android v1 (Phases 0–7).
   - Contrast table recomputed; the font files audited for tabular figures and default instances; the Material 3 fallback colours and fonts checked against the Compose sources.
-  - §5, §15–§18 rewritten to match the code. §19 (widgets), §20 (states) and §21 (conformance) added.
+  - §5, §15–§18 rewritten to match the code. Widgets, screen states and conformance added, now §25–§27.
   - Spec changes flagged for §14 sign-off: listed in TODOS.md ("Sign off the spec changes the sync recorded").
+- 2026-09-24 — the sync re-checked against `agent-main` (`5eeed05`), where #22–#33 had landed, and placed after that branch's §19–§24. The Home hero follows §19 again, the add-profile page is gone, DS1 and DS12 narrowed, DS36 and DS37 added.

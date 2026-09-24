@@ -6,7 +6,7 @@ Context: Design session initiated from aitasadduq/camunda-backup-dr repo, but th
 Status: APPROVED
 Mode: Builder
 
-> **Sync note (2026-09-23).** Android v1 Phases 0–7 are built. This document is still the architecture and decision record, but several UX specs below were superseded while building. Each superseded passage now carries an **Android v1:** note saying what shipped. For anything visual, `DESIGN.md` is the source of truth; its §21 lists where the app still breaks a design rule, with findings in `REVIEW-FINDINGS.md` (the DS findings).
+> **Sync note (2026-09-23, re-checked 2026-09-24).** Android v1 Phases 0–7 are built, and on `agent-main` so are the unified countdown, the profile FAB, the live notification and most of the WearOS app. `main` is behind; the notes below describe `agent-main` at `5eeed05`. This document is still the architecture and decision record, but several UX specs below were superseded while building. Each superseded passage now carries an **Android v1:** note saying what shipped. For anything visual, `DESIGN.md` is the source of truth; its §27 lists where the app still breaks a design rule, with findings in `REVIEW-FINDINGS.md` (the DS findings).
 
 ## Problem Statement
 
@@ -32,14 +32,16 @@ The key architectural decision: whether to share business logic across platforms
 **Android v1:**
 1. **Profiles:** built. No profile is ever GPS-based: the flag exists in the schema, but nothing sets it (see the profiles UX spec).
 2. **Qibla:** built, and extended. It uses the fused rotation-vector sensor and the device's live location when permission is granted.
-3. **Qaza countdown:** built as the Home countdown to the next event. Sunrise counts as an event, marking the end of Fajr.
+3. **Qaza countdown:** built as the Home countdown (DESIGN.md §19): it counts down to the next event and, for 30 minutes after a prayer begins, up from it. Sunrise counts as an event, marking the end of Fajr.
 4. **Widgets:** four Glance widgets (see Widget Specs).
-5. **Notifications:** built with one global adhan voice. No adhan audio is bundled yet; the system notification sound stands in.
+5. **Notifications:** built with one global adhan voice, plus an optional live countdown notification (DESIGN.md §22). No adhan audio is bundled yet; the system notification sound stands in.
 - **Prayer tracker (v3 feature 12):** built in Android v1 as the Tracker tab.
 
 ### v2 — WearOS Integration
 6. **WearOS app** — all prayer times list, next prayer display, qibla compass, quick tasbeeh
 7. **WearOS tiles/complications** — showing next prayer name + time
+
+**Status (`agent-main`, 2026-09-24):** the watch app (countdown, prayer list, profile paging), three complication families and a tile are built. The watch computes its own times from profiles the phone publishes over the Wear Data Layer. Qibla and tasbeeh aren't built.
 
 ### v3 — iOS & Daily Companion
 8. **Port to iOS** — Swift + SwiftUI implementation, validated by shared test vectors
@@ -94,7 +96,7 @@ The key architectural decision: whether to share business logic across platforms
 
 **Android v1 (as shipped; the full list is in DESIGN.md §12):**
 - **Text size:** body text is 15 sp (DESIGN.md `body`), not 16. DESIGN.md's scale governs.
-- **Home countdown** reads "Countdown to Asr: 2h 18m" — the abbreviated form, not the spoken sentence above.
+- **Home countdown** reads "Asr in 02:18:07", or "Dhuhr began 00:15:42 ago" while counting up — digits, not the spoken sentence above.
 - **Timeline rows** read "Fajr 5:12 AM, passed".
 - **Profile switcher:** each page announces "Profile page 1 of 3: London". There's no custom "Switch to next profile" action; TalkBack users rely on the pager's built-in page scrolling.
 - **Qibla:** direction announcements, 15° throttling and the haptic are built as specified. The calibration warning is **not** announced as a live region (DS25).
@@ -163,7 +165,7 @@ This is an **APP UI** (utility, task-focused). Apply calm surface hierarchy.
 - Use a tabular/monospaced number variant if the typeface has one — digits shouldn't reflow as time counts down
 
 **Android v1:** where the shipped app differs from the patterns and specs above:
-- **Left-aligned countdown — reversed.** The hero and the next-prayer line have been centred since 2026-05-29 (commit `b028aa3`). The "Centered text on Home screen countdown" ban no longer applies.
+- **Left-aligned countdown — kept.** `main` centred the hero and its prayer line on 2026-05-29 (`b028aa3`); #22 moved them back to the left on `agent-main`, so the "Centered text on Home screen countdown" ban still applies.
 - **Row banned patterns — all respected:** no left borders, no icon circles, no arabesque texture, no card per prayer.
 - **Active row:** marked by an 8 dp dot and colour, not a background fill.
 - **Past rows:** use the phase's muted token at full opacity, with a ✓.
@@ -188,10 +190,10 @@ Prayer is a 5-times-daily practice with spiritual weight. The app's tone is: **c
 **Design tone:** Calm, correct, unhurried. No gamification, no streaks on the home screen, no badges competing for attention. The app's job is to be right and stay out of the way.
 
 **Android v1:** where the journey plays out differently:
-- **First install:** the empty state is an ink screen, a Kaaba mark (still the 🕋 emoji placeholder, DS17) and "Create profile". The button opens Settings, where the + button opens the profile sheet — so creating the first profile takes one more tap than planned.
+- **First install:** the empty state is an ink screen, a Kaaba mark (still the 🕋 emoji placeholder, DS17) and "Create profile", which opens the profile sheet in place (DESIGN.md §21).
 - **Fajr window:** the hero counts down to Sunrise ("Sunrise · 6:48 AM"). There's no separate urgency styling.
 - **Prayer time passes:** the surface cross-fades over 3 s. The countdown and timeline text swap without a fade (DS28).
-- **Adding a second profile:** swiping past the last profile reveals an "Add profile" page that opens Settings. Pages move with the pager's default fling motion, not a custom spring.
+- **Adding a second profile:** the saffron FAB on Home opens the profile sheet in place, and Save lands the pager on the new profile. Pages move with the pager's default fling motion, not a custom spring.
 - **Ramadan arrives:** the banner just reads "Ramaḍān Mubārak" with Dismiss. It doesn't mention Imsak and doesn't link to notification settings.
 - **Daily use:** the app opens straight to Home. There's no custom splash; Android 12+ shows its system splash, currently with the default icon (DS8).
 
@@ -220,10 +222,10 @@ Full prayer schedule below is reference, not primary. It should not compete visu
 
 **Android v1 hierarchy** (DESIGN.md §5):
 - **Top:** "Profile · method" on the left ("London · MWL") and the Hijri date on the right.
-- **Then:** the centred countdown (`display-xl`), with "Next · time" **below** it rather than above.
+- **Then:** the left-aligned, signed countdown (`display-xl`, DESIGN.md §19), with "Prayer · time" **below** it rather than above.
 - **Then:** the timeline — six rows (Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha), seven with Imsak in Ramadan.
 - **Then:** an optional "{n} outstanding Qaḍā" line.
-- **Bottom:** the page dots, with the add-profile page counted as the last dot.
+- **Bottom:** the page dots, one per profile, and the Add profile FAB at the bottom right.
 
 The location's name isn't shown on Home.
 
@@ -270,7 +272,7 @@ All widget sizes: tap opens the app on **that widget's own profile**, not the de
 
 Widget update strategy (Reviewer Concern #4 — resolved): **Live countdown via `RemoteViews.setChronometerCountDown()`.** The system handles ticking natively — no WorkManager needed. Widget is updated only when the active prayer changes (~5x/day). The system-rendered countdown reads live without any periodic scheduling. Note: WorkManager's minimum periodic interval is 15 minutes — not usable for live countdowns. `setChronometerCountDown()` is the correct mechanism (API 17+).
 
-**Android v1 — shipped as four widgets rather than three sizes** (full visual spec in DESIGN.md §19). Each is picked separately from the launcher and has its own profile.
+**Android v1 — shipped as four widgets rather than three sizes** (full visual spec in DESIGN.md §25). Each is picked separately from the launcher and has its own profile.
 
 | Widget | Target size | Content |
 |---|---|---|
@@ -280,12 +282,12 @@ Widget update strategy (Reviewer Concern #4 — resolved): **Live countdown via 
 | Prayer Times | 4×2 | Dates and Sunrise band; five prayer columns with the current one highlighted; countdown, "until {next}" and the profile |
 
 - The 1×1 shows the full name, not the three-letter abbreviation planned here. The abbreviation is still computed but isn't rendered.
-- All widgets are launch-only: a tap opens Home.
+- All widgets are launch-only: a tap opens Home on that widget's profile (#24), as the spec above now says.
 - Each widget's profile is chosen on a configure screen when it's placed, and can be changed later through the launcher's reconfigure action. A widget with no choice falls back to the notification profile.
 
 **Update model as built:**
-- The countdown is a Chronometer. It targets the next event including **Sunrise**, and ticks H:MM:SS.
-- **Per-profile alarms:** for every profile a placed widget shows, there's an exact alarm 2 s after each of Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha and tomorrow's Fajr, so one is always pending. Each profile gets its own block of seven request codes, for up to 16 profiles.
+- The countdown is a Chronometer following DESIGN.md §19: it counts down to the next event, **Sunrise** included, and up from a prayer for its first 30 minutes.
+- **Per-profile alarms:** for every profile a placed widget shows, there's an exact alarm 2 s after each of the next 12 countdown transitions (`nextTransition()`: every event, plus the flip 30 minutes after each prayer), so one is always pending. Each profile gets its own block of 12 request codes, for up to 16 profiles.
 - **Why the 2 s guard:** it keeps the recompute from landing on the prayer instant itself.
 - **Re-anchoring:** `updatePeriodMillis` gives a 30-minute backstop. `TIME_SET` and `TIMEZONE_CHANGED` re-anchor the Chronometer, which runs on `elapsedRealtime`. App open refreshes everything.
 - **Rendering:** fresh RemoteViews are pushed with `AppWidgetManager.updateAppWidget` on the main thread, because Glance's `updateAll()` was unreliable on some OEM launchers.
@@ -311,7 +313,7 @@ Entry points to profile creation:
 There is no "+" slot past the last profile dot. It duplicated the FAB and cost the pager a
 phantom page that the dot indicator counted.
 
-**Android v1 — a bottom sheet, not a full-screen flow** (DESIGN.md §17). The sheet opens fully expanded; its fields scroll while Save stays pinned below.
+**Android v1 — where the sheet differs from the steps above** (DESIGN.md §17 and §21). Its fields scroll while Save stays pinned below.
 
 1. **Name.** The field starts empty, with no "Home" or "Profile 2" pre-fill and no 20-character limit.
 2. **Location.**
@@ -321,9 +323,9 @@ phantom page that the dot indicator counted.
 3. **Calculation method.** A dropdown of **10** methods — every adhan 1.2.1 method except `OTHER` — with no descriptions. The default is **Muslim World League**, not ISNA.
 4. **Asr school.** Shāfiʻī (the default) or Ḥanafī.
 5. **Hijri date adjustment.** −2 to +2 days (DESIGN.md §18).
-6. **Save.** Enabled once there's a name and a location. It closes the sheet and **stays on Settings**. The new profile is appended as the last page of the Home pager; it isn't made active.
+6. **Save.** Enabled once there's a name and a location. The new profile is appended as the last page of the Home pager. Saved from Home, the pager lands on it, as above; saved from Settings, the user stays on Settings.
 
-The entry points are the Home empty-state CTA and the "+ Add profile" page, both of which open Settings, and Settings' + button, which opens the sheet. Profiles are edited by tapping their row, and deleted with swipe-to-delete or the sheet's "Delete profile". Neither asks for confirmation (PR #15 M10).
+The entry points are as listed above. Profiles are edited by tapping their row in Settings, and deleted with swipe-to-delete or the sheet's "Delete profile". Neither asks for confirmation (PR #15 M10).
 
 ### Ramadan Treatment
 
@@ -382,7 +384,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 | Notifications (permission) | N/A | Notification permission not granted: banner on Home "Enable notifications for prayer reminders" with Settings deep-link | Permission permanently denied: show Settings link, not a re-request dialog | Notifications scheduled, confirmation in Settings screen | — |
 | Profile creation | Save spinner on "Save" tap | N/A | Location search no results: "No cities found for '[query]'" | Profile created, swipe to it on Home | — |
 
-**Android v1 — as built** (full list in DESIGN.md §20):
+**Android v1 — as built** (full list in DESIGN.md §26):
 
 | Feature | What shipped |
 |---|---|
@@ -417,7 +419,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 - Alarms are armed for **one profile only**, the "Alerts for" profile, which defaults to the first profile.
 - Per prayer, for that profile: on/off; alert time as an offset (−15 to +15 min) or a fixed clock time; and an optional early reminder 5, 10 or 15 min before.
 - Imsak (Fajr − 10 min) is armed only during Ramadan.
-- A master switch turns everything off. On `main` it doesn't yet: `cancelForProfile` never matches an armed alarm, so switching off leaves the day's remaining alarms armed (PR #34 A1; fixed on `agent-main` by #27).
+- A master switch turns everything off, including the live notification. Deleting the "Alerts for" profile doesn't disarm its remaining alarms (PR #34 A2).
 
 *Sound and vibration — global, not per prayer*
 - Adhan voice: Makkah, Madinah, Egyptian, Turkish, Al-Aqsa, or None.
@@ -434,7 +436,8 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 
 *Notifications*
 - They post on a silent high-importance channel, "Prayer Times", and the app handles vibration itself.
-- They have no tap action. Imsak reuses the prayer template and also starts the adhan (DS14).
+- Prayer alerts have no tap action. Imsak reuses the prayer template and also starts the adhan (DS14).
+- An optional ongoing **live countdown** notification (DESIGN.md §22) has its own minimum-importance channel. It's off by default, gated by the master switch, and re-armed by one exact alarm at each countdown transition. Tapping it opens Home on the "Alerts for" profile.
 
 *Permissions*
 - The notification permission is requested on first launch.
@@ -554,12 +557,15 @@ prayer-app/
 └── docs/
 ```
 
-**Repository today (2026-09-23)** — the tree above is the target, and only part of it exists:
-- `test-vectors/schema.json` — the schema only; no vector files yet.
-- `android/app` — the phone app, including the widgets. There's no separate `widgets/` module.
-- `android/shared-logic` — the Adhan wrapper, the Qibla maths and sensor filter, and Room.
+**Repository today (`agent-main`, 2026-09-24)** — the tree above is the target, and only part of it exists:
+- `test-vectors/` — `schema.json` and ten files in `prayer-times/`, one per calculation method, covering twelve cities. They're generated from Adhan-Kotlin 1.2.1 by `scripts/adhan-parity/generate.py`, not by the two-source generator described below.
+- `android/app` — the phone app, including the widgets and the phone side of the watch sync. There's no separate `widgets/` module.
+- `android/shared-logic` — the Adhan wrapper, the countdown timeline and Friday naming, the Qibla maths and sensor filter, Room, and the watch-sync codec.
+- `android/wear` — the WearOS app, complications and tile (inside `android/`, not a top-level `wear/`).
+- `ios/SharedLogic` — a Swift package: the Adhan-Swift wrapper, the timeline and naming ports, Qibla maths and parity tests. No app yet.
+- `scripts/` — `adhan-parity/` (the vector generator), `validate-vectors.py` and `reference-versions.json`.
+- `.github/workflows/ios.yml` — validates the vectors against the schema and runs the Swift package's tests. There's no Android workflow.
 - `android/scripts/widget-rollover-test.sh` — a manual emulator script.
-- Not present yet: `wear/`, `ios/`, the root `scripts/`, and `.github/workflows/`.
 
 ### The test vector contract
 
@@ -665,12 +671,12 @@ Both the Kotlin (wrapper around Adhan-Kotlin) and Swift (wrapper around Adhan-Sw
 8. **Add Imsak alarm for Ramadan** — detect Hijri month, auto-enable Imsak (Fajr − 10 min) during Ramadan
 9. **Set up CI for test vectors + reproducible builds** — Android CI validated against vectors; F-Droid reproducible-build setup from day 1. Note: Play Store submission at v1 launch; F-Droid listing goes live when F-Droid review completes (typically weeks to months after submission, not simultaneous).
 
-**Status (2026-09-23):**
+**Status (`agent-main`, 2026-09-24):**
 - **Done:** 1 (monorepo, in part), 5, 6 (with a direct rotation matrix and the rotation-vector sensor, not the remap; TODOS T7), 7 (live Chronometer countdown) and 8.
-- **2, in part:** Adhan is a Gradle dependency (`com.batoulapps.adhan:adhan:1.2.1`), but the SHA-256 verification metadata isn't committed and Adhan-Swift isn't set up.
-- **3, not on `main`:** the PR #8 generator (`scripts/generate_vectors.py`, `scripts/test_generator.py`) was merged into the `t3-test-vector-schema` branch only.
-- **4, in part:** the wrapper is built, but its tests use hard-coded Makkah values, not vectors.
-- **9, not started:** no CI workflows.
+- **2, in part:** Adhan is a Gradle dependency (`com.batoulapps.adhan:adhan:1.2.1`), but the SHA-256 verification metadata isn't committed. Adhan-Swift is pinned to 1.5.0 in `ios/SharedLogic`.
+- **3, in part:** vectors for twelve cities exist, generated from Adhan-Kotlin by `scripts/adhan-parity/generate.py`. The two-source PrayTimes cross-check (PR #8's `scripts/generate_vectors.py` and `scripts/test_generator.py`) is only on the unmerged `t3-test-vector-schema` branch (TODOS.md).
+- **4, in part:** the wrapper is built, but its tests use hard-coded Makkah values; only the Swift package loops over the vectors.
+- **9, in part:** `ios.yml` validates the vectors and runs the Swift tests. There's no Android CI and no reproducible-build setup.
 
 ## Testing Requirements (v1 Android)
 
@@ -700,14 +706,14 @@ Every codepath in the implementation plan requires a test. Framework: JUnit 4 + 
 - Emulator tests gated behind a `[e2e]` label or run only on PRs targeting `main` (cost control for solo dev)
 - Unit/integration tests run on every commit
 
-### Testing status (Android v1, 2026-09-23)
+### Testing status (`agent-main`, 2026-09-24)
 
 - **Framework:** JUnit 4 with MockK and kotlinx-coroutines-test on the JVM, plus AndroidX instrumented tests. Robolectric and Espresso flows aren't used.
-- **JVM tests:** `AdhanWrapperTest` (Makkah goldens, validation, polar unavailability), `QiblaCalculatorTest`, `QiblaSensorStateTest`, `SensorAccuracyTest`, `HomeRibbonStateTest`, `AlarmSchedulerTest`, `NotificationHelperTest`, `RamadanDetectorTest`, `QiblaViewModelTest`, `TrackerViewModelTest`, `PrayerWidgetTest`.
-- **Instrumented tests:** `ProfileRepositoryTest`, `QazaTrackerTest`, `RamadanDetectionTest` (Hijri offset and lapse).
-- **Not present:** the E2E `AlarmFiresWhileClosedTest` and `AlarmRestoredAfterRebootTest`. `android/scripts/widget-rollover-test.sh` is a manual emulator check of widget rollovers.
-- **Required cases still missing from files that exist:** `AdhanWrapperTest` tests MWL only, with no vector loop and no 23:59/00:00 boundary; `AlarmSchedulerTest` tests the pure builder, not `scheduleAll()`, idempotency or the midnight reschedule; `QazaTrackerTest` calls `autoMarkMissed()` directly, with no next-prayer trigger; and no test covers the app-level polar paths (Home's unavailable page, the widgets' "No times here", the scheduler's log-and-skip).
-- **CI:** no GitHub Actions workflows exist yet.
+- **JVM tests:** `AdhanWrapperTest` (Makkah goldens, validation, polar unavailability), `QiblaCalculatorTest`, `QiblaSensorStateTest`, `SensorAccuracyTest`, `PrayerTimelineTest`, `PrayerNamingTest`, `ProfileCodecTest`, `HomeRibbonStateTest`, `AlarmSchedulerTest`, `NotificationHelperTest`, `LivePrayerNotificationTest`, `RamadanDetectorTest`, `QiblaViewModelTest`, `TrackerViewModelTest`, `PrayerWidgetTest`, `CrossSurfaceConsistencyTest`; on the watch, `WearStalenessTest` and `TileFreshnessTest`.
+- **Instrumented tests:** `ProfileRepositoryTest` and `QazaTrackerTest` (which never ran until the Phase 2 gate fixed the test runner), `RamadanDetectionTest` (Hijri offset and lapse), `AlarmDeliveryTest` (arming, re-arming after a reschedule, the master switch, delivery to the shade) and `WidgetProfileBindingTest`; on the watch, `WearSurfaceConsistencyTest`, `WearSyncRoundTripTest` and `PrayerComplicationDataTest`.
+- **Manual:** `android/scripts/widget-rollover-test.sh` checks widget rollovers on an emulator. The Phase 2 and 4B gates in TODOS.md record what was checked by hand, including a real reboot.
+- **Required cases still missing from files that exist:** `AdhanWrapperTest` tests MWL only, with no vector loop and no 23:59/00:00 boundary; `AlarmSchedulerTest` tests the pure builder, and `AlarmDeliveryTest` exercises `scheduleAll()` on a device but not idempotency or the midnight rollover's timing; `AlarmDeliveryTest`'s profile-deletion case calls `cancelForProfile` directly rather than deleting through `SettingsViewModel` (PR #34 A2); `QazaTrackerTest` calls `autoMarkMissed()` directly, with no next-prayer trigger; and no test covers Home's unavailable page or the scheduler's log-and-skip on polar days (the live notification's polar case is tested).
+- **CI:** `.github/workflows/ios.yml` only (the vectors and the Swift package). No Android tests run in CI.
 
 ## Reviewer Concerns
 

@@ -17,6 +17,13 @@ Sub-spec of `architecture-design.md`. Covers license obligations for all bundled
 
 **Strategy:** ship unmodified Adhan releases when possible. Prefer raising issues/PRs upstream over forking. If we must fork, make the fork public and named clearly (`aynama-prayer-times/adhan-kotlin-fork`).
 
+## Code: Google Play services (proprietary)
+
+On `agent-main` the phone app depends on `com.google.android.gms:play-services-wearable` 18.2.0 for the watch sync (`android/app/build.gradle.kts`), which pulls in `play-services-base`, `-basement` and `-tasks`. Their POMs give the licence as the "Android Software Development Kit License" (<https://developer.android.com/studio/terms.html>), not an open-source licence.
+
+- **Play Store build:** list Google Play services on the licences screen.
+- **F-Droid:** the inclusion policy forbids Google Play Services in any app (<https://f-droid.org/docs/Inclusion_Policy/>). The planned F-Droid listing (`architecture-design.md`, next steps 9) needs a build without the watch sync, or a free transport for it.
+
 ## Fonts (bundled in Android v1)
 
 | Font | File | Copyright (from the font's `name` table) | Licence |
@@ -92,3 +99,4 @@ Tracks 2–4 (IBM Plex Sans Arabic, KFGQPC Uthman Taha Naskh, Amiri Quran) aren'
 - [ ] Google Play listing includes license note.
 - [x] Chosen project license decided (Apache 2.0) and `LICENSE` file in repo root.
 - [ ] Trademark clearance on "aynama" (moved to TODOS.md).
+- [ ] Decide how the F-Droid build handles the Play services dependency (see above).

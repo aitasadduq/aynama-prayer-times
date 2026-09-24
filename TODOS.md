@@ -2,7 +2,7 @@
 
 Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/projects/aitasadduq-aynama-prayer-times/ceo-plans/`.
 
-> **Sync note (2026-09-23).** The Android v1 checklist below was re-checked against the code. Items that were ticked but aren't in the app are now unticked, with a short note saying what actually shipped. Design gaps found in the same pass are tracked as DS findings in `REVIEW-FINDINGS.md`; DESIGN.md §21 is the index.
+> **Sync note (2026-09-23, re-checked 2026-09-24).** The Android v1 checklist below was re-checked against the code on `agent-main` (`5eeed05`). Items that were ticked but aren't in the app are now unticked, with a short note saying what actually shipped. Design gaps found in the same pass are tracked as DS findings in `REVIEW-FINDINGS.md`; DESIGN.md §27 is the index.
 
 ## Design TODOs (from /plan-design-review, 2026-04-18)
 
@@ -12,10 +12,9 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 - [x] ~~**Prayer tracker history view spec.**~~ → **COMPLETE** (DESIGN.md §16: calendar-free flat list, per-day row expansion, 5 prayer indicators (no Sunrise), marked states: on-time / Qada / missed, week sections, soft aggregate header)
 
-- [x] ~~**Design-doc sync against Android v1.**~~ → **COMPLETE 2026-09-23.** DESIGN.md was re-baselined: §3 contrast was recomputed, and §19 (widgets), §20 (states) and §21 (conformance) were added. `architecture-design.md`, README and the posture docs were updated.
+- [x] ~~**Design-doc sync against Android v1.**~~ → **COMPLETE 2026-09-24.** DESIGN.md was re-baselined against `agent-main`: §3 contrast was recomputed, and §25 (widgets), §26 (states) and §27 (conformance) were added after that branch's §19–§24. `architecture-design.md`, README and the posture docs were updated.
 
 - [ ] **Sign off the spec changes the sync recorded** (DESIGN.md §14 requires explicit discussion for §3, §4, §5 and §9). This is the one list; DESIGN.md points here.
-  - §5: the centred countdown hero. `agent-main`'s DESIGN.md §19 says the opposite: "Never centred".
   - §3, §8: the surface stepping per phase (not continuous)
   - §5: passed rows in the muted token at full opacity. This still fails AA on the Asr and Sunrise gradients (DS3).
   - §5: the current row in ink on light phases (saffron on dark ones still fails AA on the Fajr and Maghrib gradients, DS3)
@@ -24,16 +23,15 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
   - §5: the Ramadan banner no longer mentions Imsak or links to notification settings
   - §5: utilitarian screens use a 16 dp top margin (April: 32 dp)
   - §3: `saffron-ink` as the accent for text and thin strokes on light surfaces, and `ink` labels on saffron fills
-  - §4: numbers that change in place are set in IBM Plex Sans. This contradicts §4's own `display-xl` row, which keeps the hero in Fraunces, so decide it with DS9.
-  - §8: widget countdowns ticking H:MM:SS every second, as an exception to minute granularity
+  - §4: numbers that change in place are set in IBM Plex Sans. This contradicts §4's own `display-xl` row and §19's format rule, which keep the hero in Fraunces, so decide it with DS9.
   - §18: the −2…+2 Hijri adjustment
   - §17: location time zone on by default. Hold this until DS32 is fixed: city search picks the wrong zone for Madrid, Lisbon, Detroit and others, so the default labels their times an hour off.
   - §17: Muslim World League as the default method (the plan said ISNA). The default changes users' prayer times.
   - §15: master-off hiding every Notifications section
   - §15: prayer names stay `ink` when their alert is off (April: `ink-muted`)
   - §15: the alert-time value is `ink-muted` in both rows (April: `ink` when active). The code's dead branch (PR #17 N2) produced this; confirm it's wanted before N2's fix cements it.
-  - §15, §17: sheets opening fully expanded
-  - §19: four widgets instead of three sizes
+  - §15: the per-prayer detail sheet opening fully expanded
+  - §25: four widgets instead of three sizes
 
 ## Design decisions raised by the 2026-09-23 sync
 
@@ -141,6 +139,7 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
   regenerating the vectors; (c) make it a per-profile setting, which no other calculation
   input currently is. Pinned by `HighLatitudeParityTests` either way, so the decision cannot
   be made accidentally. Needs a product call before iOS ships to users above 48°.
+  *(The countdown handles the collapse; Home's ribbon and surface don't — DS31 in `REVIEW-FINDINGS.md`.)*
 
 
 - [ ] **GPS profile assumes the device timezone matches the fix.** "Use current location" sets
@@ -179,7 +178,7 @@ Run on a rooted `google_apis` API 36 emulator, 2026-09-07. Clock control via `ad
 | Widgets: two placed on two profiles | each keeps its own profile; reconfiguring one leaves the other alone; both get rollover chains |
 | Widget → profile navigation | cold, warm, from another tab, and for a deleted profile |
 | Friday Jumu'ah | tracker history for Fri Sep 4 reads "Jumuah — 1:01 PM"; today (Monday) reads "Dhuhr" |
-| Light / dark themes | both legible; nav bar palette bug found and fixed |
+| Light / dark themes | both legible; nav bar palette bug found and fixed *(the 2026-09-24 re-check still finds dark-mode text hard-coded to light-theme colours: DS4)* |
 | Notification permission denied | master row becomes "Enable in Settings →" per DESIGN §15 |
 
 ### Issues found and fixed
@@ -268,7 +267,7 @@ Phases run in dependency order. Each phase should be a separate PR. Scaffold (Ph
 
 ### Phase 0 — Scaffold ✅ DONE (PR #9)
 - [x] Gradle build files (AGP 9.1.1, Kotlin 2.3.20, Compose BOM 2026.04.01)
-- [x] `AynamaTheme` — 6-token color system, no dynamic color *(only 12 of Material's colour roles are mapped; the rest fall back to Material's baseline purples — DS1)*
+- [x] `AynamaTheme` — 6-token color system, no dynamic color *(every Material role except `error` is mapped since the Phase 2 gate; light `onPrimary` still fails contrast — DS1)*
 - [x] `AynamaTypography` — Fraunces + IBM Plex Sans, 8 scale slots *(the other 7 Material slots fall back to Roboto — DS5)*
 - [x] `NavGraph` — 4-tab bottom nav (Home, Qibla, Tracker, Settings), placeholder screens
 - [x] `AdhanWrapper` — Adhan 1.2.1, both Shafi'i and Hanafi Asr, `java.time.LocalTime`
@@ -315,9 +314,9 @@ Depends on: Phase 1.
 - [x] `HomeViewModel` — observes all profiles via `Flow`; calls `AdhanWrapper.getPrayerTimes()` once per day per profile (cached by profile id + date); exposes `HomeUiState`; 1-second tick drives countdown + ribbon state; `AynamaApplication` manual DI with debug seed profiles
 
 **Prayer timeline ribbon (DESIGN.md §5)**
-- [x] Countdown hero: Fraunces `display-xl` (72sp) — *centred since 2026-05-29 (`b028aa3`), not left-aligned*
+- [x] Countdown hero: Fraunces `display-xl` (72sp), left-aligned, signed per DESIGN.md §19 — *`main` has centred it since 2026-05-29 (`b028aa3`); #22 restored the left alignment*
 - [ ] Countdown hero digits don't drift — **not met:** the bundled Fraunces has proportional figures and no `tnum` feature, so `fontFeatureSettings = "tnum"` does nothing (DS9)
-- [x] Next prayer line: Fraunces `display-md`, "Asr · 4:14 PM" — *below the countdown, not above it*
+- [x] Prayer line: Fraunces `display-md`, "Asr · 4:14 PM" — *below the countdown, not above it, naming the prayer the countdown refers to (the one just begun while counting up)*
 - [x] Header line: IBM Plex `body-sm` — *shows "Profile · method" plus the Hijri date, not "Home · London"*
 - [x] Prayer rows — 3 visual states:
   - Passed: `ink-muted` (light phases) / `parchment-muted` (dark) at **full** opacity (not 60%), ✓ glyph
@@ -345,7 +344,7 @@ Depends on: Phase 1.
 - [x] First Ramadan open: dismissible banner, shown once per Hijri year (dismissed year in SharedPreferences) — *the copy is just "Ramaḍān Mubārak", with no Imsak mention*
 
 **Accessibility**
-- [x] TalkBack countdown — *reads "Countdown to Asr: 2h 14m", not the full sentence*
+- [x] TalkBack countdown — *reads "Asr in 02:14:00", or "Dhuhr began 00:15:42 ago", not the full sentence*
 - [x] Prayer row announces: "Fajr 5:12 AM, passed"
 - [ ] Profile switcher: accessibility action "Switch to next profile" — **not built.** Pages announce "Profile page 1 of 3: London"; navigation relies on the pager's default scroll actions.
 
@@ -493,9 +492,9 @@ Depends on: Phase 1 (profiles), Phase 5 (notifications config).
   2. Location: city search (platform `Geocoder` — network-backed on most devices, not offline) OR "Use current location"
   3. Calculation method picker — *10 methods, no descriptions, default Muslim World League*
   4. Asr madhab picker (Hanafi / Shafi'i)
-  5. Save → closes the sheet and stays on Settings
+  5. Save → closes the sheet; from Home the pager lands on the new profile, from Settings it stays on Settings
 - [ ] Profile name max 20 chars, pre-filled "Home" / "Profile 2" — **not built**
-- [ ] Save navigates back to Home with the new profile active — **not built**
+- [x] ~~Save navigates back to Home with the new profile active~~ → **superseded by the Prayers-screen FAB (#25):** saving from Home lands the pager on the new profile
 - [ ] GPS profile auto-names with detected city name if user hasn't edited it — **not built.** "Use current location" fills the location only.
 
 #### Phase 6b — Notification Settings Screen ✅ DONE
@@ -534,7 +533,7 @@ Depends on: Phase 1 (profiles), Phase 2 (prayer time calc).
 - [x] `GlanceAppWidget` base class + `GlanceAppWidgetReceiver`
 - [x] Widget metadata XML (sizes, preview, description)
 
-**Four widget categories (DESIGN.md §19 / architecture-design.md)**
+**Four widget categories (DESIGN.md §25 / architecture-design.md)**
 Each is separately pickable in the widget drawer and only stretches on resize (`SizeMode.Single`).
 - [x] Next Prayer, 1×1 — prayer name + time + countdown + profile
 - [x] Next Prayer & Dates, 2×2 — dates band + next prayer cluster
@@ -590,12 +589,16 @@ Run before Play Store submission.
 - [ ] Launcher icon and a token-coloured launch window (DS8)
 - [ ] Adhan audio assets, a notification tap action and a stop action; Imsak copy (DS14)
 - [ ] Contrast: saffron text on light surfaces, the Home gradient, dark mode (DS2–DS4)
-- [ ] No Material fallbacks: every colour role and type slot defined (DS1, DS5)
+- [ ] No Material fallbacks: every type slot defined, and light `onPrimary` set to ink (DS1, DS5)
+- [ ] Watch typography: IBM Plex Sans and Fraunces on the watch (DS36)
+- [ ] Home's Add profile FAB clears the timeline (DS37; check on a device first)
 - [ ] Hijri adjustment lapse fixed (DS7)
 
 **Privacy / legal (see the posture docs)**
 - [ ] Decide `android:allowBackup` / data-extraction rules (Qaza history is religious data)
 - [ ] Disclose that location search and reverse geocoding go through the platform geocoder
+- [ ] Disclose the watch sync: profiles go to a paired watch through Google Play services
+- [ ] Decide the F-Droid build: `play-services-wearable` is proprietary, and F-Droid forbids Google Play Services (`legal-posture.md`)
 - [ ] About screen: Adhan, Fraunces and IBM Plex Sans (SIL OFL 1.1) attributions
 
 **Play Store prep**
