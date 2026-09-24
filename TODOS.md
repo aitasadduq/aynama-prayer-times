@@ -152,6 +152,8 @@ Run on a rooted `google_apis` API 36 emulator, 2026-09-07. Clock control via `ad
    intent without an action while `submitAlarm` armed one with `ACTION_PRAYER_ALARM`;
    PendingIntent lookup matches on `Intent.filterEquals`, so nothing was ever cancelled.
    Master off, per-prayer off, profile deleted, profile switched — all left alarms firing.
+   A deleted profile's alarms still survived this fix: `SettingsViewModel.delete` never
+   cancelled them, and `scheduleAll` only cancels the profiles it is given. Fixed separately.
 2. **The bottom navigation was Material's default lavender**, in both themes, on every screen.
    Unset `ColorScheme` roles keep Material's purple baseline; DESIGN §10 forbids purple.
 3. **`shared-logic`'s 16 Room instrumented tests had never run** — the module named
@@ -387,7 +389,7 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 - [x] Imsak alarm = Fajr −10 min, scheduled only during Hijri Ramadan
 - [x] Idempotent: calling `scheduleAll()` twice produces no duplicate alarms
 - [x] Reschedule on app open/resume (covers gaps from background kill)
-- [x] Daily midnight reschedule (advance to next day's times)
+- [x] Daily midnight reschedule (advance to next day's times), at the notification profile's midnight, not the device's
 
 **BroadcastReceivers**
 - [x] `BootReceiver` — `BOOT_COMPLETED` → `scheduleAll()` for all active profiles
@@ -398,7 +400,7 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 - [x] Adhan audio assets bundled: Makkah, Madinah, Egyptian, Turkish, Al-Aqsa, Silent
 
 **OEM battery optimization**
-- [x] `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent immediately after notification permission granted
+- [x] `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent at first launch: after the notification permission is granted on Android 13+, or straight away when there is none to ask for (Android 8–12, or already granted)
 - [x] One-time prompt; do not re-prompt
 
 **Tests**
