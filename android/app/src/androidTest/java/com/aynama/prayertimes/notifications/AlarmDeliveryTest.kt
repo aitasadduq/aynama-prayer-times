@@ -8,6 +8,7 @@ import android.content.Intent
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.aynama.prayertimes.AynamaApplication
+import com.aynama.prayertimes.settings.SettingsViewModel
 import com.aynama.prayertimes.shared.CalculationMethodKey
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
@@ -146,14 +147,22 @@ class AlarmDeliveryTest {
     }
 
     @Test
-    fun deletingAProfileDisarmsItsAlarms() = runBlocking {
-        AlarmScheduler.scheduleAll(context, app.profileRepository.observeAll().first())
+    fun deletingTheAlertsProfileDisarmsItsAlarms() = runBlocking {
+        val repo = app.profileRepository
+        val prefs = NotificationPreferences(app.prefs)
+        AlarmScheduler.scheduleAll(context, repo.observeAll().first())
         assertTrue(
             "precondition: alarms armed",
             (PRAYER_INDEX_FAJR..PRAYER_INDEX_ISHA).any { existingAlarm(it) != null },
         )
 
-        AlarmScheduler.cancelForProfile(context, profile.id)
+        // Through the Settings screen's own path. The reschedule that follows a delete only
+        // sees the profiles that remain, so it can never reach this one's alarms.
+        SettingsViewModel(repo, prefs, context).delete(profile)
+        awaitTrue("the profile was not deleted") {
+            prefs.notificationProfileId == -1L &&
+                runBlocking { repo.observeAll().first() }.none { it.id == profile.id }
+        }
 
         assertTrue(
             "a deleted profile's alarms would keep firing",

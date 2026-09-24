@@ -42,6 +42,8 @@ class SettingsViewModel(
 
     fun delete(profile: Profile) {
         viewModelScope.launch(Dispatchers.IO) {
+            // scheduleAll only cancels the profiles it is given, and this one is about to be gone.
+            AlarmScheduler.cancelForProfile(context, profile.id)
             repo.delete(profile)
             if (notifPrefs.notificationProfileId == profile.id) {
                 notifPrefs.notificationProfileId = -1L
