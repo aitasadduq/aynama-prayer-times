@@ -7,5 +7,11 @@
   "adhan-swift": "1.5.0",
   "adhan-swift-url": "https://github.com/batoulapps/adhan-swift.git",
   "adhan-swift-tag": "1.5.0",
-  "adhan-swift-commit": "a6fa2deee80c5abb0b9ad04466f8ab12b53144e7"
+  "adhan-swift-commit": "a6fa2deee80c5abb0b9ad04466f8ab12b53144e7",
+  "tzdata": "2026d",
+  "tzdata-url": "https://data.iana.org/time-zones/releases/tzdata2026d.tar.gz",
+  "tzdata-sha256": "0cb2aa8e333c3dc049badc42a0c61f21987b8cd44e107fa900bad764aacc7767",
+  "timezone-boundary-builder": "2026d",
+  "timezone-boundary-builder-url": "https://github.com/evansiroky/timezone-boundary-builder/releases/download/2026d/timezones.geojson.zip",
+  "timezone-boundary-builder-sha256": "f72a40a0d00ef4464ad5f6dee85e0bf727e3fbe5ade360d8830f5a1db7d5f44b"
 }
