@@ -5,7 +5,7 @@ import android.content.pm.PackageManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
+import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -50,6 +50,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -82,25 +84,29 @@ private const val QIBLA_ALIGN_ENTER_DEG = 5f
 private const val QIBLA_ALIGN_EXIT_DEG = 7f
 private const val A11Y_ANNOUNCE_THRESHOLD_DEG = 15f
 
+private val LOCATION_PERMISSIONS = arrayOf(
+    Manifest.permission.ACCESS_FINE_LOCATION,
+    Manifest.permission.ACCESS_COARSE_LOCATION,
+)
+
 @Composable
 fun QiblaScreen() {
-    val app = LocalContext.current.applicationContext as AynamaApplication
+    val context = LocalContext.current
+    val app = context.applicationContext as AynamaApplication
     val vm: QiblaViewModel = viewModel(factory = QiblaViewModel.factory(app))
     val uiState by vm.uiState.collectAsStateWithLifecycle()
 
-    // Fine location lets the compass point from the user's current GPS position rather than a
-    // saved profile. On Android 12+ the system shows a Precise/Approximate picker — either
-    // answer is handled; if denied entirely, the screen still works from the active profile.
-    val locationPermissionLauncher = rememberLauncherForActivityResult(RequestPermission()) { }
+    // Live location lets the compass point from where the user is rather than a saved profile.
+    // Fine and coarse go in one request: that is what shows Android 12+'s Precise/Approximate
+    // choice, and some Android 12 releases ignore a fine-only request. Either grant is enough;
+    // the location is fetched on the ON_RESUME that follows the dialog. If denied entirely, the
+    // screen still works from the active profile.
+    val locationPermissionLauncher = rememberLauncherForActivityResult(RequestMultiplePermissions()) { }
     LaunchedEffect(Unit) {
-        val granted = ContextCompat.checkSelfPermission(
-            app,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
-            app,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!granted) locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        val granted = LOCATION_PERMISSIONS.any {
+            ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+        }
+        if (!granted) locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -317,7 +323,10 @@ private fun ReadyContent(state: QiblaUiState.Ready) {
             ) {
                 BearingReadout(
                     degrees = qiblaDeg,
-                    distanceLabel = "$formattedDistance km to the Kaaba",
+                    // Naming the profile is the only sign the bearing isn't from where the user is.
+                    distanceLabel = state.fromProfile
+                        ?.let { "$formattedDistance km from $it to the Kaaba" }
+                        ?: "$formattedDistance km to the Kaaba",
                     boxBg = boxBg,
                     boxFg = boxFg,
                     boxFgMuted = boxFgMuted,
@@ -385,9 +394,13 @@ private fun BearingReadout(
                     fontFamily = IbmPlexSans,
                     fontWeight = FontWeight.Normal,
                     fontSize = 14.sp,
-                    lineHeight = 14.sp,
+                    lineHeight = 20.sp,
+                    textAlign = TextAlign.Center,
                 ),
                 color = boxFgMuted,
+                // Profile names have no length limit; two lines keep the compass its room.
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
