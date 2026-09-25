@@ -269,7 +269,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
   - `BOOT_COMPLETED` BroadcastReceiver: reschedules all active profiles' exact alarms after device reboot (AlarmManager state is wiped on reboot).
   - `ACTION_TIMEZONE_CHANGED` BroadcastReceiver: recalculates prayer times for all active profiles and reschedules alarms (alarms scheduled in UTC would fire at wrong local time in new zone).
 - Also reschedule alarms on app open/resume to cover gaps from background kill.
-- **OEM battery optimization prompt**: immediately after notification permission is granted, send `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent. Xiaomi (MIUI), Huawei (EMUI), and Samsung (One UI) aggressively kill exact alarms; whitelisting is the standard mitigation used by every reliable alarm/prayer app. One-time prompt, proactive at setup.
+- **OEM battery optimization prompt**: at first launch — right after notification permission is granted on Android 13+, or straight away when there is no permission to ask for (Android 8–12, or already granted) — send `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` intent. Xiaomi (MIUI), Huawei (EMUI), and Samsung (One UI) aggressively kill exact alarms; whitelisting is the standard mitigation used by every reliable alarm/prayer app. One-time prompt, proactive at setup.
 - Adhan audio: configurable per prayer (silent, vibrate, short alert, full adhan). Audio playback via notification sound attachment (iOS) / media player in foreground service (Android)
 - watchOS: mirrored notifications from phone by default; standalone scheduling if watch app runs independently
 
