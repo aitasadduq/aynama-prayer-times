@@ -42,8 +42,10 @@ struct PrayerMarkSheet: View {
         let today = CalendarDate.from(AppClock.now, in: target.profile.effectiveTimeZone)
         if target.date == today { return "Today" }
         if target.date == today.minusDays(1) { return "Yesterday" }
-        return target.date.atTime(ClockTime(hour: 12, minute: 0), in: target.profile.effectiveTimeZone)
-            .formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        let formatter = DateFormatter()
+        formatter.timeZone = target.profile.effectiveTimeZone
+        formatter.setLocalizedDateFormatFromTemplate("EEE MMM d")
+        return formatter.string(from: target.date.atTime(ClockTime(hour: 12, minute: 0), in: target.profile.effectiveTimeZone))
     }
 
     private func option(_ status: QazaStatus, _ label: String, enabled: Bool = true) -> some View {
