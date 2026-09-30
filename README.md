@@ -16,7 +16,7 @@ Open-source Muslim prayer times & spiritual companion app for Android, iOS, Wear
 |---|---|
 | Android (phone + widgets) | v1 — in development. Built so far: prayer times with multiple profiles, Qibla, prayer tracker, notifications, four home-screen widgets, an optional live countdown notification |
 | WearOS | v2 — in progress: watch app, complications and tile, with profiles synced from the phone |
-| iOS (phone + widgets) | v3 — started: the shared prayer-time logic is ported to Swift (`ios/SharedLogic`); no app yet |
+| iOS (phone + widgets) | v3 — in progress: Swift domain logic, the profile pager, prayer ribbon and profile creation; simulator tests run in CI |
 | watchOS | v3 — not started |
 
 ## Architecture
@@ -32,7 +32,7 @@ aynama/
 │   ├── app/               ← Kotlin + Jetpack Compose phone app, incl. Glance widgets
 │   ├── shared-logic/      ← Adhan wrapper, countdown timeline, Qibla maths, Room database
 │   └── wear/              ← WearOS app, complications and tile
-├── ios/SharedLogic/       ← Swift package: Adhan-Swift wrapper and the shared-logic ports
+├── ios/                  ← SwiftUI app, SharedLogic package and simulator tests
 └── scripts/               ← test-vector generator and validator
 ```
 
@@ -46,7 +46,23 @@ Read [DESIGN.md](DESIGN.md) before any UI work. Hard rules are non-negotiable. D
 
 ## Contributing
 
-All code changes require corresponding tests in the same PR. Before opening a pull request, run the unit tests from `android/` with `./gradlew test` and, with an emulator or device attached, the instrumented tests (Room, Hijri offset, alarm delivery, widget binding). `:app` and `:wear` share an application ID, so run `./gradlew :app:connectedAndroidTest :shared-logic:connectedAndroidTest` on a phone and `./gradlew :wear:connectedAndroidTest` on a Wear OS emulator, picking each with `ANDROID_SERIAL`. For the Swift package, run `swift test` in `ios/SharedLogic`.
+All code changes require corresponding regression tests in the same PR. **Every change must
+pass both Android and iOS CI**, even when it touches only one platform or documentation.
+
+The [mobile CI workflow](.github/workflows/ios.yml) validates the shared vectors, runs the Swift
+domain suite, builds and tests the iOS app on a simulator (SwiftData persistence and profile
+UI flows), and runs Android builds, lint, unit tests, and phone and Wear OS instrumentation.
+Test reports and the iOS `.xcresult` bundle are retained as workflow artifacts for 14 days.
+
+Wait for the **Android and iOS** check on the final PR revision before merging. Repository
+administrators must make this check required in branch protection for `main` and `agent-main`
+after this workflow lands; the workflow itself cannot configure repository protection.
+
+For local checks, run `./gradlew testDebugUnitTest` in `android/` and `swift test` in
+`ios/SharedLogic`. Run phone/Room and watch instrumentation on separate emulators because
+`:app` and `:wear` share an application ID. Generate the iOS project with `cd ios && xcodegen
+generate`, then run `xcodebuild test -project Aynama.xcodeproj -scheme Aynama -destination
+"platform=iOS Simulator,name=<installed iPhone>"`.
 
 ## License
 

@@ -47,7 +47,7 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 ## Deferred decisions (not blocking v1 code start)
 
 - [ ] **Monetization / sustainability model.** Pick one: donations, pay-what-you-want, freemium, paid-upfront, fully-free. Decide before v2.
-- [ ] **iOS CI runner strategy.** GitHub macOS vs MacStadium vs self-hosted Mac mini vs no-iOS-until-v3. Decide before v3 (iOS phase start).
+- [x] **iOS CI runner strategy.** GitHub-hosted `macos-15` with Xcode 16.4 runs Swift domain tests and iOS simulator persistence/UI tests on every change. Results are uploaded as `.xcresult` artifacts.
 - [ ] **Quran data source.** Tanzil (chosen in legal-posture.md) vs alternative. Validate against licensing + attribution before v4 (Quran feature).
 - [ ] **Gold/silver price API for zakat.** Free tier API vs scraped static value vs user-input. Decide before v5.
 - [ ] **Trademark clearance on "aynama."** USPTO + EUIPO search before Play Store + F-Droid submission.
@@ -94,6 +94,26 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 - [x] ~~**iOS notification limit analysis.**~~ → **RESOLVED** (Phase 3A, DESIGN.md §24). A fixed day cap is the wrong shape — it is sized for the worst case and short-changes the common one, where the user has enabled far fewer than eleven notifications a day. The horizon is computed from what is actually enabled instead: `perDay = enabled prayers + enabled early reminders + Imsak`, `horizon = clamp(60 / perDay, 3...7)` days. Four of the 64 slots are held back as headroom, prayers are scheduled before their reminders so overflow drops the reminder and never the prayer, and the queue is refilled on foreground and from a `BGAppRefreshTask`. Worst realistic case (5 prayers + 5 reminders + Imsak = 11/day) still yields a 5-day horizon; the common case is capped at 7.
 
 ## Known issues
+
+- [x] ~~**BLOCKER — this machine cannot build or run anything for the iOS simulator.**~~ →
+  **RESOLVED.** The iOS platform component is installed now. Verified 2026-09-08:
+  `xcodebuild -showdestinations` lists dozens of iOS Simulator destinations including OS 26.5,
+  `simctl` has the 26.5 runtime, and the app builds, installs, launches and ticks on
+  `iPhone 17 Pro (26.5)`. **Phase 4A is no longer blocked** and no `-downloadPlatform` download
+  is needed. `ios/scripts/typecheck-simulator.sh` still works and is still the fastest check,
+  but it is no longer the only one available.
+
+- [ ] **The App Group does not take effect without a `DEVELOPMENT_TEAM`.**
+  `ios/project.yml` declares `group.com.aynama.prayertimes` and XcodeGen wires
+  `CODE_SIGN_ENTITLEMENTS` correctly, but an App Group is scoped to a team identifier and the
+  Debug config signs ad-hoc with none — measured, the embedded entitlement dictionary comes out
+  empty. `AynamaStore` then falls back to its app-private container and logs the warning it was
+  written for.
+
+  Harmless for the app on its own. It is the first thing that blocks the widget extension: a
+  widget cannot read profiles it has no shared container for, and "the widget shows a profile
+  the user deleted" is a Phase 4A item. Needs a paid team set in `project.yml` before that PR
+  can be tested for real, on a device or a signed simulator build.
 
 - [ ] **Wall-clock round-trip loses an hour in a DST fall-back, on both platforms.**
   `AdhanWrapper` throws away the absolute instants Adhan returns and stores wall-clock times
@@ -566,12 +586,13 @@ Depends on: all phases (run after each PR, gate on `main` merge).
 - [ ] Expand `AdhanWrapperTest` to load from `test-vectors/schema.json` — replace hardcoded Makkah test with file-driven loop over all 12 cities and methods
 - [x] ~~`vectors.yml` GitHub Actions workflow~~ → **DONE, as the `vectors` job in `ios.yml`** rather than its own file (it gates the macOS job, so it has to be in the same workflow). `scripts/validate-vectors.py` validates every `test-vectors/prayer-times/*.json` against `schema.json`. `schema.json` had claimed this was enforced since it was written; until now nothing enforced it.
 
-**android.yml**
-- [x] Unit tests for `:shared-logic`, `:app` and `:wear` on relevant PRs and pushes to `main` / `agent-main`
-- [x] Lint all three modules; build phone/watch debug and R8 release APKs and phone/Room test APKs
-- [x] Phone and Room instrumentation on API 31 and 36 via `android-emulator-runner@v2`, `ubuntu-24.04`, after the build job; no `[e2e]` label gate
-- [x] Trigger on `android/**`, `test-vectors/**`, the vector validator, reference versions and the workflow itself; manual dispatch supported
-- [x] Validate vector JSON against the schema; upload build and instrumentation reports
+**Android and iOS CI (`ios.yml`)**
+- [x] Android unit tests, lint, debug/R8 release builds and test APKs for `:shared-logic`, `:app`, and `:wear` on every change via reusable `android.yml`
+- [x] Phone/database instrumentation on API 31/36 and Wear OS instrumentation on API 34, using `android-emulator-runner@v2` on `ubuntu-24.04`
+- [x] iOS Swift domain/parity tests and simulator persistence/UI tests on `macos-15`
+- [x] Run both platforms on every push, PR, merge queue, and manual dispatch, with no path or label filters
+- [x] Combined **Android and iOS** check fails if any required suite fails, is cancelled, or is skipped
+- [ ] Require **Android and iOS** in branch protection for `main` and `agent-main` after the workflow lands (repository administration access required)
 
 **adhan-test-vectors companion repo**
 - [ ] README documents: (1) how to trigger vector regeneration on Adhan upstream release (GitHub Actions manual dispatch); (2) who reviews PrayTimes.py vs Adhan disagreements; (3) process for syncing vectors back to main repo

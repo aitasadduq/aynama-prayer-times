@@ -1,22 +1,10 @@
-name: iOS
+name: Android and iOS CI
 
 on:
   push:
-    paths:
-      - "ios/**"
-      - "test-vectors/**"
-      - "scripts/adhan-parity/**"
-      - "scripts/validate-vectors.py"
-      - "scripts/reference-versions.json"
-      - ".github/workflows/ios.yml"
   pull_request:
-    paths:
-      - "ios/**"
-      - "test-vectors/**"
-      - "scripts/adhan-parity/**"
-      - "scripts/validate-vectors.py"
-      - "scripts/reference-versions.json"
-      - ".github/workflows/ios.yml"
+  merge_group:
+  workflow_dispatch:
 
 # Nothing here writes to the repository, and a new workflow inherits whatever the repository
 # default happens to be. Say it explicitly instead.
@@ -24,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ios-${{ github.ref }}
+  group: mobile-ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -37,6 +25,7 @@ jobs:
     # comparing against it. Linux, so it costs almost nothing.
     name: Test vectors - schema
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -51,21 +40,16 @@ jobs:
         run: python3 scripts/validate-vectors.py
 
   shared-logic:
-    # The domain package has no UIKit and no simulator dependency, so this job is a plain
-    # `swift test` — seconds, not minutes. It carries the Adhan-Swift <-> Adhan-Kotlin parity
-    # gate (TODOS.md, pre-v3), so it must run on every commit that touches the vectors as well
-    # as every one that touches iOS code.
-    #
-    # macOS runners bill at roughly 10x Linux, which is the open "iOS CI runner strategy"
-    # decision in TODOS.md. This job is the cheapest possible shape of it: one runner, no
-    # simulator boot, no xcodebuild. If SharedLogic turns out to build under swift-corelibs
-    # Foundation, it could move to ubuntu-latest and cost almost nothing — untested, so not
-    # assumed here.
+    # Domain rules and Adhan-Swift <-> Adhan-Kotlin parity run without a simulator.
     name: SharedLogic - domain and Adhan parity
     runs-on: macos-15
+    timeout-minutes: 15
     needs: vectors
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select Xcode 16.4
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
 
       - name: Report toolchain
         run: swift --version
@@ -92,3 +76,92 @@ jobs:
       - name: Test
         working-directory: ios/SharedLogic
         run: swift test
+
+  app:
+    # The app target. The Xcode project is generated from ios/project.yml rather than committed,
+    # so this job regenerates it and fails if the checked-in yml no longer describes a buildable
+    # project — a .pbxproj in git is a merge-conflict generator and nobody reviews one.
+    name: iOS simulator - persistence and UI tests
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 16.4
+        run: sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Select an installed iPhone simulator
+        id: simulator
+        run: |
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/simulators.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          devices = json.loads(Path(os.environ["RUNNER_TEMP"], "simulators.json").read_text())["devices"]
+          iphones = [device for runtime, entries in sorted(devices.items(), reverse=True)
+                     if ".iOS-" in runtime for device in entries
+                     if device["name"].startswith("iPhone") and device["isAvailable"]]
+          if not iphones:
+              raise SystemExit("No installed iPhone simulator is available")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"udid={iphones[0]['udid']}\n")
+          print(f"Testing on {iphones[0]['name']} ({iphones[0]['udid']})")
+          PY
+
+      - name: Build and test on the simulator
+        working-directory: ios
+        env:
+          SIMULATOR_UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          xcodebuild -project Aynama.xcodeproj -scheme Aynama \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -destination-timeout 120 -configuration Debug \
+            -parallel-testing-enabled NO \
+            -resultBundlePath "$RUNNER_TEMP/Aynama.xcresult" \
+            CODE_SIGNING_ALLOWED=NO test
+
+      - name: Upload simulator test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: ${{ runner.temp }}/Aynama.xcresult
+          if-no-files-found: warn
+          retention-days: 14
+
+  android:
+    name: Android
+    uses: ./.github/workflows/android.yml
+
+  mobile-ci:
+    # Configure this stable check as required on main and agent-main. A failed, cancelled or
+    # skipped platform job must never turn into a successful merge gate.
+    name: Android and iOS
+    if: always()
+    needs: [vectors, shared-logic, app, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every platform check to pass
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          results = json.loads(os.environ["JOB_RESULTS"])
+          failed = [job for job, result in results.items() if result["result"] != "success"]
+          if failed:
+              raise SystemExit(f"Required CI checks did not pass: {', '.join(failed)}")
+          print("All Android and iOS checks passed")
+          PY
