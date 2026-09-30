@@ -72,7 +72,7 @@ struct ProfileFormSheet: View {
                             Text("Device time zone").tag("")
                             ForEach(TimeZone.knownTimeZoneIdentifiers, id: \.self) { Text($0).tag($0) }
                         }
-                    }.accessibilityIdentifier("manual-location")
+                    }
                     if !timezone.isEmpty {
                         Toggle(isOn: $useLocationTimezone) {
                             VStack(alignment: .leading, spacing: 4) {

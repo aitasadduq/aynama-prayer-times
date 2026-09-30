@@ -167,7 +167,9 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ios-screenshots"
           if [ -d "$RUNNER_TEMP/Aynama.xcresult" ]; then
             xcrun xcresulttool export attachments --path "$RUNNER_TEMP/Aynama.xcresult" \
-              --output-path "$RUNNER_TEMP/ios-screenshots"
+              --output-path "$RUNNER_TEMP/ios-attachments"
+            python3 scripts/ios/collect-screenshots.py "$RUNNER_TEMP/ios-attachments" "$RUNNER_TEMP/ios-screenshots"
+            cp "$RUNNER_TEMP/ios-attachments/manifest.json" "$RUNNER_TEMP/ios-screenshots/manifest.json"
           fi
 
       - name: Upload app screenshots

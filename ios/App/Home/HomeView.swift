@@ -128,7 +128,7 @@ private struct ProfilePageView: View {
                     CountdownHero(text: state.countdownText, isElapsed: state.countdownIsElapsed,
                                   prayerName: state.countdownPrayerName, prayerTime: state.countdownPrayerTime, surface: surface)
                     PrayerRibbon(rows: state.ribbonRows, surface: surface,
-                                 rowHeight: max(56, (geometry.size.height - 220) / CGFloat(state.ribbonRows.count)),
+                                 rowHeight: max(56, (geometry.size.height - 270) / CGFloat(state.ribbonRows.count)),
                                  progress: ribbonPosition(state)) { prayer in
                         onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer,
                                                date: CalendarDate.from(now, in: state.profile.effectiveTimeZone)))

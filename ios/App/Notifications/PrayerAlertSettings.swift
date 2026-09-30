@@ -69,7 +69,10 @@ enum PrayerAlertPlan {
         guard perDay > 0 else { return [] }
         let horizon = min(7, max(3, 60 / perDay))
         var alerts: [PlannedPrayerAlert] = []
-        for offset in 0..<horizon {
+        let horizonEnd = today.plusDays(horizon).atTime(ClockTime(hour: 0, minute: 0), in: profile.effectiveTimeZone)
+        // Yesterday's Isha can occur after today's midnight. Keep it when refilling, then
+        // bound the queue by occurrence day rather than the day the times were calculated for.
+        for offset in -1..<horizon {
             let day = today.plusDays(offset)
             var reminders: [PlannedPrayerAlert] = []
             for prayer in enabled {
@@ -99,7 +102,7 @@ enum PrayerAlertPlan {
             }
             alerts.append(contentsOf: reminders)
         }
-        return Array(alerts.prefix(60))
+        return Array(alerts.filter { $0.instant < horizonEnd }.prefix(60))
     }
 }
 

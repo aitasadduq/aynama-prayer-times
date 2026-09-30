@@ -51,6 +51,16 @@ final class DesignParityTests: XCTestCase {
         XCTAssertEqual(Set(plan.map(\.id)).count, plan.count)
     }
 
+    func testMidnightRefillPreservesIshaFromThePreviousPrayerDay() throws {
+        let today = CalendarDate(year: 2026, month: 6, day: 12)
+        let isha = try XCTUnwrap(PrayerSchedule.instant(.isha, profile: london, date: today.minusDays(1)))
+        XCTAssertEqual(CalendarDate.from(isha, in: london.effectiveTimeZone), today)
+        let now = today.atTime(ClockTime(hour: 0, minute: 0), in: london.effectiveTimeZone)
+        let plan = PrayerAlertPlan.build(profile: london, configurations: [:], imsak: false, now: now)
+        XCTAssertTrue(plan.contains { $0.prayer == .isha && $0.instant == isha })
+        XCTAssertTrue(plan.allSatisfy { $0.instant > now && $0.instant < today.plusDays(7).atTime(ClockTime(hour: 0, minute: 0), in: london.effectiveTimeZone) })
+    }
+
     func testAlertOffsetAndFixedTimeDoNotChangeCalculatedPrayerTime() throws {
         let day = CalendarDate(year: 2026, month: 9, day: 30)
         let scheduled = try XCTUnwrap(PrayerSchedule.instant(.fajr, profile: london, date: day))

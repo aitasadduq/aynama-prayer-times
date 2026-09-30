@@ -32,6 +32,9 @@ struct SettingsView: View {
                         }.frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(record.name)
+                    .accessibilityValue(record.profile.calculationMethod.displayName)
+                    .accessibilityHint("Edit profile")
                     .listRowBackground(Color.clear)
                     .swipeActions { Button("Delete", role: .destructive) { remove(record.profile) } }
                 }

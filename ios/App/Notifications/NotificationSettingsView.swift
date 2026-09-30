@@ -84,7 +84,7 @@ struct NotificationSettingsView: View {
                     Text(prayer.rawValue.capitalized)
                     Spacer(minLength: 8)
                     Text(PrayerSchedule.formatted(alertTime(prayer, profile: profile), zone: profile.effectiveTimeZone))
-                        .font(AynamaFont.monoNum).foregroundStyle(palette.muted)
+                        .font(AynamaFont.monoNum).foregroundStyle(palette.muted).lineLimit(1).minimumScaleFactor(0.7)
                 }.frame(minHeight: 44)
             }.buttonStyle(.plain)
             Toggle("\(prayer.rawValue.capitalized) prayer alert", isOn: Binding(get: {

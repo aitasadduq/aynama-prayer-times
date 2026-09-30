@@ -40,7 +40,7 @@ struct QiblaView: View {
         return ScrollView {
             VStack(spacing: 24) {
                 HStack {
-                    Text("Qibla").font(AynamaFont.displayMD)
+                    Text("Qibla").font(AynamaFont.qiblaTitle)
                     Spacer()
                     Text(phaseDisplayName(phase, on: date).uppercased())
                         .font(AynamaFont.bodySM).tracking(1).foregroundStyle(surface.prefersLightForeground ? AynamaColor.saffron : AynamaColor.saffronInk)
@@ -54,7 +54,7 @@ struct QiblaView: View {
                     Circle().stroke(panel, lineWidth: 28).frame(width: 252, height: 252)
                     QiblaArrow().fill(AynamaColor.saffron)
                         .frame(width: 140, height: 200).rotationEffect(.degrees(bearing))
-                    Text("N").font(AynamaFont.title)
+                    Text("N").font(AynamaFont.north)
                         .rotationEffect(.degrees(location.heading ?? 0)).offset(y: -126)
                 }
                 .frame(width: 280, height: 280)
@@ -63,7 +63,7 @@ struct QiblaView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Qibla bearing \(Int(bearing.rounded())) degrees from true north")
                 VStack(spacing: 8) {
-                    Text("\(Int(bearing.rounded()))°").font(AynamaFont.displayLG)
+                    Text("\(Int(bearing.rounded()))°").font(AynamaFont.qiblaDegree)
                     Text("\(Int(distance.rounded()).formatted()) km \(location.location == nil ? "from \(profile.name) " : "")to the Kaaba")
                         .font(AynamaFont.bodySM).foregroundStyle(surface.foregroundMuted)
                         .multilineTextAlignment(.center)

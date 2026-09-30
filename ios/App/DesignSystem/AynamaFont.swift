@@ -29,6 +29,10 @@ enum AynamaFont {
     /// 20pt / 1.25 — section titles.
     static let title = fraunces(size: 20, weight: 500, opticalSize: 20, textStyle: .title3)
 
+    static let qiblaTitle = fraunces(size: 28, weight: 500, opticalSize: 32, textStyle: .title1)
+    static let qiblaDegree = fraunces(size: 56, weight: 400, opticalSize: 96, textStyle: .largeTitle)
+    static let north = fraunces(size: 16, weight: 500, opticalSize: 20, textStyle: .subheadline)
+
     // MARK: - Body (IBM Plex Sans)
 
     /// 17pt / 1.45 — primary reading.

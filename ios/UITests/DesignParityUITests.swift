@@ -2,13 +2,14 @@ import XCTest
 
 final class DesignParityUITests: XCTestCase {
     @MainActor
-    private func launch(dark: Bool = false, store: String = UUID().uuidString) -> XCUIApplication {
+    private func launch(dark: Bool = false, store: String = UUID().uuidString, largeText: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment["AYNAMA_UI_TEST_STORE"] = store
         app.launchEnvironment["AYNAMA_SCREENSHOT_FIXTURES"] = "1"
         app.launchEnvironment["AYNAMA_TEST_NOW"] = "2026-09-30T12:15:00Z"
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-AppleInterfaceStyle", dark ? "Dark" : "Light"]
+        if largeText { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
         app.launch()
         XCTAssertTrue(app.staticTexts["London · MWL"].waitForExistence(timeout: 10))
         return app
@@ -65,6 +66,17 @@ final class DesignParityUITests: XCTestCase {
     }
 
     @MainActor
+    func testLargeTextScreenshotsKeepProfileControlsReachable() {
+        let app = launch(largeText: true)
+        XCTAssertTrue(app.buttons["New profile"].isHittable)
+        capture(app, "12-prayers-large-text")
+        app.tabBars.buttons["Settings"].tap()
+        XCTAssertTrue(app.staticTexts["Profiles"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["New profile"].isHittable)
+        capture(app, "13-settings-large-text")
+    }
+
+    @MainActor
     func testPrayerMarkPersistsAndPastPrayersCannotBeMarkedOnTime() {
         let store = UUID().uuidString
         let app = launch(store: store)
@@ -72,6 +84,7 @@ final class DesignParityUITests: XCTestCase {
         let fajr = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Fajr,")).firstMatch
         XCTAssertTrue(fajr.waitForExistence(timeout: 5))
         fajr.tap()
+        capture(app, "14-prayer-mark-sheet")
         XCTAssertTrue(app.buttons["I prayed this"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["I prayed this"].isEnabled)
         app.buttons["I didn't pray this"].tap()
