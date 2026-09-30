@@ -35,7 +35,7 @@ struct AppRootView: View {
                 .tabItem { Label("Settings", systemImage: tab == 3 ? "gearshape.fill" : "gearshape").symbolVariant(.none) }.tag(3)
         }
         .preferredColorScheme(testAppearance)
-        .tint(NeutralPalette(scheme: testAppearance ?? scheme).accent)
+        .tint((testAppearance ?? scheme) == .dark ? AynamaColor.parchmentMuted : AynamaColor.saffronInk)
         .onAppear { ScreenshotFixtures.seed(context) }
         .font(AynamaFont.body)
         .environmentObject(alerts)
