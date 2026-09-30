@@ -10,6 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -401,6 +402,39 @@ class AlarmSchedulerTest {
             86_400_000L,
             correct.first().triggerEpochMs - deviceZoneDay.first().triggerEpochMs,
         )
+    }
+
+    // --- The daily rollover lands at the profile's midnight, not the device's ------
+
+    // 13:00 in London (the device), 08:00 in New York, 21:00 in Tokyo, all on 24 September.
+    private val rolloverNow = Instant.parse("2026-09-24T12:00:00Z")
+    private val deviceZone = ZoneId.of("Europe/London")
+    private val deviceMidnight = Instant.parse("2026-09-24T23:00:00Z")
+
+    @Test
+    fun `rollover for a profile behind the device lands at the profile's midnight`() {
+        val newYork = profile.copy(timezone = "America/New_York", useLocationTimezone = true)
+
+        val rollover = Instant.ofEpochMilli(nextRolloverEpochMs(newYork.effectiveZoneId(), rolloverNow))
+
+        assertEquals(Instant.parse("2026-09-25T04:00:00Z"), rollover)
+        assertEquals(LocalDate.of(2026, 9, 25), schedulingDate(newYork, rollover))
+        // At the device's midnight it is still the 24th in New York: that re-arm builds a day
+        // that is nearly over, and the 25th's Fajr, Dhuhr and Asr are never armed.
+        assertEquals(deviceMidnight.toEpochMilli(), nextRolloverEpochMs(deviceZone, rolloverNow))
+        assertEquals(LocalDate.of(2026, 9, 24), schedulingDate(newYork, deviceMidnight))
+    }
+
+    @Test
+    fun `rollover for a profile ahead of the device lands at the profile's midnight`() {
+        val tokyo = profile.copy(timezone = "Asia/Tokyo", useLocationTimezone = true)
+
+        val rollover = Instant.ofEpochMilli(nextRolloverEpochMs(tokyo.effectiveZoneId(), rolloverNow))
+
+        // Nine hours before the device's midnight, so Tokyo's 25th is armed from its own start.
+        assertEquals(Instant.parse("2026-09-24T15:00:00Z"), rollover)
+        assertEquals(LocalDate.of(2026, 9, 25), schedulingDate(tokyo, rollover))
+        assertEquals(LocalDate.of(2026, 9, 24), schedulingDate(tokyo, rollover.minusMillis(1)))
     }
 
     // ---- Friday naming ----

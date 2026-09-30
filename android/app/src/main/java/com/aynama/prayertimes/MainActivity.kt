@@ -44,10 +44,14 @@ class MainActivity : ComponentActivity() {
         notifPermLauncher = registerForActivityResult(RequestPermission()) { granted ->
             if (granted) requestBatteryOptExemptionOnce()
         }
+        // Below Android 13, and once notifications are allowed, there is no permission result
+        // to wait for: without asking here, those devices would never see the battery prompt.
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
             notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            requestBatteryOptExemptionOnce()
         }
 
         requestedProfileId.value = widgetProfileFrom(intent)
@@ -99,6 +103,6 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        private const val KEY_BATTERY_OPT_REQUESTED = "battery_opt_requested"
+        internal const val KEY_BATTERY_OPT_REQUESTED = "battery_opt_requested"
     }
 }
