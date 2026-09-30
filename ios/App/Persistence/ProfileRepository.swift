@@ -115,7 +115,7 @@ final class SelectedProfile: ObservableObject {
     }
 
     init(defaults: UserDefaults? = nil) {
-        let store = defaults ?? UserDefaults(suiteName: AynamaStore.appGroupIdentifier) ?? .standard
+        let store = defaults ?? AynamaStore.preferences
         self.defaults = store
         let stored = store.object(forKey: Self.key) as? Int
         id = stored.map(Int64.init)

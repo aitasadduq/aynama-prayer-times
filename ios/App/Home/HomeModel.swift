@@ -47,7 +47,7 @@ enum ProfilePage: Equatable, Identifiable {
 final class HomeModel {
 
     private(set) var pages: [ProfilePage] = []
-    private(set) var now: Date = .now
+    private(set) var now: Date = AppClock.now
 
     private let adhan = AdhanWrapper()
     private var tickTask: Task<Void, Never>?
@@ -91,7 +91,7 @@ final class HomeModel {
                 // once a second forever. There is no `deinit` to cancel it from: `tickTask` is
                 // main-actor isolated and `deinit` is not, so the loop has to end itself.
                 guard let self else { return }
-                self.now = .now
+                self.now = AppClock.now
                 try? await Task.sleep(for: .seconds(1))
             }
         }

@@ -18,6 +18,7 @@ final class ProfileFlowUITests: XCTestCase {
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         nameField.tap()
         nameField.typeText(name)
+        app.buttons["Enter coordinates"].tap()
         app.textFields["profile-latitude"].tap()
         app.textFields["profile-latitude"].typeText("21.4225")
         app.textFields["profile-longitude"].tap()
@@ -28,7 +29,7 @@ final class ProfileFlowUITests: XCTestCase {
     private func assertProfileVisible(_ app: XCUIApplication, name: String,
                                       file: StaticString = #filePath, line: UInt = #line) {
         // The profile name follows the prayer ribbon and may need scrolling on smaller phones.
-        let label = app.staticTexts[name]
+        let label = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", name + " ·")).firstMatch
         _ = label.waitForExistence(timeout: 5)
         if !label.isHittable {
             app.swipeUp()
@@ -61,6 +62,7 @@ final class ProfileFlowUITests: XCTestCase {
         app.textFields["profile-name"].tap()
         app.textFields["profile-name"].typeText("Home")
         XCTAssertFalse(save.isEnabled)
+        app.buttons["Enter coordinates"].tap()
         app.textFields["profile-latitude"].tap()
         app.textFields["profile-latitude"].typeText("91")
         app.textFields["profile-longitude"].tap()

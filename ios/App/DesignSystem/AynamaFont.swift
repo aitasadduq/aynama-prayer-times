@@ -46,6 +46,10 @@ enum AynamaFont {
     /// shuffle sideways as the digits change.
     static let monoNum = plex(size: 17, weight: 500, textStyle: .body, tabular: true)
 
+    /// The bundled Fraunces has proportional figures; Plex keeps the live clock stable (§4).
+    static let countdown = plex(size: 72, weight: 400, textStyle: .largeTitle, tabular: true)
+    static let timelineTime = plex(size: 20, weight: 500, textStyle: .title3, tabular: true)
+
     // MARK: - Construction
 
     /// Fraunces' four axes. `SOFT` and `WONK` stay at the family defaults — the design uses
@@ -86,6 +90,11 @@ enum AynamaFont {
         axes: [Int: CGFloat],
         tabular: Bool = false
     ) -> Font {
+        Font(uiFont(named: family, size: size, textStyle: textStyle, axes: axes, tabular: tabular))
+    }
+
+    private static func uiFont(named family: String, size: CGFloat, textStyle: UIFont.TextStyle,
+                               axes: [Int: CGFloat], tabular: Bool = false) -> UIFont {
         var attributes: [UIFontDescriptor.AttributeName: Any] = [
             .family: family,
             kCTFontVariationAttribute as UIFontDescriptor.AttributeName: axes,
@@ -105,7 +114,18 @@ enum AynamaFont {
         // Dynamic Type, capped so `display-xl` at an accessibility size does not push the prayer
         // name off the screen entirely. §12 asks for Dynamic Type, not for unbounded growth.
         let scaled = UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base, maximumPointSize: size * 1.6)
-        return Font(scaled)
+        return scaled
+    }
+
+    @MainActor
+    static func configureNativeTypography() {
+        let body = uiFont(named: "IBM Plex Sans", size: 17, textStyle: .body, axes: [axisTag("wght"): 400])
+        let caption = uiFont(named: "IBM Plex Sans", size: 11, textStyle: .caption1, axes: [axisTag("wght"): 500])
+        UINavigationBar.appearance().titleTextAttributes = [.font: body]
+        UITabBarItem.appearance().setTitleTextAttributes([.font: caption], for: .normal)
+        UITabBarItem.appearance().setTitleTextAttributes([.font: caption], for: .selected)
+        UISegmentedControl.appearance().setTitleTextAttributes([.font: body], for: .normal)
+        UISegmentedControl.appearance().setTitleTextAttributes([.font: body], for: .selected)
     }
 
     /// A four-character axis tag as the integer CoreText wants ('wght' → 0x77676874).

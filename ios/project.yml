@@ -59,6 +59,10 @@ targets:
     info:
       path: App/Info.plist
       properties:
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.aynama.prayertimes.refresh
+        UIBackgroundModes:
+          - fetch
         UIAppFonts:
           - Fraunces.ttf
           - IBMPlexSans.ttf

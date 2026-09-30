@@ -5,6 +5,8 @@ import SwiftUI
 @main
 struct AynamaApp: App {
 
+    @UIApplicationDelegateAdaptor(AynamaAppDelegate.self) private var appDelegate
+
     /// One container for the process, shared with the widget extension through the App Group.
     @State private var container = AynamaStore.makeContainer()
     @StateObject private var selection = SelectedProfile()
@@ -16,9 +18,11 @@ struct AynamaApp: App {
     /// to the widget's profile on every redraw.
     @State private var requestedProfileID: Int64?
 
+    init() { AynamaFont.configureNativeTypography() }
+
     var body: some Scene {
         WindowGroup {
-            HomeView(requestedProfileID: $requestedProfileID)
+            AppRootView(requestedProfileID: $requestedProfileID)
                 .environmentObject(selection)
                 // §3: the only accent is saffron. Without this, every unstyled control, text
                 // cursor and selection handle in the app renders in the system's blue.

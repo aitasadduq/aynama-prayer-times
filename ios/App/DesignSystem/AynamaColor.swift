@@ -90,6 +90,8 @@ enum TimeOfDaySurface {
         }
     }
 
+    var activeForeground: Color { prefersLightForeground ? AynamaColor.saffron : AynamaColor.ink }
+
     var foreground: Color { prefersLightForeground ? AynamaColor.parchment : AynamaColor.ink }
 
     var foregroundMuted: Color {

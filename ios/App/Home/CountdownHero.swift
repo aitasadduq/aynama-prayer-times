@@ -20,9 +20,9 @@ struct CountdownHero: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(text)
-                .font(AynamaFont.displayXL)
+                .font(AynamaFont.countdown)
                 .monospacedDigit()
-                .foregroundStyle(isElapsed ? AynamaColor.saffron : surface.foreground)
+                .foregroundStyle(isElapsed ? surface.activeForeground : surface.foreground)
                 // §5: never centred. The hero is left-aligned with the ribbon beneath it.
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .minimumScaleFactor(0.6)

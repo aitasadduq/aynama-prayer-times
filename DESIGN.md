@@ -633,6 +633,13 @@ Everything else on this list holds.
 ## 11. Platform Notes
 
 ### iOS
+- The phone app shares Android's four destinations: Prayers, Qibla, Tracker, Settings. Notifications and Adhan voice use native pushes within Settings. Profiles and prayer details use native sheets.
+- Native tab and navigation bars use the iOS 26 Liquid Glass treatment when built with the iOS 26 SDK. Glass belongs to navigation chrome and utilitarian controls; the prayer ribbon and Qibla instrument remain directly on their phase surfaces. The Settings add button uses tinted glass, with a solid saffron fallback for Reduce Transparency and iOS 17–25.
+- Home uses the profile/method and Hijri header, a left-aligned countdown in tabular IBM Plex, Fraunces prayer names, and a connected ribbon with a moving time tick. The add control and page dots sit below the scrollable content so they do not cover prayer times.
+- Settings, Tracker, notifications and profile/mark sheets follow the system appearance on warm ink or parchment. Rows expand with Dynamic Type. Historical on-time marking is disabled outside the actual prayer window; marks use the profile's calendar day.
+- Location search uses the native geocoder, with current-location and manual-coordinate alternatives. A detected time zone is retained when its toggle is off. Profile sheets include the per-profile Hijri adjustment.
+- Qibla uses true heading when available, with the saved default-profile coordinates as a location fallback. A simulator or device without a compass shows a labelled bearing from true north instead of a false live alignment hint.
+- Prayer alerts implement the profile-scoped offset/fixed-time controls, reminders, Ramadan Imsak, the 60-slot budget (§24), foreground refill and opportunistic background refresh. Notification taps return to the relevant Prayers page. iOS owns sound/vibration policy. As on Android, adhan recordings are not bundled; the picker says that alerts currently use the system sound (or silent for None). Widget and Live Activity extensions remain future work (§23).
 - Liquid Glass surfaces allowed on utilitarian screens (Settings modals, share sheets). Do not apply Liquid Glass over contemplative time-of-day surfaces — the effect clashes.
 - SF Symbols on utilitarian chrome. Custom SVGs on contemplative screens.
 - Dynamic Type supported through `display-xl` down to `body-sm`.
@@ -1288,6 +1295,13 @@ notification's own `when` field, which takes no format string at all. There the 
 carried in words — "At 1:00 PM" while counting down, "Began at 1:00 PM" while counting up.
 
 #### iOS
+- The phone app shares Android's four destinations: Prayers, Qibla, Tracker, Settings. Notifications and Adhan voice use native pushes within Settings. Profiles and prayer details use native sheets.
+- Native tab and navigation bars use the iOS 26 Liquid Glass treatment when built with the iOS 26 SDK. Glass belongs to navigation chrome and utilitarian controls; the prayer ribbon and Qibla instrument remain directly on their phase surfaces. The Settings add button uses tinted glass, with a solid saffron fallback for Reduce Transparency and iOS 17–25.
+- Home uses the profile/method and Hijri header, a left-aligned countdown in tabular IBM Plex, Fraunces prayer names, and a connected ribbon with a moving time tick. The add control and page dots sit below the scrollable content so they do not cover prayer times.
+- Settings, Tracker, notifications and profile/mark sheets follow the system appearance on warm ink or parchment. Rows expand with Dynamic Type. Historical on-time marking is disabled outside the actual prayer window; marks use the profile's calendar day.
+- Location search uses the native geocoder, with current-location and manual-coordinate alternatives. A detected time zone is retained when its toggle is off. Profile sheets include the per-profile Hijri adjustment.
+- Qibla uses true heading when available, with the saved default-profile coordinates as a location fallback. A simulator or device without a compass shows a labelled bearing from true north instead of a false live alignment hint.
+- Prayer alerts implement the profile-scoped offset/fixed-time controls, reminders, Ramadan Imsak, the 60-slot budget (§24), foreground refill and opportunistic background refresh. Notification taps return to the relevant Prayers page. iOS owns sound/vibration policy. As on Android, adhan recordings are not bundled; the picker says that alerts currently use the system sound (or silent for None). Widget and Live Activity extensions remain future work (§23).
 
 iOS widgets and Live Activities render the countdown with SwiftUI's
 `Text(timerInterval:pauseTime:countsDown:)`. WidgetKit ticks it in the system's own render
