@@ -44,13 +44,16 @@ struct ProfileFormSheet: View {
                 Section("Location") {
                     TextField("Name", text: $name)
                         .textInputAutocapitalization(.words)
+                        .accessibilityIdentifier("profile-name")
                     LabeledContent("Latitude") {
                         TextField("21.4225", text: $latitudeText)
+                            .accessibilityIdentifier("profile-latitude")
                             .keyboardType(.numbersAndPunctuation)
                             .multilineTextAlignment(.trailing)
                     }
                     LabeledContent("Longitude") {
                         TextField("39.8262", text: $longitudeText)
+                            .accessibilityIdentifier("profile-longitude")
                             .keyboardType(.numbersAndPunctuation)
                             .multilineTextAlignment(.trailing)
                     }

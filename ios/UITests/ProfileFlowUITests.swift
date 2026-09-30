@@ -14,14 +14,14 @@ final class ProfileFlowUITests: XCTestCase {
 
     @MainActor
     private func fillProfile(_ app: XCUIApplication, name: String) {
-        let nameField = app.textFields["Name"]
+        let nameField = app.textFields["profile-name"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         nameField.tap()
         nameField.typeText(name)
-        app.textFields["21.4225"].tap()
-        app.textFields["21.4225"].typeText("21.4225")
-        app.textFields["39.8262"].tap()
-        app.textFields["39.8262"].typeText("39.8262")
+        app.textFields["profile-latitude"].tap()
+        app.textFields["profile-latitude"].typeText("21.4225")
+        app.textFields["profile-longitude"].tap()
+        app.textFields["profile-longitude"].typeText("39.8262")
     }
 
     @MainActor
@@ -29,10 +29,12 @@ final class ProfileFlowUITests: XCTestCase {
                                       file: StaticString = #filePath, line: UInt = #line) {
         // The profile name follows the prayer ribbon and may need scrolling on smaller phones.
         let label = app.staticTexts[name]
-        if !label.waitForExistence(timeout: 5) {
-            app.scrollViews.firstMatch.swipeUp()
+        _ = label.waitForExistence(timeout: 5)
+        if !label.isHittable {
+            app.swipeUp()
         }
         XCTAssertTrue(label.waitForExistence(timeout: 5), file: file, line: line)
+        XCTAssertTrue(label.isHittable, "The selected profile must be on screen", file: file, line: line)
     }
 
     @MainActor
@@ -56,13 +58,13 @@ final class ProfileFlowUITests: XCTestCase {
         let save = app.buttons["Save"]
         XCTAssertTrue(save.waitForExistence(timeout: 5))
         XCTAssertFalse(save.isEnabled)
-        app.textFields["Name"].tap()
-        app.textFields["Name"].typeText("Home")
+        app.textFields["profile-name"].tap()
+        app.textFields["profile-name"].typeText("Home")
         XCTAssertFalse(save.isEnabled)
-        app.textFields["21.4225"].tap()
-        app.textFields["21.4225"].typeText("91")
-        app.textFields["39.8262"].tap()
-        app.textFields["39.8262"].typeText("39.8262")
+        app.textFields["profile-latitude"].tap()
+        app.textFields["profile-latitude"].typeText("91")
+        app.textFields["profile-longitude"].tap()
+        app.textFields["profile-longitude"].typeText("39.8262")
         XCTAssertFalse(save.isEnabled)
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["Create profile"].waitForExistence(timeout: 5))
