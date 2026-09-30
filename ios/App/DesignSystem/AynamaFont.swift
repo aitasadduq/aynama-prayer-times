@@ -125,12 +125,12 @@ enum AynamaFont {
     static func configureNativeTypography() {
         let body = uiFont(named: "IBM Plex Sans", size: 17, textStyle: .body, axes: [axisTag("wght"): 400])
         let caption = uiFont(named: "IBM Plex Sans", size: 11, textStyle: .caption1, axes: [axisTag("wght"): 500])
-        UINavigationBar.appearance().titleTextAttributes = [.font: body]
-        UITabBarItem.appearance().setTitleTextAttributes([.font: caption], for: .normal)
-        UITabBarItem.appearance().setTitleTextAttributes([.font: caption], for: .selected)
         let foreground = UIColor { traits in
             traits.userInterfaceStyle == .dark ? UIColor(AynamaColor.parchment) : UIColor(AynamaColor.ink)
         }
+        UINavigationBar.appearance().titleTextAttributes = [.font: body, .foregroundColor: foreground]
+        UITabBarItem.appearance().setTitleTextAttributes([.font: caption, .foregroundColor: foreground], for: .normal)
+        UITabBarItem.appearance().setTitleTextAttributes([.font: caption, .foregroundColor: foreground], for: .selected)
         UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(AynamaColor.saffron)
         UISegmentedControl.appearance().backgroundColor = UIColor { traits in
             traits.userInterfaceStyle == .dark ? UIColor(AynamaColor.inkMuted) : UIColor(AynamaColor.parchmentMuted)

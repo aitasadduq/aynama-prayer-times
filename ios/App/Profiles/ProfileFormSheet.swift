@@ -117,8 +117,8 @@ struct ProfileFormSheet: View {
             .neutralSurface()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.font(AynamaFont.body) }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.font(AynamaFont.body).disabled(!isValid) }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() }.font(AynamaFont.body).foregroundStyle(palette.foreground) }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.font(AynamaFont.body).foregroundStyle(palette.foreground).disabled(!isValid) }
             }
             .task(id: search) { await findPlaces() }
             .onChange(of: location.location) { _, fix in

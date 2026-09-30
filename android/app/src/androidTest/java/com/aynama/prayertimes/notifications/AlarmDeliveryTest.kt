@@ -21,6 +21,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.Instant
+import java.time.ZoneId
 
 /**
  * That prayer alarms are really armed, really fire, and really come back.
@@ -34,6 +36,21 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class AlarmDeliveryTest {
+
+    private data class TestLocation(val name: String, val latitude: Double, val longitude: Double, val zone: String)
+
+    // scheduleAll arms only prayers remaining in the profile's current day. Select a real
+    // location whose morning is still in progress so this device test works at any UTC hour.
+    private fun locationWithUpcomingPrayers(): TestLocation {
+        val now = Instant.now()
+        return listOf(
+            TestLocation("Makkah", 21.4225, 39.8262, "Asia/Riyadh"),
+            TestLocation("London", 51.5074, -0.1278, "Europe/London"),
+            TestLocation("New York", 40.7128, -74.0060, "America/New_York"),
+            TestLocation("Honolulu", 21.3099, -157.8581, "Pacific/Honolulu"),
+            TestLocation("Tokyo", 35.6762, 139.6503, "Asia/Tokyo"),
+        ).first { now.atZone(ZoneId.of(it.zone)).hour in 6..11 }
+    }
 
     private val context: Context =
         InstrumentationRegistry.getInstrumentation().targetContext.applicationContext
@@ -55,17 +72,18 @@ class AlarmDeliveryTest {
         NotificationHelper.createChannels(context)
         val prefs = NotificationPreferences(app.prefs)
         savedNotificationProfile = prefs.notificationProfileId
+        val location = locationWithUpcomingPrayers()
 
         val id = app.profileRepository.insert(
             Profile(
-                name = "Alarm test Makkah",
-                latitude = 21.4225,
-                longitude = 39.8262,
+                name = "Alarm test ${location.name}",
+                latitude = location.latitude,
+                longitude = location.longitude,
                 calculationMethod = CalculationMethodKey.UMM_AL_QURA,
                 asrMadhab = AsrMadhab.SHAFII,
                 isGps = false,
                 sortOrder = 950,
-                timezone = "Asia/Riyadh",
+                timezone = location.zone,
                 useLocationTimezone = true,
             ),
         )

@@ -180,7 +180,7 @@ struct PrayerAlertDetailView: View {
                     .datePickerStyle(.wheel).environment(\.timeZone, target.profile.effectiveTimeZone)
                     .padding(24).neutralSurface().navigationTitle("Fixed time").navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { choosingFixed = false } }
+                        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { choosingFixed = false }.foregroundStyle(palette.foreground) }
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Save") {
                                 let time = ClockTime.from(fixedDate, in: target.profile.effectiveTimeZone)
@@ -188,7 +188,7 @@ struct PrayerAlertDetailView: View {
                                 config.fixedMinutes = time.hour * 60 + time.minute
                                 alerts.set(config, profileID: target.profile.id, prayer: target.prayer)
                                 choosingFixed = false
-                            }
+                            }.foregroundStyle(palette.foreground)
                         }
                     }
             }.presentationDetents([.medium]).presentationBackground(palette.background)
