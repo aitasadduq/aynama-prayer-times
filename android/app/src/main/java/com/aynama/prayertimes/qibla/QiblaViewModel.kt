@@ -47,6 +47,8 @@ sealed interface QiblaUiState {
         val roll: Float,
         val qiblaBearing: Float,
         val distanceKm: Double,
+        /** The profile's name while the bearing is measured from its saved coordinates; null with a live fix. */
+        val fromProfile: String?,
         val accuracy: SensorAccuracy,
         val phase: PrayerPhase,
         /** The phase label, day-aware — "Jumuah" on a Friday afternoon. */
@@ -76,6 +78,7 @@ class QiblaViewModel(
     @Volatile private var liveLocation: Pair<Double, Double>? = null
     @Volatile private var qiblaBearing = 0f
     @Volatile private var distanceKm = 0.0
+    @Volatile private var fromProfile: String? = null
     // ROTATION_VECTOR is a fused virtual sensor; some OEM stacks (Samsung, Huawei) never
     // emit an initial onAccuracyChanged, so default UNRELIABLE would pin the calibration
     // banner forever. Default HIGH and let onAccuracyChanged drop us if real calibration
@@ -87,6 +90,8 @@ class QiblaViewModel(
     // Single-flight prayer-times job. Cancelled on profile change so a stale coroutine
     // can't write the old profile's times into the new profile's cache slot.
     private var timesJob: Job? = null
+    // Location fetch for the current resume; cancelled on pause so no GPS work outlives the screen.
+    private var locationJob: Job? = null
 
     // LP filter + unwrap state. Single-threaded (sensor thread only).
     private val sensorState = QiblaSensorState()
@@ -147,7 +152,9 @@ class QiblaViewModel(
      * (profile observer + location fetch), so the geo fields are written from a single thread.
      */
     private fun recomputeGeo() {
-        val (lat, lng) = liveLocation ?: activeProfile?.let { it.latitude to it.longitude } ?: return
+        val live = liveLocation
+        val (lat, lng) = live ?: activeProfile?.let { it.latitude to it.longitude } ?: return
+        fromProfile = if (live == null) activeProfile?.name else null
         qiblaBearing = QiblaCalculator.bearingTo(lat, lng).toFloat()
         distanceKm = QiblaCalculator.distanceKm(lat, lng)
         // GeomagneticField throws when the bundled WMM model is past expiry (e.g., WMM2020
@@ -161,10 +168,13 @@ class QiblaViewModel(
     }
 
     private fun fetchCurrentLocation() {
-        viewModelScope.launch {
-            val location = locationProvider.current() ?: return@launch
-            liveLocation = location
-            // Recompute from the fresh fix; the next sensor frame emits with the new bearing.
+        // Single-flight: an older request finishing late must not overwrite a newer one.
+        locationJob?.cancel()
+        locationJob = viewModelScope.launch {
+            // Null clears an earlier fix, so a city the user has left falls back to the profile,
+            // which the screen names, rather than passing for where they are now.
+            liveLocation = locationProvider.current()
+            // The next sensor frame emits with the new bearing.
             recomputeGeo()
         }
     }
@@ -181,6 +191,7 @@ class QiblaViewModel(
 
     fun stop() {
         sensorManager.unregisterListener(sensorListener)
+        locationJob?.cancel()
     }
 
     override fun onCleared() {
@@ -259,6 +270,7 @@ class QiblaViewModel(
             roll = roll,
             qiblaBearing = qiblaBearing,
             distanceKm = distanceKm,
+            fromProfile = fromProfile,
             accuracy = accuracy,
             phase = phase,
             phaseName = phaseDisplayName(phase, today),

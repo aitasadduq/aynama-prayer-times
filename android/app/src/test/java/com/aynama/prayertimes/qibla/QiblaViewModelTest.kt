@@ -21,6 +21,7 @@ import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkAll
 import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -415,6 +416,7 @@ class QiblaViewModelTest {
         assert(ready.qiblaBearing in 56f..60f) {
             "expected NYC bearing ~58° from live location, got ${ready.qiblaBearing}"
         }
+        assert(ready.fromProfile == null) { "a live fix must not name the profile, got ${ready.fromProfile}" }
     }
 
     @Test
@@ -436,6 +438,53 @@ class QiblaViewModelTest {
         assert(ready.qiblaBearing in 117f..121f) {
             "expected London bearing ~119° fallback, got ${ready.qiblaBearing}"
         }
+        // The screen names the profile, so the user can tell the bearing isn't from where they are.
+        assert(ready.fromProfile == "Profile1") { "expected the fallback to name Profile1, got ${ready.fromProfile}" }
+    }
+
+    @Test
+    fun `a failed refresh drops the earlier fix and names the profile`() = runTest {
+        every { adhan.getPrayerTimes(any(), any(), any(), any(), any()) } returns fakeTimes
+        val captured = captureSensorListener()
+
+        // First resume finds NYC; after travelling, the next resume finds nothing.
+        val fixes = ArrayDeque(listOf(40.7128 to -74.0060, null))
+        val vm = newVm(locationProvider = CurrentLocationProvider { fixes.removeFirst() })
+        profileFlow.value = listOf(makeProfile(id = 1, latitude = 51.5074, longitude = -0.1278))
+        advanceUntilIdle()
+
+        vm.start()
+        advanceUntilIdle()
+        vm.stop()
+        vm.start()
+        advanceUntilIdle()
+        captured.captured.onSensorChanged(fakeSensorEvent())
+        advanceUntilIdle()
+
+        val ready = vm.uiState.value as QiblaUiState.Ready
+        assert(ready.qiblaBearing in 117f..121f) { "expected London bearing, not the stale NYC fix; got ${ready.qiblaBearing}" }
+        assert(ready.fromProfile == "Profile1") { "expected the fallback to name Profile1, got ${ready.fromProfile}" }
+    }
+
+    @Test
+    fun `pausing cancels an in-flight location fetch`() = runTest {
+        every { adhan.getPrayerTimes(any(), any(), any(), any(), any()) } returns fakeTimes
+        val captured = captureSensorListener()
+
+        val fix = CompletableDeferred<Pair<Double, Double>?>()
+        val vm = newVm(locationProvider = CurrentLocationProvider { fix.await() })
+        profileFlow.value = listOf(makeProfile(id = 1, latitude = 51.5074, longitude = -0.1278))
+        advanceUntilIdle()
+
+        vm.start()
+        vm.stop()
+        fix.complete(40.7128 to -74.0060)
+        advanceUntilIdle()
+        captured.captured.onSensorChanged(fakeSensorEvent())
+        advanceUntilIdle()
+
+        val ready = vm.uiState.value as QiblaUiState.Ready
+        assert(ready.fromProfile == "Profile1") { "a fix arriving after pause must be dropped, got ${ready.fromProfile}" }
     }
 
     // ---------- Lifecycle ----------
