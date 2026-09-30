@@ -80,7 +80,7 @@ struct TrackerView: View {
                 Spacer(minLength: 8)
                 Text(PrayerSchedule.formatted(instant, zone: profile.effectiveTimeZone))
                     .font(AynamaFont.monoNum).foregroundStyle(palette.muted)
-            }.frame(minHeight: 56)
+            }.frame(minHeight: 56).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!due)
@@ -101,7 +101,7 @@ struct TrackerView: View {
                     }
                     Text("\(completed(profile, date: date))/5").font(AynamaFont.bodySM)
                         .foregroundStyle(palette.muted).frame(width: 30, alignment: .trailing)
-                }.frame(minHeight: 56)
+                }.frame(minHeight: 56).contentShape(Rectangle())
             }.buttonStyle(.plain)
                 .accessibilityLabel("\(dateLabel(date, profile: profile)), \(completed(profile, date: date)) of 5 prayers")
             if expandedDay == date {

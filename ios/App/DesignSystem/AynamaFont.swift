@@ -117,7 +117,7 @@ enum AynamaFont {
         let base = UIFont(descriptor: descriptor, size: size)
         // Dynamic Type, capped so `display-xl` at an accessibility size does not push the prayer
         // name off the screen entirely. §12 asks for Dynamic Type, not for unbounded growth.
-        let scaled = UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base, maximumPointSize: size * 1.6)
+        let scaled = UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base, maximumPointSize: size * 2)
         return scaled
     }
 
@@ -128,8 +128,15 @@ enum AynamaFont {
         UINavigationBar.appearance().titleTextAttributes = [.font: body]
         UITabBarItem.appearance().setTitleTextAttributes([.font: caption], for: .normal)
         UITabBarItem.appearance().setTitleTextAttributes([.font: caption], for: .selected)
-        UISegmentedControl.appearance().setTitleTextAttributes([.font: body], for: .normal)
-        UISegmentedControl.appearance().setTitleTextAttributes([.font: body], for: .selected)
+        let foreground = UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(AynamaColor.parchment) : UIColor(AynamaColor.ink)
+        }
+        UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(AynamaColor.saffron)
+        UISegmentedControl.appearance().backgroundColor = UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(AynamaColor.inkMuted) : UIColor(AynamaColor.parchmentMuted)
+        }
+        UISegmentedControl.appearance().setTitleTextAttributes([.font: body, .foregroundColor: foreground], for: .normal)
+        UISegmentedControl.appearance().setTitleTextAttributes([.font: body, .foregroundColor: UIColor(AynamaColor.ink)], for: .selected)
     }
 
     /// A four-character axis tag as the integer CoreText wants ('wght' → 0x77676874).

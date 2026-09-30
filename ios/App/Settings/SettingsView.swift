@@ -7,8 +7,7 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var scheme
     @Query(sort: [SortDescriptor(\ProfileRecord.sortOrder), SortDescriptor(\ProfileRecord.profileID)])
     private var records: [ProfileRecord]
-    @State private var showingForm = false
-    @State private var editing: Profile?
+    @State private var form: ProfileFormDestination?
     @State private var error: String?
 
     var body: some View {
@@ -22,14 +21,13 @@ struct SettingsView: View {
             Section {
                 ForEach(records) { record in
                     Button {
-                        editing = record.profile
-                        showingForm = true
+                        form = ProfileFormDestination(profile: record.profile)
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(record.name).font(AynamaFont.title)
                             Text(String(format: "%.4f, %.4f · %@", record.latitude, record.longitude, record.profile.calculationMethod.displayName))
                                 .font(AynamaFont.bodySM).foregroundStyle(palette.muted)
-                        }.frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                        }.frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(record.name)
@@ -45,17 +43,17 @@ struct SettingsView: View {
         }
         .listStyle(.plain)
         .safeAreaInset(edge: .bottom) {
-            HStack { Spacer(); AddProfileButton(usesGlass: true) { editing = nil; showingForm = true } }
+            HStack { Spacer(); AddProfileButton(usesGlass: true) { form = ProfileFormDestination(profile: nil) } }
                 .padding(.horizontal, 24).padding(.vertical, 12)
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .neutralSurface()
-        .sheet(isPresented: $showingForm) {
-            ProfileFormSheet(editing: editing, onDelete: { remove($0) }) { profile in
+        .sheet(item: $form) { destination in
+            ProfileFormSheet(editing: destination.profile, onDelete: { remove($0) }) { profile in
                 do {
                     let repository = ProfileRepository(context: context)
-                    if editing != nil { try repository.update(profile) } else { try repository.insert(profile) }
+                    if destination.profile != nil { try repository.update(profile) } else { try repository.insert(profile) }
                 } catch { self.error = "Couldn't save this profile. Please try again." }
             }
         }
@@ -68,4 +66,9 @@ struct SettingsView: View {
         do { try ProfileRepository(context: context).delete(id: profile.id) }
         catch { self.error = "Couldn't delete this profile. Please try again." }
     }
+}
+
+private struct ProfileFormDestination: Identifiable {
+    let profile: Profile?
+    var id: String { profile.map { "edit-\($0.id)" } ?? "new" }
 }

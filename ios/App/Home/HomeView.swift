@@ -39,7 +39,7 @@ struct HomeView: View {
                         Spacer()
                         HStack(spacing: 6) {
                             ForEach(profiles) { profile in
-                                Circle().fill(profile.id == pagerSelection ? AynamaColor.saffron : surface.foreground.opacity(0.3))
+                                Circle().fill(profile.id == pagerSelection ? surface.accent : surface.foreground.opacity(0.3))
                                     .frame(width: profile.id == pagerSelection ? 8 : 5, height: profile.id == pagerSelection ? 8 : 5)
                             }
                         }.accessibilityLabel("Profile \(profiles.firstIndex(where: { $0.id == pagerSelection }).map { $0 + 1 } ?? 1) of \(profiles.count)")

@@ -25,7 +25,7 @@ struct CountdownHero: View {
                 .foregroundStyle(isElapsed ? surface.activeForeground : surface.foreground)
                 // §5: never centred. The hero is left-aligned with the ribbon beneath it.
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .minimumScaleFactor(0.6)
+                .minimumScaleFactor(0.35)
                 .lineLimit(1)
                 .accessibilityLabel(spokenCountdown)
 

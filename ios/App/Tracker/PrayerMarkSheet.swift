@@ -57,7 +57,7 @@ struct PrayerMarkSheet: View {
                 PrayerStatusSquare(status: status, size: 12)
                 Text(label).font(AynamaFont.bodyLG)
                 Spacer()
-            }.frame(minHeight: 56)
+            }.frame(minHeight: 56).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)

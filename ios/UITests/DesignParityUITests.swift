@@ -7,6 +7,7 @@ final class DesignParityUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchEnvironment["AYNAMA_UI_TEST_STORE"] = store
         app.launchEnvironment["AYNAMA_SCREENSHOT_FIXTURES"] = "1"
+        app.launchEnvironment["AYNAMA_TEST_APPEARANCE"] = dark ? "dark" : "light"
         app.launchEnvironment["AYNAMA_TEST_NOW"] = "2026-09-30T12:15:00Z"
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-AppleInterfaceStyle", dark ? "Dark" : "Light"]
         if largeText { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }

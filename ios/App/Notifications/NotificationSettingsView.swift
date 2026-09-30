@@ -16,11 +16,11 @@ struct NotificationSettingsView: View {
         Form {
             Section {
                 if alerts.authorization == .denied {
-                    Button("Enable in Settings →") { openSettings() }.frame(minHeight: 44)
+                    Button("Enable in Settings →") { openSettings() }.frame(minHeight: 44).contentShape(Rectangle())
                 } else {
                     Toggle("Prayer alerts", isOn: Binding(get: { alerts.enabled }, set: { value in
                         if value { Task { await alerts.requestPermission() } } else { alerts.enabled = false }
-                    })).frame(minHeight: 44)
+                    })).frame(minHeight: 44).contentShape(Rectangle())
                 }
             }.listRowBackground(Color.clear)
             if alerts.enabled {
@@ -37,7 +37,7 @@ struct NotificationSettingsView: View {
                     Section {
                         NavigationLink { AdhanVoiceView() } label: {
                             HStack { Text("Adhan voice"); Spacer(); Text(alerts.voice.name).font(AynamaFont.bodySM).foregroundStyle(palette.muted) }
-                                .frame(minHeight: 44)
+                                .frame(minHeight: 44).contentShape(Rectangle())
                         }
                     } header: { header("ADHAN") }
                     .listRowBackground(Color.clear)
@@ -71,7 +71,7 @@ struct NotificationSettingsView: View {
                             Text(record.name)
                             Spacer()
                             if record.profileID == profile?.id { Image(systemName: "checkmark").foregroundStyle(palette.accent) }
-                        }.frame(minHeight: 44)
+                        }.frame(minHeight: 44).contentShape(Rectangle())
                     }.listRowBackground(Color.clear)
                 }.neutralSurface().navigationTitle("Profile").navigationBarTitleDisplayMode(.inline)
             }.presentationDetents([.medium, .large]).presentationDragIndicator(.visible).presentationBackground(palette.background)
@@ -85,7 +85,7 @@ struct NotificationSettingsView: View {
                     Spacer(minLength: 8)
                     Text(PrayerSchedule.formatted(alertTime(prayer, profile: profile), zone: profile.effectiveTimeZone))
                         .font(AynamaFont.monoNum).foregroundStyle(palette.muted).lineLimit(1).minimumScaleFactor(0.7)
-                }.frame(minHeight: 44)
+                }.frame(minHeight: 44).contentShape(Rectangle())
             }.buttonStyle(.plain)
             Toggle("\(prayer.rawValue.capitalized) prayer alert", isOn: Binding(get: {
                 alerts.configuration(profileID: profile.id, prayer: prayer).enabled
@@ -107,7 +107,7 @@ struct NotificationSettingsView: View {
     private func header(_ title: String) -> some View { Text(title).font(AynamaFont.title).foregroundStyle(palette.foreground).textCase(nil) }
     private func disclosure(_ label: String, value: String) -> some View {
         HStack { Text(label); Spacer(); Text(value).font(AynamaFont.bodySM).foregroundStyle(palette.muted); Image(systemName: "chevron.right") }
-            .frame(minHeight: 44)
+            .frame(minHeight: 44).contentShape(Rectangle())
     }
     private func openSettings() {
         if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
@@ -212,7 +212,7 @@ struct PrayerAlertDetailView: View {
             Spacer()
             Text(value).font(AynamaFont.bodySM).foregroundStyle(NeutralPalette(scheme: scheme).muted)
             Image(systemName: "chevron.right")
-        }.frame(minHeight: 44)
+        }.frame(minHeight: 44).contentShape(Rectangle())
     }
 }
 
@@ -231,7 +231,7 @@ struct AdhanVoiceView: View {
                             if !voice.caption.isEmpty { Text(voice.caption).font(AynamaFont.bodySM).foregroundStyle(palette.muted) }
                         }
                         Spacer()
-                    }.frame(minHeight: 56)
+                    }.frame(minHeight: 56).contentShape(Rectangle())
                 }.buttonStyle(.plain).listRowBackground(Color.clear)
                     .accessibilityAddTraits(alerts.voice == voice ? [.isSelected] : [])
             }

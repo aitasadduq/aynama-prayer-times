@@ -45,12 +45,12 @@ struct ProfileFormSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Name", text: $name).font(AynamaFont.bodyLG)
+                    TextField("Name", text: $name, prompt: Text("Name").foregroundStyle(palette.muted)).font(AynamaFont.bodyLG)
                         .textInputAutocapitalization(.words).accessibilityIdentifier("profile-name")
                 } header: { sectionTitle(editing == nil ? "New profile" : "Edit profile", display: true) }
                 .listRowBackground(Color.clear)
                 Section {
-                    TextField("City or location", text: $search).accessibilityIdentifier("profile-city")
+                    TextField("City or location", text: $search, prompt: Text("City or location").foregroundStyle(palette.muted)).accessibilityIdentifier("profile-city")
                     if searching { Text("Finding locations…").font(AynamaFont.bodySM).foregroundStyle(palette.muted) }
                     ForEach(Array(results.enumerated()), id: \.offset) { _, place in
                         Button(placeLabel(place)) { choose(place) }.frame(minHeight: 44)
@@ -143,7 +143,7 @@ struct ProfileFormSheet: View {
     }
     private func coordinateField(_ title: String, text: Binding<String>, example: String, id: String) -> some View {
         LabeledContent(title) {
-            TextField(example, text: text).accessibilityIdentifier(id)
+            TextField(example, text: text, prompt: Text(example).foregroundStyle(NeutralPalette(scheme: scheme).muted)).accessibilityIdentifier(id)
                 .keyboardType(.numbersAndPunctuation).multilineTextAlignment(.trailing)
         }
     }

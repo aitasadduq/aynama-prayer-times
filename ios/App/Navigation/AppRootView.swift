@@ -11,17 +11,29 @@ struct AppRootView: View {
     private var records: [ProfileRecord]
     @StateObject private var alerts = PrayerAlertSettings()
 
+    private var testAppearance: ColorScheme? {
+        #if DEBUG
+        switch ProcessInfo.processInfo.environment["AYNAMA_TEST_APPEARANCE"] {
+        case "dark": return .dark
+        case "light": return .light
+        default: break
+        }
+        #endif
+        return nil
+    }
+
     var body: some View {
         TabView(selection: $tab) {
             HomeView(requestedProfileID: $requestedProfileID)
-                .tabItem { Label("Prayers", systemImage: tab == 0 ? "house.fill" : "house") }.tag(0)
+                .tabItem { Label("Prayers", systemImage: tab == 0 ? "house.fill" : "house") }.symbolVariant(.none).tag(0)
             QiblaView()
-                .tabItem { Label("Qibla", systemImage: tab == 1 ? "location.fill" : "location") }.tag(1)
+                .tabItem { Label("Qibla", systemImage: tab == 1 ? "location.fill" : "location") }.symbolVariant(.none).tag(1)
             NavigationStack { TrackerView() }
-                .tabItem { Label("Tracker", systemImage: "calendar") }.tag(2)
+                .tabItem { Label("Tracker", systemImage: "calendar") }.symbolVariant(.none).tag(2)
             NavigationStack { SettingsView() }
-                .tabItem { Label("Settings", systemImage: tab == 3 ? "gearshape.fill" : "gearshape") }.tag(3)
+                .tabItem { Label("Settings", systemImage: tab == 3 ? "gearshape.fill" : "gearshape") }.symbolVariant(.none).tag(3)
         }
+        .preferredColorScheme(testAppearance)
         .onAppear { ScreenshotFixtures.seed(context) }
         .font(AynamaFont.body)
         .environmentObject(alerts)
