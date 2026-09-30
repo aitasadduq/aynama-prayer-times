@@ -13,7 +13,7 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 ## Deferred decisions (not blocking v1 code start)
 
 - [ ] **Monetization / sustainability model.** Pick one: donations, pay-what-you-want, freemium, paid-upfront, fully-free. Decide before v2.
-- [ ] **iOS CI runner strategy.** GitHub macOS vs MacStadium vs self-hosted Mac mini vs no-iOS-until-v3. Decide before v3 (iOS phase start).
+- [x] **iOS CI runner strategy.** GitHub-hosted `macos-15` with Xcode 16.4 runs Swift domain tests and iOS simulator persistence/UI tests on every change. Results are uploaded as `.xcresult` artifacts.
 - [ ] **Quran data source.** Tanzil (chosen in legal-posture.md) vs alternative. Validate against licensing + attribution before v4 (Quran feature).
 - [ ] **Gold/silver price API for zakat.** Free tier API vs scraped static value vs user-input. Decide before v5.
 - [ ] **Trademark clearance on "aynama."** USPTO + EUIPO search before Play Store + F-Droid submission.
@@ -530,11 +530,13 @@ Depends on: all phases (run after each PR, gate on `main` merge).
 - [ ] Expand `AdhanWrapperTest` to load from `test-vectors/schema.json` — replace hardcoded Makkah test with file-driven loop over all 12 cities and methods
 - [x] ~~`vectors.yml` GitHub Actions workflow~~ → **DONE, as the `vectors` job in `ios.yml`** rather than its own file (it gates the macOS job, so it has to be in the same workflow). `scripts/validate-vectors.py` validates every `test-vectors/prayer-times/*.json` against `schema.json`. `schema.json` had claimed this was enforced since it was written; until now nothing enforced it.
 
-**android.yml**
-- [ ] Unit tests (`:shared-logic:test`, `:app:test`) on every commit
-- [ ] Lint (`:app:lintDebug`) on every commit
-- [ ] E2E tests (`android-emulator-runner@v2`, `ubuntu-latest`) gated behind `[e2e]` label or PRs targeting `main`
-- [ ] Trigger on `android/**` and `test-vectors/**` path changes
+**Android and iOS CI (`ios.yml`)**
+- [x] Android unit tests, lint, and builds for `:shared-logic`, `:app`, and `:wear` on every change
+- [x] Phone/database and Wear OS instrumentation with `android-emulator-runner@v2` on `ubuntu-latest`
+- [x] iOS Swift domain/parity tests and simulator persistence/UI tests on `macos-15`
+- [x] Run both platforms on every push, PR, merge queue, and manual dispatch, with no path or label filters
+- [x] Combined **Android and iOS** check fails if any required suite fails, is cancelled, or is skipped
+- [ ] Require **Android and iOS** in branch protection for `main` and `agent-main` after the workflow lands (repository administration access required)
 
 **adhan-test-vectors companion repo**
 - [ ] README documents: (1) how to trigger vector regeneration on Adhan upstream release (GitHub Actions manual dispatch); (2) who reviews PrayTimes.py vs Adhan disagreements; (3) process for syncing vectors back to main repo

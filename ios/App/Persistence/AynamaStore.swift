@@ -126,9 +126,22 @@ enum AynamaStore {
     @MainActor
     static func makeContainer(inMemory: Bool = false) -> ModelContainer {
         let schema = Schema([ProfileRecord.self, QazaRecord.self])
+        // Each UI test gets its own disk store, retained across app relaunches so persistence
+        // is exercised. The UUID is supplied only by the test runner; release builds cannot
+        // redirect the user's store through a launch environment variable.
+        var testStoreURL: URL?
+        #if DEBUG
+        if let value = ProcessInfo.processInfo.environment["AYNAMA_UI_TEST_STORE"],
+           let id = UUID(uuidString: value) {
+            testStoreURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("ui-test-\(id.uuidString).store")
+        }
+        #endif
         let configuration: ModelConfiguration =
             if inMemory {
                 ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            } else if let testStoreURL {
+                ModelConfiguration(schema: schema, url: testStoreURL)
             } else if isSharedWithExtensions {
                 ModelConfiguration(schema: schema, groupContainer: .identifier(appGroupIdentifier))
             } else {

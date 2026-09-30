@@ -90,12 +90,28 @@ targets:
         com.apple.security.application-groups:
           - group.com.aynama.prayertimes
 
-# There is no iOS unit-test target yet, deliberately. Everything in the app that can be tested
-# without a screen — the countdown rule, the ribbon states, Friday naming, the Hijri offset, the
-# deep-link format — lives in SharedLogic and is tested by `swift test`, which needs no simulator
-# and runs in milliseconds. A target here would carry only what genuinely needs a running app,
-# and that is blocked on the toolchain (see ios/scripts/typecheck-simulator.sh). Add it with the
-# first XCUITest.
+  AynamaTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Aynama
+      - package: SharedLogic
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+  AynamaUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Aynama
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
 
 schemes:
   Aynama:
@@ -104,3 +120,8 @@ schemes:
         Aynama: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - AynamaTests
+        - AynamaUITests

@@ -41,7 +41,17 @@ Read [DESIGN.md](DESIGN.md) before any UI work. Hard rules are non-negotiable.
 
 ## Contributing
 
-All code changes require corresponding tests in the same PR. Run the test vector suite before opening a pull request.
+All code changes require corresponding regression tests in the same PR. **Every change must
+pass both Android and iOS CI**, even when it touches only one platform or documentation.
+
+The [mobile CI workflow](.github/workflows/ios.yml) validates the shared vectors, runs the Swift
+domain suite, builds and tests the iOS app on a simulator (SwiftData persistence and profile
+UI flows), and runs Android builds, lint, unit tests, and phone and Wear OS instrumentation.
+Test reports and the iOS `.xcresult` bundle are retained as workflow artifacts for 14 days.
+
+Wait for the **Android and iOS** check on the final PR revision before merging. Repository
+administrators must make this check required in branch protection for `main` and `agent-main`
+after this workflow lands; the workflow itself cannot configure repository protection.
 
 ## License
 
