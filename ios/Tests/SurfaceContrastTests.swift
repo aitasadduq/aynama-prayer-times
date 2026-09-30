@@ -5,12 +5,13 @@ import XCTest
 @testable import Aynama
 
 final class SurfaceContrastTests: XCTestCase {
-    func testBodyAndMetadataMeetAAAtBothEndsOfEveryPhaseGradient() {
+    func testBodyMetadataAndActiveTextMeetAAAtBothEndsOfEveryPhaseGradient() {
         let surfaces: [TimeOfDaySurface] = [.fajr, .sunriseTransition, .dhuhr, .asr, .maghrib, .isha]
         for surface in surfaces {
             for background in [surface.stops.top, surface.stops.bottom] {
                 XCTAssertGreaterThanOrEqual(contrast(surface.foreground, background), 4.5, "\(surface) body text")
                 XCTAssertGreaterThanOrEqual(contrast(surface.foregroundMuted, background), 4.5, "\(surface) metadata")
+                XCTAssertGreaterThanOrEqual(contrast(surface.activeForeground, background), 4.5, "\(surface) active text")
             }
         }
     }

@@ -92,7 +92,10 @@ enum TimeOfDaySurface {
 
     var accent: Color { prefersLightForeground ? AynamaColor.saffron : AynamaColor.saffronInk }
 
-    var activeForeground: Color { prefersLightForeground ? AynamaColor.saffron : AynamaColor.ink }
+    var activeForeground: Color {
+        // Saffron meets AA on Isha's ink, but not on predawn warmth or oxblood.
+        self == .isha ? AynamaColor.saffron : foreground
+    }
 
     var foreground: Color { prefersLightForeground ? AynamaColor.parchment : AynamaColor.ink }
 

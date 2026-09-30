@@ -53,6 +53,7 @@ struct QiblaView: View {
                 ZStack {
                     Circle().stroke(panel, lineWidth: 28).frame(width: 252, height: 252)
                     QiblaArrow().fill(AynamaColor.saffron)
+                        .overlay { QiblaArrow().stroke(surface.activeForeground, lineWidth: 1.5) }
                         .frame(width: 140, height: 200).rotationEffect(.degrees(bearing))
                     Text("N").font(AynamaFont.north)
                         .rotationEffect(.degrees(location.heading ?? 0)).offset(y: -126)
