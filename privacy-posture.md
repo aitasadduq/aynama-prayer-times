@@ -18,13 +18,13 @@ Sub-spec of `architecture-design.md`. Covers data collection, retention, and reg
 
 **Never collected:** name, email, phone, contacts, device IDs, advertising IDs, crash dumps with PII, prayer-completion telemetry.
 
-### Android v1 — what is actually stored (`agent-main`, 2026-09-24)
+### Android v1 — what is actually stored (`agent-main`, 2026-09-30)
 
 | Data | Where | Notes |
 |---|---|---|
 | Profiles: name, coordinates, method, madhab, time zone and its toggle, Hijri adjustment | Room database `aynama.db` | Stores coordinates only; the city name isn't kept. |
 | Prayer marks: on time, qaḍā, missed | Room `qaza_entries` | Written only when the user marks a prayer; nothing is auto-recorded. The Tracker is **always on**, not opt-in (see GDPR below). |
-| Notification settings (global, and per profile and prayer), the Ramadan banner's dismissed Hijri year, the one-time battery-prompt flag | SharedPreferences `aynama_prefs` | Nothing about the last screen or theme is stored. |
+| Notification settings (global, and per profile and prayer), the Ramadan banner's dismissed Hijri year, the one-time battery-prompt and city-zone-repair flags | SharedPreferences `aynama_prefs` | Nothing about the last screen or theme is stored. |
 | Each widget's chosen profile | Glance widget state (DataStore) | Cleared by the system when the widget is removed. |
 | Live device location | Memory only (Qibla screen) | Used for the bearing and distance; never written to disk. |
 | Profiles, mirrored to a paired watch | A Wear Data Layer item, read by the watch app | Every profile's name, coordinates, calculation settings, time zone and Hijri adjustment, plus which profile is active. Prayer marks aren't sent. See the third route below. |
@@ -73,23 +73,23 @@ Required manifest entries:
 
 - `POST_NOTIFICATIONS` runtime permission (API 33+).
 - `USE_EXACT_ALARM` — declared in manifest (no user grant required). Prayer apps qualify under the alarm/clock exemption. Inexact alarms are unacceptable for prayer notification timing. Play Console requires exact alarm category declaration.
-- `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — coarse is sufficient for prayer time calculation (<1 arcminute error) and for Qibla; prefer coarse. The profile sheet's "Use current location" asks for coarse only. The Qibla screen asks for both in one request, which is how Android 12+ offers Precise or Approximate (fine on its own is ignored on some Android 12 releases); either answer works.
+- `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` — coarse is sufficient for prayer time calculation (<1 arcminute error); prefer coarse. Qibla accepts Approximate too, except within a few kilometres of the Kaaba, where Precise is needed. The profile sheet's "Use current location" asks for coarse only; Qibla asks for both in one request so Android 12+ offers Precise or Approximate.
 - Play Store **Data Safety form:** tick "No data collected" + "No data shared." *(Android v1: only once the Auto Backup, geocoder and watch-sync decisions below are made.)* Declare `SCHEDULE_EXACT_ALARM` usage reason in Play Console.
 
-**Android v1 manifest (`agent-main`, 2026-09-24):**
+**Android v1 manifest and permission flow (`agent-main`, 2026-09-30):**
 
 *Permissions declared:*
 - `POST_NOTIFICATIONS` — requested on first launch on Android 13+.
 - `USE_EXACT_ALARM` and `SCHEDULE_EXACT_ALARM` — the app falls back to inexact alarms when exact alarms aren't allowed.
 - `RECEIVE_BOOT_COMPLETED`, `VIBRATE`.
 - `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_SPECIAL_USE` — for adhan playback.
-- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — requested once, right after notifications are allowed; so only on Android 13+ after a fresh grant (PR #34 A3).
-- `ACCESS_COARSE_LOCATION` **and** `ACCESS_FINE_LOCATION`. The profile sheet's "Use current location" asks for coarse. The Qibla screen asks for **fine** alone on first open. Android offers the approximate choice only when both are requested together, and some Android 12 releases ignore a fine-only request (DS33). So "prefer coarse" holds for profiles, but not for Qibla.
+- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — requested once at first launch: after a notification-permission grant on Android 13+, or straight away on Android 8–12 and when notifications are already allowed (#37).
+- `ACCESS_COARSE_LOCATION` **and** `ACCESS_FINE_LOCATION`. The profile sheet's "Use current location" asks for coarse. Qibla asks for both together on first open and accepts either grant. It names the default profile in the distance line when permission is denied or no fix is available; last-known fixes older than an hour are rejected (#35).
 
 *Not declared:* `INTERNET`, so the app can't open network connections itself. The Play services libraries the watch sync pulls in (`play-services-wearable`, `-base`, `-basement`, `-tasks`) declare no permissions in their own manifests; confirm with the merged manifest (`:app:processReleaseMainManifest`) before release.
 
 *Three routes off the device, all through system services:*
-1. **Location search and reverse geocoding** use the platform `Geocoder`, which delegates to a backend service outside the Android framework (Android reference: <https://developer.android.com/reference/android/location/Geocoder>). On most devices that backend is a network service, so the typed city query and the chosen coordinates can leave the device. Disclose this in the privacy page and the Data Safety review. Without a backend (for example, some de-Googled devices), search returns nothing.
+1. **Location search and reverse geocoding** use the platform `Geocoder`, which delegates to a backend service outside the Android framework (Android reference: <https://developer.android.com/reference/android/location/Geocoder>). On most devices that backend is a network service, so the typed city query and the chosen coordinates can leave the device. Disclose this in the privacy page and the Data Safety review. Without a backend (for example, some de-Googled devices), search returns nothing. After a city is selected, its time zone is resolved offline from a bundled boundary table. The one-time repair of saved city zones uses the stored zone's ICU region and coordinates without a Geocoder request (#36).
 2. **Android Auto Backup** is on: `android:allowBackup="true"`, with no backup or data-extraction rules. Auto Backup uploads app data — including databases and shared preferences — to the user's Google Drive backup (Android guide: <https://developer.android.com/identity/data/autobackup>). The same data also moves to a new phone in a device-to-device transfer, and on some manufacturers' devices `allowBackup="false"` stops the Google Drive backup but not that transfer (Android 12 behaviour changes: <https://developer.android.com/about/versions/12/behavior-changes-12>). Excluding `aynama.db` from both takes `android:dataExtractionRules` on Android 12+ and `android:fullBackupContent` below it. A restore would also bring back the one-time battery-prompt flag in `aynama_prefs` (`MainActivity.kt:89,97`), so a restored phone is never asked for the battery-optimisation exemption. The cloud backup would carry Qaza history and profiles off the device, which contradicts "Qaza history stays on-device" above. Decide before release: turn backup off, exclude the database, or document it as a user-controlled backup.
 3. **The watch sync.** Whenever the profiles change, the phone publishes all of them — name, coordinates, calculation settings, time zone and Hijri adjustment — and which one is active, as a Wear Data Layer item (`PhoneWearSync.kt`, through `play-services-wearable`). Google Play services delivers it to a paired watch, and when Bluetooth is unavailable it routes the data through Google Cloud, end-to-end encrypted (Android guide: <https://developer.android.com/training/wearables/data/overview>). Prayer marks aren't sent. The destination is the user's own watch, but the transport is Google's: disclose it with the other two.
 

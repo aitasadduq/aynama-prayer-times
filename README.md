@@ -23,6 +23,8 @@ Open-source Muslim prayer times & spiritual companion app for Android, iOS, Wear
 
 Independent native projects, validated by shared JSON test vectors. Prayer time math is handled by [Adhan](https://github.com/batoulapps/adhan-kotlin) (Batoul Apps) on both platforms: `com.batoulapps.adhan:adhan:1.2.1` on Android and Adhan-Swift 1.5.0 on iOS. The vectors in `test-vectors/prayer-times/` are generated from Adhan-Kotlin by `scripts/adhan-parity/generate.py`; CI checks them against the schema and runs the Swift tests against them. The Android tests still check Adhan against hard-coded Makkah values.
 
+Android CI runs phone, shared-logic and watch unit tests and lint, builds debug and R8 release APKs, and runs phone/Room instrumentation on API 31 and 36. City-search time zones use a bundled offline boundary lookup; existing city profiles are repaired once on upgrade.
+
 ```
 aynama/
 ├── test-vectors/          ← JSON contract between platforms: schema + generated vectors

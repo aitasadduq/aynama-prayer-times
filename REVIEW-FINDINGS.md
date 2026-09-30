@@ -128,7 +128,7 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ### Testing
 
-- [ ] **[T1]** `settings/SettingsViewModel.kt` — Zero tests. Insert path computes sortOrder + schedules alarm, update path schedules alarm, delete path cancels alarm. All untested. Regressions in sortOrder math, alarm scheduling on edit, or alarm cancellation on delete will land silently. **Fix:** JVM unit test with a fake `ProfileRepository` and a spy `AlarmScheduler` (extract its scheduling API behind an interface or test the static functions via the static-mock pattern); assert (a) insert assigns sortOrder = profiles.size, calls `scheduleForProfile` with the new id; (b) update calls `scheduleForProfile` with the updated profile. Delete's alarm cancellation is covered on device by `AlarmDeliveryTest.deletingTheAlertsProfileDisarmsItsAlarms`. *(Origin: PR #15)*
+- [ ] **[T1]** `settings/SettingsViewModel.kt` — Insert's sortOrder assignment and alarm rescheduling on save/update remain untested. Delete's alarm cancellation is covered on device by `AlarmDeliveryTest.deletingTheAlertsProfileDisarmsItsAlarms`, through the ViewModel (#37). **Fix:** JVM tests with a fake `ProfileRepository` and a spy scheduling interface; assert (a) insert assigns sortOrder = profiles.size; (b) save/update reschedules alarms using the current profiles. *(Origin: PR #15; narrowed after #37 on 2026-09-30)*
 
 - [ ] **[T2]** `SettingsScreen.kt:485-491,554-572` — `buildCityLabel`, `formatCoord`, `CalculationMethodKey.displayName`, `AsrMadhab.displayName` are pure functions with zero tests. Mechanical but easy regressions (a renamed enum value, a swapped fallback chain). **Fix:** JVM unit tests asserting (a) `buildCityLabel` prefers `locality + countryName`, falls back through subAdminArea → adminArea, then `getAddressLine(0)`, then formatted coords; (b) `formatCoord(51.5074)` returns `"51.5074"`; (c) both `displayName()` extensions are total (every enum entry produces a non-empty, non-default string). *(Origin: PR #15)*
 
@@ -250,7 +250,7 @@ Format: `- [ ] [ID] file:line — finding. **Fix:** suggested fix. *(Origin: PR 
 
 ## From design-doc sync — Android v1 vs DESIGN.md (2026-09-23)
 
-The Android v1 code was read end to end against DESIGN.md, which was then re-baselined, and re-checked on 2026-09-24 against `agent-main` (`5eeed05`); line numbers below are from that commit. Where the app deliberately changed the design, the spec was updated. Where the app breaks a DESIGN.md rule, the rule stayed and the breach is listed here. DESIGN.md §27 is the index. When you fix one, first grep the docs for its ID (`grep -rnw 'DS7' --include='*.md' .`) and update every sentence that describes the defect as current, including TODOS.md items and architecture-design.md notes. Then delete the finding here and remove its ID from the §27 row, deleting the row once no IDs remain.
+The Android v1 code was read end to end against DESIGN.md, which was then re-baselined, and re-checked on 2026-09-24 against `agent-main` (`5eeed05`); line numbers below are from that commit. On 2026-09-30 the location and alarm findings were reconciled with #35–#37 through `1be4f56`; resolved findings were removed and DS12 was narrowed. Where the app deliberately changed the design, the spec was updated. Where the app breaks a DESIGN.md rule, the rule stayed and the breach is listed here. DESIGN.md §27 is the index. When you fix one, first search the docs for its ID (`rg -n -w 'DS7' -g '*.md' .`) and update every sentence that describes the defect as current, including TODOS.md items and architecture-design.md notes. Then delete the finding here and remove its ID from the §27 row, deleting the row once no IDs remain.
 
 How the evidence was gathered:
 - **Contrast:** WCAG 2.x relative luminance.
@@ -385,12 +385,11 @@ How the evidence was gathered:
 
   **Fix:** Choose a calculation type explicitly, document it in DESIGN.md §18, and optionally make it a per-profile setting. *(Origin: design-doc sync 2026-09-23)*
 
-- [ ] **[DS12]** `HomeScreen.kt:148`, `TrackerScreen.kt:76,96`, `NotificationSettingsViewModel.kt:209` and `AlarmScheduler.kt:208-212` — Qibla, the Tracker's rows and Home's times now resolve their day in the profile's zone (#22, #23), but three things still use the device's date:
+- [ ] **[DS12]** `HomeScreen.kt:148`, `TrackerScreen.kt:76,96` and `NotificationSettingsViewModel.kt:209` — Qibla, the Tracker's rows and Home's times resolve their day in the profile's zone (#22, #23), but two things still use the device's date:
   - **Mark dates.** Home's mark sheet and the Tracker's Today rows date the mark with the device's `LocalDate.now()`, captured once when the screen is composed. For a profile whose date differs from the device's, the Tracker's Today rows show the profile's day but the mark is saved under the device's, and the sheet's "Today"/"Yesterday" label compares against the device's date too (`MarkPrayerSheet.kt:141`). A screen left open past midnight keeps the old date (PR #13 M1).
   - **The Notifications screen** computes its rows for the device's `LocalDate.now()` in the profile's zone, so between the two midnights it shows the wrong day's times.
-  - **The notification rollover alarm** fires at device midnight, but each day's alarms are built for the profile's date (`AlarmScheduler.kt:85-86`). Prayers between the profile's midnight and the device's are never armed unless the app is opened or a widget's rollover alarm re-runs `scheduleAll` (`PrayerWidgetUpdateReceiver.kt:23`). For a profile a few hours behind the device zone, that can be most of the day's alarms.
 
-  **Fix:** Take the mark date from the profile's zone at the moment of the tap, compute the Notifications rows for `schedulingDate(profile)`, and arm the rollover at the notification profile's next midnight. Fix DS32 first, or this spreads its wrong zones further. *(Origin: design-doc sync 2026-09-23; Home and the alarm rollover added at the 2026-09-24 review; narrowed at the re-check against `agent-main`)*
+  **Fix:** Take the mark date from the profile's zone at the moment of the tap, and compute the Notifications rows for `schedulingDate(profile)`. The city-zone lookup is fixed by #36 and the rollover uses the notification profile's midnight after #37, so neither blocks this remaining work. *(Origin: design-doc sync 2026-09-23; narrowed after #36/#37 on 2026-09-30)*
 
 - [ ] **[DS13]** Time formats disagree. The same time reads "4:14 PM" on Home and "16:14" in Notifications.
   - Always 12-hour ("h:mm a"): Home (`HomeViewModel.kt:151`), Tracker (`TrackerViewModel.kt:79`) and the live notification (`LivePrayerNotification.kt:177`).
@@ -451,14 +450,6 @@ How the evidence was gathered:
 
   **Fix:** Derive the ribbon and phase from the shared timeline's instants, as the countdown and the widgets do, instead of comparing `LocalTime`s. Add a `HomeRibbonStateTest` built from real London 2026-06-21 MWL output, not the synthetic 00:25 Isha. *(Origin: 2026-09-24 review)*
 
-- [ ] **[DS32]** `ProfileFormSheet.kt:525-532` — City search detects a location's time zone by picking, among the country's zones, the one whose raw offset is closest to longitude ÷ 15. That's an hour off for some major cities: Madrid and Barcelona get `Atlantic/Canary`, Lisbon `Atlantic/Azores`, Detroit, Atlanta and Columbus a US Central zone, Calgary and Edmonton `America/Vancouver`, and Surabaya WITA. With "Use location time zone" on by default, Home, the widgets and the Notifications rows then label every prayer an hour early or late against the local clock. The countdown and the alarm instants stay right, but someone reading Madrid's Dhuhr off the timeline would pray an hour before it starts.
-
-  **Fix:** Resolve the zone from the coordinates with a zone-boundary lookup, not offset proximity. Until then, keep "Use location time zone" off by default. Fix this before DS12, whose fix would spread the wrong zones to Qibla and the Tracker. *(Origin: 2026-09-24 review)*
-
-- [ ] **[DS33]** `QiblaScreen.kt:94,103` — Qibla requests `ACCESS_FINE_LOCATION` on its own. Android says to request fine and coarse together: that's what shows the Precise/Approximate choice, a fine-only request logs "ACCESS_FINE_LOCATION must be requested with ACCESS_COARSE_LOCATION" for apps targeting Android 12+, and some Android 12 releases ignore it (<https://developer.android.com/develop/sensors-and-location/location/permissions/runtime>). When it's ignored, Qibla gets live location only if coarse was already granted through the profile sheet; otherwise it points from the default profile's saved city without saying so, so a traveller gets the bearing from home.
-
-  **Fix:** Request both with `RequestMultiplePermissions`, and show which location the bearing uses when it falls back to a profile. *(Origin: 2026-09-24 review)*
-
 - [ ] **[DS34]** `HomeScreen.kt:231` vs `TrackerViewModel.kt:98,105` — Home saves a mark under the profile page it was made on; the Tracker shows only the default (first) profile's marks. A prayer marked on any other Home page never appears in the Tracker's Today rows, history, weekly line or outstanding count, and each Home page counts only its own marks. Deleting a profile also deletes its marks (`QazaEntry` cascades), with no confirmation (PR #15 M10).
 
   **Fix:** Decide the model: marks belong to the person rather than the location profile (store them once, or migrate), or Home always marks against the Tracker's profile. Document it in §5 and §16, and mention the deleted history in M10's delete dialog. *(Origin: 2026-09-24 review)*
@@ -474,16 +465,6 @@ How the evidence was gathered:
 - [ ] **[DS37]** `HomeScreen.kt:203-212` — The Add profile FAB floats over the pager at the bottom end, 56 dp up and 24 dp in, and nothing pads the page to clear it. Its top edge is 112 dp above the bottom of the content area. The timeline's rows are spread evenly, so the Isha row's bottom edge sits 32 dp plus one row gap above it, with the time right-aligned at the same 24 dp inset. With six 25 dp rows, that gap stays under the 80 dp needed to clear the FAB unless the pager is about 900 dp tall, so by this arithmetic the FAB covers part of the Isha time on most phones when no Qaḍā line shows. A Qaḍā line lifts the timeline about 26 dp, which clears it on taller phones only. Estimated from the layout code; not checked on a device.
 
   **Fix:** Check on a device. If it overlaps, reserve the FAB's height below the timeline or move the FAB beside the dots. While there, check the saffron FAB against the Asr gradient's saffron bottom stop (DESIGN.md §3, non-text contrast). *(Origin: 2026-09-24 re-check against `agent-main`)*
-
-## From PR #34 — design-doc sync review (`/review` 2026-09-24)
-
-Code defects found while checking the sync's claims. Both contradict `architecture-design.md`'s notification notes.
-
-### Adversarial / Cross-cutting
-
-- [ ] **[A2]** `SettingsViewModel.kt:43-50` — Deleting a profile deletes it, then calls `scheduleAll` with the remaining profiles, and `scheduleAll` only cancels alarms for the profiles it's given. The deleted profile's alarms are never cancelled: if it was the "Alerts for" profile, its remaining alarms still fire today, alongside the new default profile's. #27's cancel fix doesn't reach this path. The Phase 2 gate in TODOS.md lists "profile deleted" as fixed, and `AlarmDeliveryTest.deletingAProfileDisarmsItsAlarms` passes, but that test calls `cancelForProfile` itself instead of deleting through `SettingsViewModel`. **Fix:** Call `AlarmScheduler.cancelForProfile(context, profile.id)` before deleting, make the test delete through the ViewModel, and cover it in PR #15 T1. *(Origin: PR #34 review)*
-
-- [ ] **[A3]** `MainActivity.kt:44-51` — The battery-optimisation exemption is asked for only from the notification-permission result, and that permission is only requested on Android 13+ when it's missing. So Android 8–12 (minSdk is 26) never see the prompt, and neither do Android 13+ users who had already allowed notifications — including most of the aggressive-OEM devices the prompt exists for. **Fix:** Call `requestBatteryOptExemptionOnce()` directly on Android 12 and below, and when notifications are already allowed. *(Origin: PR #34 review)*
 
 ---
 

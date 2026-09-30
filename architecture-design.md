@@ -6,7 +6,7 @@ Context: Design session initiated from aitasadduq/camunda-backup-dr repo, but th
 Status: APPROVED
 Mode: Builder
 
-> **Sync note (2026-09-23, re-checked 2026-09-24).** Android v1 Phases 0–7 are built, and on `agent-main` so are the unified countdown, the profile FAB, the live notification and most of the WearOS app. `main` is behind; the notes below describe `agent-main` at `5eeed05`. This document is still the architecture and decision record, but several UX specs below were superseded while building. Each superseded passage now carries an **Android v1:** note saying what shipped. For anything visual, `DESIGN.md` is the source of truth; its §27 lists where the app still breaks a design rule, with findings in `REVIEW-FINDINGS.md` (the DS findings).
+> **Sync note (2026-09-23, re-checked 2026-09-24).** Android v1 Phases 0–7 are built, and on `agent-main` so are the unified countdown, the profile FAB, the live notification and most of the WearOS app. `main` is behind; the original notes describe `agent-main` at `5eeed05`, with location, alarm and CI updates through `1be4f56` on 2026-09-30 after #35–#37. This document is still the architecture and decision record, but several UX specs below were superseded while building. Each superseded passage now carries an **Android v1:** note saying what shipped. For anything visual, `DESIGN.md` is the source of truth; its §27 lists where the app still breaks a design rule, with findings in `REVIEW-FINDINGS.md` (the DS findings).
 
 ## Problem Statement
 
@@ -319,7 +319,7 @@ phantom page that the dot indicator counted.
 2. **Location.**
    - City search uses the platform `Geocoder`: results appear after 3 characters with a 400 ms debounce, as "City, Country". No results shows nothing.
    - **"Use current location"** fills in the device's last known position once, and doesn't rename the profile.
-   - A time zone is detected, and **"Use location time zone"** is on by default.
+   - A time zone is detected from the Geocoder's country and coordinates by the bundled offline boundary lookup, and **"Use location time zone"** is on by default. Saved city profiles are repaired once on upgrade before alarms and widgets are scheduled, preserving the user's toggle (DESIGN.md §17).
 3. **Calculation method.** A dropdown of **10** methods — every adhan 1.2.1 method except `OTHER` — with no descriptions. The default is **Muslim World League**, not ISNA.
 4. **Asr school.** Shāfiʻī (the default) or Ḥanafī.
 5. **Hijri date adjustment.** −2 to +2 days (DESIGN.md §18).
@@ -419,7 +419,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 - Alarms are armed for **one profile only**, the "Alerts for" profile, which defaults to the first profile.
 - Per prayer, for that profile: on/off; alert time as an offset (−15 to +15 min) or a fixed clock time; and an optional early reminder 5, 10 or 15 min before.
 - Imsak (Fajr − 10 min) is armed only during Ramadan.
-- A master switch turns everything off, including the live notification. Deleting the "Alerts for" profile doesn't disarm its remaining alarms (PR #34 A2).
+- A master switch turns everything off, including the live notification. Deleting a profile cancels its alarms before removing it, then reschedules for the remaining "Alerts for" profile (#37).
 
 *Sound and vibration — global, not per prayer*
 - Adhan voice: Makkah, Madinah, Egyptian, Turkish, Al-Aqsa, or None.
@@ -430,7 +430,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 *Scheduling*
 - `setExactAndAllowWhileIdle` via `USE_EXACT_ALARM`.
 - `SCHEDULE_EXACT_ALARM` is also declared. When exact alarms aren't allowed, the app falls back to `setAndAllowWhileIdle`.
-- Every alarm is rescheduled on app open, at the device's midnight (not the profile's; DS12), on boot, on a time-zone change, and — new here — on `TIME_SET`.
+- Every alarm is rescheduled on app open, at the notification profile's next midnight, on boot, on a time-zone change, and on `TIME_SET`. The rollover uses the device zone if there is no notification profile or its zone is invalid (#37).
 - Widget rollover alarms are armed separately, per widget-bound profile.
 - A profile with no computable times loses its alarms and is logged; it can't crash the scheduler.
 
@@ -441,7 +441,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 
 *Permissions*
 - The notification permission is requested on first launch.
-- The battery-optimisation exemption is requested once, right after that permission is granted: only on Android 13+ after a fresh grant, never on Android 8–12 (PR #34 A3).
+- The battery-optimisation exemption is requested once at first launch: after a notification-permission grant on Android 13+, or straight away on Android 8–12 and when notifications are already allowed (#37).
 
 ### Data Persistence
 
@@ -557,14 +557,15 @@ prayer-app/
 └── docs/
 ```
 
-**Repository today (`agent-main`, 2026-09-24)** — the tree above is the target, and only part of it exists:
+**Repository today (`agent-main`, 2026-09-30)** — the tree above is the target, and only part of it exists:
 - `test-vectors/` — `schema.json` and ten files in `prayer-times/`, one per calculation method, covering twelve cities. They're generated from Adhan-Kotlin 1.2.1 by `scripts/adhan-parity/generate.py`, not by the two-source generator described below.
 - `android/app` — the phone app, including the widgets and the phone side of the watch sync. There's no separate `widgets/` module.
-- `android/shared-logic` — the Adhan wrapper, the countdown timeline and Friday naming, the Qibla maths and sensor filter, Room, and the watch-sync codec.
+- `android/shared-logic` — the Adhan wrapper, the countdown timeline and Friday naming, the Qibla maths and sensor filter, Room, the watch-sync codec, and the bundled offline city time-zone lookup.
 - `android/wear` — the WearOS app, complications and tile (inside `android/`, not a top-level `wear/`).
 - `ios/SharedLogic` — a Swift package: the Adhan-Swift wrapper, the timeline and naming ports, Qibla maths and parity tests. No app yet.
-- `scripts/` — `adhan-parity/` (the vector generator), `validate-vectors.py` and `reference-versions.json`.
-- `.github/workflows/ios.yml` — validates the vectors against the schema and runs the Swift package's tests. There's no Android workflow.
+- `scripts/` — `adhan-parity/` (the vector generator), `timezone-lookup/` (the boundary-table generator), `validate-vectors.py` and `reference-versions.json`.
+- `.github/workflows/ios.yml` — validates the vectors against the schema and runs the Swift package's tests.
+- `.github/workflows/android.yml` — validates vectors, runs phone/shared/watch unit tests and lint, builds debug/release/test APKs, and runs phone/Room instrumentation on API 31 and 36.
 - `android/scripts/widget-rollover-test.sh` — a manual emulator script.
 
 ### The test vector contract
@@ -671,12 +672,12 @@ Both the Kotlin (wrapper around Adhan-Kotlin) and Swift (wrapper around Adhan-Sw
 8. **Add Imsak alarm for Ramadan** — detect Hijri month, auto-enable Imsak (Fajr − 10 min) during Ramadan
 9. **Set up CI for test vectors + reproducible builds** — Android CI validated against vectors; F-Droid reproducible-build setup from day 1. Note: Play Store submission at v1 launch; F-Droid listing goes live when F-Droid review completes (typically weeks to months after submission, not simultaneous).
 
-**Status (`agent-main`, 2026-09-24):**
+**Status (`agent-main`, 2026-09-30):**
 - **Done:** 1 (monorepo, in part), 5, 6 (with a direct rotation matrix and the rotation-vector sensor, not the remap; TODOS T7), 7 (live Chronometer countdown) and 8.
 - **2, in part:** Adhan is a Gradle dependency (`com.batoulapps.adhan:adhan:1.2.1`), but the SHA-256 verification metadata isn't committed. Adhan-Swift is pinned to 1.5.0 in `ios/SharedLogic`.
 - **3, in part:** vectors for twelve cities exist, generated from Adhan-Kotlin by `scripts/adhan-parity/generate.py`. The two-source PrayTimes cross-check (PR #8's `scripts/generate_vectors.py` and `scripts/test_generator.py`) is only on the unmerged `t3-test-vector-schema` branch (TODOS.md).
 - **4, in part:** the wrapper is built, but its tests use hard-coded Makkah values; only the Swift package loops over the vectors.
-- **9, in part:** `ios.yml` validates the vectors and runs the Swift tests. There's no Android CI and no reproducible-build setup.
+- **9, in part:** `ios.yml` validates the vectors and runs the Swift tests; `android.yml` runs Android unit tests, lint, APK builds and API 31/36 phone/Room instrumentation. Reproducible-build setup remains open.
 
 ## Testing Requirements (v1 Android)
 
@@ -702,18 +703,18 @@ Every codepath in the implementation plan requires a test. Framework: JUnit 4 + 
 
 ### CI configuration
 
-- Emulator tests run in `android.yml` on `ubuntu-latest` using `reactivecircus/android-emulator-runner@v2`
-- Emulator tests gated behind a `[e2e]` label or run only on PRs targeting `main` (cost control for solo dev)
-- Unit/integration tests run on every commit
+- `android.yml` runs phone and Room emulator tests on API 31 and 36 using `reactivecircus/android-emulator-runner@v2`, on `ubuntu-24.04`, after the build job. Watch instrumentation isn't included.
+- Relevant PRs and pushes to `main` / `agent-main` trigger it, plus manual dispatch. Paths cover `android/**`, `test-vectors/**`, the vector validator, reference versions and the workflow itself; there is no `[e2e]` label gate.
+- The build job validates vector JSON, runs unit tests and lint for shared logic, phone and watch, and builds debug, R8 release and phone/Room test APKs. Both jobs upload their reports.
 
-### Testing status (`agent-main`, 2026-09-24)
+### Testing status (`agent-main`, 2026-09-30)
 
 - **Framework:** JUnit 4 with MockK and kotlinx-coroutines-test on the JVM, plus AndroidX instrumented tests. Robolectric and Espresso flows aren't used.
-- **JVM tests:** `AdhanWrapperTest` (Makkah goldens, validation, polar unavailability), `QiblaCalculatorTest`, `QiblaSensorStateTest`, `SensorAccuracyTest`, `PrayerTimelineTest`, `PrayerNamingTest`, `ProfileCodecTest`, `HomeRibbonStateTest`, `AlarmSchedulerTest`, `NotificationHelperTest`, `LivePrayerNotificationTest`, `RamadanDetectorTest`, `QiblaViewModelTest`, `TrackerViewModelTest`, `PrayerWidgetTest`, `CrossSurfaceConsistencyTest`; on the watch, `WearStalenessTest` and `TileFreshnessTest`.
-- **Instrumented tests:** `ProfileRepositoryTest` and `QazaTrackerTest` (which never ran until the Phase 2 gate fixed the test runner), `RamadanDetectionTest` (Hijri offset and lapse), `AlarmDeliveryTest` (arming, re-arming after a reschedule, the master switch, delivery to the shade) and `WidgetProfileBindingTest`; on the watch, `WearSurfaceConsistencyTest`, `WearSyncRoundTripTest` and `PrayerComplicationDataTest`.
+- **JVM tests:** `AdhanWrapperTest` (Makkah goldens, validation, polar unavailability), `QiblaCalculatorTest`, `QiblaSensorStateTest`, `SensorAccuracyTest`, `PrayerTimelineTest`, `PrayerNamingTest`, `ProfileCodecTest`, `HomeRibbonStateTest`, `AlarmSchedulerTest` (including rollover in zones ahead of and behind the device), `NotificationHelperTest`, `LivePrayerNotificationTest`, `RamadanDetectorTest`, `QiblaViewModelTest`, `CurrentLocationProviderTest` (provider choice and fix age), `LocationTimeZoneTest` (cities, boundaries, all zone.tab principal locations and repair rules), `TrackerViewModelTest`, `PrayerWidgetTest`, `CrossSurfaceConsistencyTest`; on the watch, `WearStalenessTest` and `TileFreshnessTest`.
+- **Instrumented tests:** `ProfileRepositoryTest` and `QazaTrackerTest` (which never ran until the Phase 2 gate fixed the test runner), `RamadanDetectionTest` (Hijri offset and lapse), `AlarmDeliveryTest` (arming, re-arming after a reschedule, the master switch, deletion through `SettingsViewModel`, an unknown-zone profile and delivery to the shade), `QiblaLocationPermissionTest` (fine/coarse in one request and no request when coarse is already granted), `BatteryPromptTest` (notifications already allowed) and `WidgetProfileBindingTest`; on the watch, `WearSurfaceConsistencyTest`, `WearSyncRoundTripTest` and `PrayerComplicationDataTest`.
 - **Manual:** `android/scripts/widget-rollover-test.sh` checks widget rollovers on an emulator. The Phase 2 and 4B gates in TODOS.md record what was checked by hand, including a real reboot.
-- **Required cases still missing from files that exist:** `AdhanWrapperTest` tests MWL only, with no vector loop and no 23:59/00:00 boundary; `AlarmSchedulerTest` tests the pure builder, and `AlarmDeliveryTest` exercises `scheduleAll()` on a device but not idempotency or the midnight rollover's timing; `AlarmDeliveryTest`'s profile-deletion case calls `cancelForProfile` directly rather than deleting through `SettingsViewModel` (PR #34 A2); `QazaTrackerTest` calls `autoMarkMissed()` directly, with no next-prayer trigger; and no test covers Home's unavailable page or the scheduler's log-and-skip on polar days (the live notification's polar case is tested).
-- **CI:** `.github/workflows/ios.yml` only (the vectors and the Swift package). No Android tests run in CI.
+- **Required cases still missing from files that exist:** `AdhanWrapperTest` tests MWL only, with no vector loop and no 23:59/00:00 boundary; `AlarmDeliveryTest` exercises `scheduleAll()` on a device but not idempotency or delivery at the profile's midnight (the rollover helper is unit-tested); `QazaTrackerTest` calls `autoMarkMissed()` directly, with no next-prayer trigger; and no test covers Home's unavailable page or the scheduler's log-and-skip on polar days (the live notification's polar case is tested).
+- **CI:** `.github/workflows/ios.yml` covers vectors and the Swift package; `.github/workflows/android.yml` covers Android unit tests, lint, APK builds and phone/Room instrumentation as described above.
 
 ## Reviewer Concerns
 

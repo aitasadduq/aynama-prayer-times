@@ -2,7 +2,7 @@
 
 Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/projects/aitasadduq-aynama-prayer-times/ceo-plans/`.
 
-> **Sync note (2026-09-23, re-checked 2026-09-24).** The Android v1 checklist below was re-checked against the code on `agent-main` (`5eeed05`). Items that were ticked but aren't in the app are now unticked, with a short note saying what actually shipped. Design gaps found in the same pass are tracked as DS findings in `REVIEW-FINDINGS.md`; DESIGN.md §27 is the index.
+> **Sync note (2026-09-23, re-checked 2026-09-24).** The Android v1 checklist below was re-checked against the code on `agent-main` (`5eeed05`), then updated on 2026-09-30 for #35–#37 through `1be4f56`. Items that were ticked but aren't in the app are now unticked, with a short note saying what actually shipped. Design gaps found in the same pass are tracked as DS findings in `REVIEW-FINDINGS.md`; DESIGN.md §27 is the index.
 
 ## Design TODOs (from /plan-design-review, 2026-04-18)
 
@@ -25,7 +25,7 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
   - §3: `saffron-ink` as the accent for text and thin strokes on light surfaces, and `ink` labels on saffron fills
   - §4: numbers that change in place are set in IBM Plex Sans. This contradicts §4's own `display-xl` row and §19's format rule, which keep the hero in Fraunces, so decide it with DS9.
   - §18: the −2…+2 Hijri adjustment
-  - §17: location time zone on by default. Hold this until DS32 is fixed: city search picks the wrong zone for Madrid, Lisbon, Detroit and others, so the default labels their times an hour off.
+  - §17: location time zone on by default. The city-zone defect was fixed by #36, so the hold is lifted; the spec change still needs sign-off.
   - §17: Muslim World League as the default method (the plan said ISNA). The default changes users' prayer times.
   - §15: master-off hiding every Notifications section
   - §15: prayer names stay `ink` when their alert is off (April: `ink-muted`)
@@ -146,7 +146,7 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
   `timezone = ZoneId.systemDefault()`, which is right at home and wrong for a traveller whose
   phone has not updated its zone: the profile then computes correct prayer instants and renders
   them in the wrong wall clock. Derive the zone from the fix's coordinates instead, as the
-  city-search path already does via `detectTimezoneForLocation`. (found while testing the
+  city-search path already does via `LocationTimeZone.detect(country, lat, lng)`. (found while testing the
   add-profile FAB flow)
 
 ## Supply-chain / security
@@ -188,7 +188,8 @@ Run on a rooted `google_apis` API 36 emulator, 2026-09-07. Clock control via `ad
    PendingIntent lookup matches on `Intent.filterEquals`, so nothing was ever cancelled.
    Master off, per-prayer off, profile deleted, profile switched — all left alarms firing.
    A deleted profile's alarms still survived this fix: `SettingsViewModel.delete` never
-   cancelled them, and `scheduleAll` only cancels the profiles it is given. Fixed separately.
+   cancelled them, and `scheduleAll` only cancels the profiles it is given. Fixed separately
+   in #37; `AlarmDeliveryTest` now deletes through `SettingsViewModel`.
 2. **The bottom navigation was Material's default lavender**, in both themes, on every screen.
    Unset `ColorScheme` roles keep Material's purple baseline; DESIGN §10 forbids purple.
 3. **`shared-logic`'s 16 Room instrumented tests had never run** — the module named
@@ -359,7 +360,7 @@ Depends on: Phase 1 (ProfileRepository for active profile + prayer times for gra
 - [x] `QiblaViewModel` — registers `SensorManager` listener in `onResume`, unregisters in `onPause`
 - [x] `SENSOR_DELAY_UI` (~16 Hz) sampling rate; `LP_ALPHA = 0.15` tuned for ~6-sample (~300 ms) settling. UI rate chosen over GAME for power; convergence acceptable during normal turning.
 - [x] Direct rotation matrix (no `remapCoordinateSystem`) for tilt-stable flat-phone bearing (T7)
-- [x] Bearing from device coordinates to Kaaba (21.4225°N, 39.8262°E) — *uses the live device location when permission is granted (asked for on first open), otherwise the default profile. The request asks for fine alone, which some Android 12 releases ignore (DS33).*
+- [x] Bearing from device coordinates to Kaaba (21.4225°N, 39.8262°E) — *first open asks for fine and coarse together; either grant works. Uses a live fix when available, otherwise the default profile, named in the distance line. Last-known fixes older than an hour are rejected, and a failed refresh clears an earlier fix (#35).*
 - [x] Accuracy state: `HIGH` / `MEDIUM` / `LOW` / `UNRELIABLE`
 
 **UI (DESIGN.md §5)**
@@ -447,7 +448,8 @@ Depends on: Phase 1 (profiles + Qaza repo), Phase 2 (prayer time calculation).
 - [x] One-time prompt; do not re-prompt
 
 **Tests**
-- [x] `AlarmSchedulerTest` — pure `buildAlarmSchedule()`: 5 alarms (6 in Ramadan); unique request codes, which is what makes re-arming idempotent; Imsak = Fajr −10 min; master, per-prayer and Imsak toggles; offsets, fixed times, early reminders; `resolveNotificationProfile`. *(`scheduleAll()` itself and the midnight reschedule aren't unit-tested.)*
+- [x] `AlarmSchedulerTest` — pure `buildAlarmSchedule()`: 5 alarms (6 in Ramadan); unique request codes, which is what makes re-arming idempotent; Imsak = Fajr −10 min; master, per-prayer and Imsak toggles; offsets, fixed times, early reminders; `resolveNotificationProfile`; and `nextRolloverEpochMs` for profile zones ahead of and behind the device. *(`scheduleAll()` itself isn't unit-tested; device coverage includes deletion through `SettingsViewModel` and an unknown-zone profile.)*
+- [x] `BatteryPromptTest` (instrumented) — the one-time prompt is requested when notifications are already allowed (#37)
 - [x] `RamadanDetectorTest` (JVM, month mapping) + `RamadanDetectionTest` (instrumented: known dates, Hijri offset and its lapse)
 - [x] E2E (emulator): an armed alarm fires and reaches the shade — `AlarmDeliveryTest`
 - [x] E2E (emulator): alarms are restored after a reschedule — `AlarmDeliveryTest`
@@ -520,6 +522,7 @@ Depends on: Phase 1 (profiles), Phase 5 (notifications config).
 - [x] Early reminder picker: Off / 5 / 10 / 15 min before, default Off
 - [x] Notification profile scoping ("Alerts for"); per-prayer settings stored per profile
 - [x] Per-profile "Use location time zone" (DESIGN.md §17) — on by default for new profiles
+- [x] City time zone from a bundled country/coordinate boundary lookup; one-time repair of saved city profiles before alarms and widgets, preserving the toggle (#36)
 - [ ] Preview row plays a 10 s sample — **not built** (toast placeholder)
 
 #### Phase 6d — Hijri Settings ✅ DONE
@@ -564,10 +567,11 @@ Depends on: all phases (run after each PR, gate on `main` merge).
 - [x] ~~`vectors.yml` GitHub Actions workflow~~ → **DONE, as the `vectors` job in `ios.yml`** rather than its own file (it gates the macOS job, so it has to be in the same workflow). `scripts/validate-vectors.py` validates every `test-vectors/prayer-times/*.json` against `schema.json`. `schema.json` had claimed this was enforced since it was written; until now nothing enforced it.
 
 **android.yml**
-- [ ] Unit tests (`:shared-logic:test`, `:app:test`) on every commit
-- [ ] Lint (`:app:lintDebug`) on every commit
-- [ ] E2E tests (`android-emulator-runner@v2`, `ubuntu-latest`) gated behind `[e2e]` label or PRs targeting `main`
-- [ ] Trigger on `android/**` and `test-vectors/**` path changes
+- [x] Unit tests for `:shared-logic`, `:app` and `:wear` on relevant PRs and pushes to `main` / `agent-main`
+- [x] Lint all three modules; build phone/watch debug and R8 release APKs and phone/Room test APKs
+- [x] Phone and Room instrumentation on API 31 and 36 via `android-emulator-runner@v2`, `ubuntu-24.04`, after the build job; no `[e2e]` label gate
+- [x] Trigger on `android/**`, `test-vectors/**`, the vector validator, reference versions and the workflow itself; manual dispatch supported
+- [x] Validate vector JSON against the schema; upload build and instrumentation reports
 
 **adhan-test-vectors companion repo**
 - [ ] README documents: (1) how to trigger vector regeneration on Adhan upstream release (GitHub Actions manual dispatch); (2) who reviews PrayTimes.py vs Adhan disagreements; (3) process for syncing vectors back to main repo
@@ -601,7 +605,7 @@ Run before Play Store submission.
 - [ ] Disclose that location search and reverse geocoding go through the platform geocoder
 - [ ] Disclose the watch sync: profiles go to a paired watch through Google Play services
 - [ ] Decide the F-Droid build: `play-services-wearable` is proprietary, and F-Droid forbids Google Play Services (`legal-posture.md`)
-- [ ] About screen: Adhan, Fraunces and IBM Plex Sans (SIL OFL 1.1) attributions
+- [ ] About screen: Adhan, Fraunces and IBM Plex Sans (SIL OFL 1.1), and OpenStreetMap/timezone-boundary-builder (ODbL 1.0) attributions
 
 **Play Store prep**
 - [ ] Declare `USE_EXACT_ALARM` alarm/clock category in Play Console

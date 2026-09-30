@@ -6,7 +6,7 @@
 
 Every UI decision in this repo traces back to this document. If a new surface contradicts something here, update this file first, then the code.
 
-> **How to read this revision.** Android v1 is the first built surface, and this file now describes it. Where the app deliberately moved away from the April 2026 spec, the spec now follows the app. That covers the stepped surface cycle, the Qibla panels, the four widgets, the ±2-day Hijri adjustment, and location time zone being on by default. Where the app breaks a hard rule (contrast, no Roboto, tabular numerals), **the rule stands**, and the breach is listed in §27 with a finding ID (`DS…`) tracked in `REVIEW-FINDINGS.md`. "Android v1" means the code on `agent-main` at `5eeed05`: Android, WearOS and iOS work merges there, and `main` is behind it. §19–§24 are that branch's specs; the sync added §25–§27. Android dp and sp map 1:1 onto the pt values used in the platform-neutral tables.
+> **How to read this revision.** Android v1 is the first built surface, and this file now describes it. Where the app deliberately moved away from the April 2026 spec, the spec now follows the app. That covers the stepped surface cycle, the Qibla panels, the four widgets, the ±2-day Hijri adjustment, and location time zone being on by default. Where the app breaks a hard rule (contrast, no Roboto, tabular numerals), **the rule stands**, and the breach is listed in §27 with a finding ID (`DS…`) tracked in `REVIEW-FINDINGS.md`. The original Android v1 sync used `agent-main` at `5eeed05`; the location and alarm documentation was updated through `1be4f56` on 2026-09-30 after #35–#37. Android, WearOS and iOS work merges on that branch, and `main` is behind it. §19–§24 are that branch's specs; the sync added §25–§27. Android dp and sp map 1:1 onto the pt values used in the platform-neutral tables.
 
 ---
 
@@ -409,7 +409,7 @@ Which profile each surface uses:
 
 **Readout panel**
 - The Qibla bearing from true north, rounded ("119°"), in the Qibla degree style. It is the bearing for this location, not the live heading.
-- Under it, "4,832 km to the Kaaba" in Readout-secondary style, muted, with locale digit grouping.
+- Under it, "4,832 km to the Kaaba" in Readout-secondary style, muted, with locale digit grouping. While using the profile's saved coordinates, it names the profile: "4,794 km from London to the Kaaba". A long name wraps, centred, with an ellipsis after two lines.
 
 **Chip panel.** A 6 dp accent dot, then "Qibla" and "119°" in Caption style, in the accent colour.
 
@@ -418,8 +418,8 @@ Which profile each surface uses:
 - Text: "Hold phone flat and move in a figure-8 to calibrate", `body-sm`, `#FFF3CD` on `#7A5800` at 90%, 8 dp corners.
 
 **Location and north**
-- The bearing is computed from the device's current position when location permission is granted. The screen asks for fine location alone on first open (`QiblaScreen.kt:103`). Android's Precise/Approximate choice needs fine and coarse in one request, and some Android 12 releases ignore a fine-only request (DS33). Nothing on screen says when the bearing comes from the profile instead.
-- Without permission, it uses the default profile's saved coordinates.
+- First open asks for fine and coarse location together, so Android 12+ offers Precise or Approximate. Either grant works. Approximate is sufficient across a city, except within a few kilometres of the Kaaba, where Precise is needed.
+- The bearing uses a live device fix when available, otherwise the default profile's saved coordinates; the distance line names the profile while falling back. A last-known fix older than an hour counts as no fix, and a failed refresh clears an earlier fix. The location request is refreshed on resume and cancelled on pause.
 - Magnetic declination is applied to get true north. If the device's geomagnetic model has expired, declination falls back to 0°.
 
 **Forbidden:** a cardinal N/E/S/W ring, concentric circles, tick marks, degree graduations, a 3D Kaaba, a needle. It reads as a letterpress print with a single ruled circle, not a cockpit.
@@ -956,7 +956,7 @@ The two modes:
 
 **Permissions**
 - The notification permission is requested on first launch (Android 13+).
-- Right after it's granted, the app asks once to be exempted from battery optimisation. That only happens on a fresh grant on Android 13+: Android 8–12, and users who had already allowed notifications, are never asked (PR #34 A3).
+- At first launch, the app asks once to be exempted from battery optimisation: after a notification-permission grant on Android 13+, or straight away on Android 8–12 and when notifications are already allowed.
 
 ### States
 
@@ -1149,8 +1149,9 @@ Home's header uses short names for the same methods: MWL, ISNA, Umm al-Qurā, Eg
 
 **Auto-detection rules**
 - **"Use current location":** the device's zone, `ZoneId.systemDefault()`.
-- **City search:** `android.icu.util.TimeZone.getAvailableIDs(countryCode)`. If the country has one zone, use it. If it has several, pick the one whose `rawOffset` is closest to `longitude / 15 × 3 600 000 ms`. That picks an hour-off zone for some major cities: Madrid and Barcelona get `Atlantic/Canary`, Lisbon `Atlantic/Azores`, Detroit and Atlanta a US Central zone, Calgary `America/Vancouver`, Surabaya WITA (DS32).
+- **City search:** `LocationTimeZone.detect(countryCode, latitude, longitude)`. The Geocoder supplies the country; a bundled boundary lookup (`timezone-lookup.bin`, generated by `scripts/timezone-lookup/generate.py` from timezone-boundary-builder and tzdata 2026d) selects that country's zone at the coordinates, to about 1 km. The lookup works offline with no new dependency. Unknown countries or zones absent from the device's tz database return blank, so the profile follows the device zone. Where boundaries overlap (Xinjiang), the smaller zone wins: Ürümqi gets `Asia/Urumqi`.
 - **Editing an older profile with a blank zone:** reverse-geocode its coordinates and detect again.
+- **One-time upgrade repair:** before alarms and widgets are scheduled, `AynamaApplication` re-detects each saved city profile's zone, recovering the country from the stored zone's ICU region. This replaces the old longitude guess. GPS profiles, unresolved zones and the user's toggle are left alone; repaired profiles reach the watch through the existing profile collector.
 
 **Placement.** Below the location, above the calculation method. The row is rendered only when `timezone` isn't blank. There's no ghost row and no "unknown" label; silence is clearer than a disabled toggle.
 
@@ -1165,7 +1166,7 @@ Home's header uses short names for the same methods: MWL, ISNA, Umm al-Qurā, Eg
 - Notification alarms and the live notification
 - Widgets
 
-Three things still use the device's date (DS12): the date a mark is saved under, from Home or the Tracker; the date the Notifications screen computes its rows for; and the midnight rollover that re-arms notification alarms. With the toggle off, everything uses the device zone.
+Two things still use the device's date (DS12): the date a mark is saved under, from Home or the Tracker; and the date the Notifications screen computes its rows for. The notification rollover now re-arms at the profile's next midnight. With the toggle off, everything uses the device zone.
 
 ---
 
@@ -1673,7 +1674,7 @@ Where the shipped Android app stands against this document's rules. Each gap has
 | §4 — tabular numerals | ✗ The Fraunces countdowns drift. IBM Plex times are fine. | DS9 |
 | §4 — Fraunces only at 400/500 | ? Widgets probably render Fraunces Black. | DS10 |
 | §18 — the same Hijri date on every device | ✗ It depends on the device's region. | DS11 |
-| §17 — one time zone per profile everywhere | ~ Mark dates, the Notifications screen's date and the alarm rollover use the device's date. | DS12 |
+| §17 — one time zone per profile everywhere | ~ Mark dates and the Notifications screen's date use the device's date. | DS12 |
 | Consistent time format | ✗ Mixed 12-hour and 24-hour. | DS13 |
 | §15 — alerts behave well | ✗ No tap action, no stop action, Imsak treated as a prayer, placeholder audio. | DS14 |
 | §16 — "on time" only within the window; missed distinct from unmarked | ✗ | DS15 |
@@ -1693,8 +1694,6 @@ Where the shipped Android app stands against this document's rules. Each gap has
 | §12 — 48 dp touch targets | ✗ Home's timeline rows are about 25 dp tall. | DS29 |
 | §26 — the Tracker survives a polar profile | ✗ It shows its no-profile state. | DS30 |
 | §5 — Maghrib holds until an after-midnight Isha | ✗ Near the June solstice at about 50°N and up, Isha shows as current from about 1 AM. | DS31 |
-| §17 — the detected location time zone is right | ✗ City search picks a neighbouring zone for some major cities. | DS32 |
-| §5 — Qibla uses the device's location | ✗ The fine-only request may never show a dialog on Android 12+. | DS33 |
 | §16 — the Tracker shows the prayers marked on Home | ✗ Marks on other profile pages never reach it. | DS34 |
 | §15 — rows show the current alert time | ✗ They show the time from when the screen opened. | DS35 |
 | §21 — the FAB stays clear of the content | ? It likely covers part of the Isha time on shorter phones. | DS37 |
@@ -1711,6 +1710,8 @@ Where the shipped Android app stands against this document's rules. Each gap has
 - dynamic colour off, and every Material colour role except `error` mapped from the tokens
 - squares, not circles, in the tracker
 - a single quiet Qibla ring
+- city-search time zones resolved from country and coordinates, with one-time repair of saved city profiles
+- Qibla requests fine and coarse together and names the profile when no live fix is available
 - 48 dp touch targets on the utilitarian screens
 
 ---
@@ -1730,3 +1731,4 @@ Where the shipped Android app stands against this document's rules. Each gap has
   - §5, §15–§18 rewritten to match the code. Widgets, screen states and conformance added, now §25–§27.
   - Spec changes flagged for §14 sign-off: listed in TODOS.md ("Sign off the spec changes the sync recorded").
 - 2026-09-24 — the sync re-checked against `agent-main` (`5eeed05`), where #22–#33 had landed, and placed after that branch's §19–§24. The Home hero follows §19 again, the add-profile page is gone, DS1 and DS12 narrowed, DS36 and DS37 added.
+- 2026-09-30 — rebased after #35–#37 (`agent-main`, `1be4f56`): removed resolved DS32/DS33, documented the boundary lookup and city-profile repair, Qibla permissions and fallback label, and battery-prompt timing. DS12 now covers only mark dates and the Notifications screen's date; alarm rollover uses the profile's midnight.
