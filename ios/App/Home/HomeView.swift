@@ -92,6 +92,7 @@ private struct ProfilePageView: View {
     let page: ProfilePage
     let now: Date
     let onMark: (PrayerMarkTarget) -> Void
+    @ScaledMetric(relativeTo: .title3) private var minimumRowHeight = 56.0
     @Query private var marks: [QazaRecord]
 
     var body: some View {
@@ -128,7 +129,7 @@ private struct ProfilePageView: View {
                     CountdownHero(text: state.countdownText, isElapsed: state.countdownIsElapsed,
                                   prayerName: state.countdownPrayerName, prayerTime: state.countdownPrayerTime, surface: surface)
                     PrayerRibbon(rows: state.ribbonRows, surface: surface,
-                                 rowHeight: max(56, (geometry.size.height - 270) / CGFloat(state.ribbonRows.count)),
+                                 rowHeight: max(min(112, minimumRowHeight), (geometry.size.height - 270) / CGFloat(state.ribbonRows.count)),
                                  progress: ribbonPosition(state)) { prayer in
                         onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer,
                                                date: CalendarDate.from(now, in: state.profile.effectiveTimeZone)))

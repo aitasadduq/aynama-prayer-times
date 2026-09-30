@@ -5,6 +5,15 @@ import XCTest
 @testable import Aynama
 
 final class SurfaceContrastTests: XCTestCase {
+    func testNativeLabelsAndAccentsMeetAAInBothAppearances() {
+        for scheme in [ColorScheme.light, .dark] {
+            let palette = NeutralPalette(scheme: scheme)
+            for foreground in [palette.foreground, palette.muted, palette.accent] {
+                XCTAssertGreaterThanOrEqual(contrast(foreground, palette.background), 4.5, "\(scheme) native labels")
+            }
+        }
+    }
+
     func testBodyMetadataAndActiveTextMeetAAAtBothEndsOfEveryPhaseGradient() {
         let surfaces: [TimeOfDaySurface] = [.fajr, .sunriseTransition, .dhuhr, .asr, .maghrib, .isha]
         for surface in surfaces {

@@ -45,7 +45,7 @@ struct PrayerRibbon: View {
             }.frame(width: 20).accessibilityHidden(true)
             Text(title(row)).font(AynamaFont.title)
             Spacer(minLength: 8)
-            Text(row.displayTime).font(AynamaFont.timelineTime).monospacedDigit().lineLimit(1)
+            Text(row.displayTime).font(AynamaFont.timelineTime).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
         }.foregroundStyle(color(row)).frame(minHeight: rowHeight).contentShape(Rectangle())
     }
     private func title(_ row: RibbonRow) -> String {

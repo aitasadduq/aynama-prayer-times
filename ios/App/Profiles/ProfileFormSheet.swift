@@ -77,7 +77,7 @@ struct ProfileFormSheet: View {
                         Toggle(isOn: $useLocationTimezone) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Use location time zone")
-                                Text(TimeZone(identifier: timezone)?.localizedName(for: .standard, locale: .current) ?? timezone)
+                                Text(timezone)
                                     .font(AynamaFont.bodySM).foregroundStyle(palette.muted)
                             }
                         }.accessibilityIdentifier("profile-location-time-zone")

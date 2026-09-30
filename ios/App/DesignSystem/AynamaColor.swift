@@ -100,10 +100,10 @@ enum TimeOfDaySurface {
     var foreground: Color { prefersLightForeground ? AynamaColor.parchment : AynamaColor.ink }
 
     var foregroundMuted: Color {
-        // Muted ink falls below AA on honey and saffron. Size and state marks carry the
-        // hierarchy there; retain full ink so metadata and passed prayers remain legible.
+        // Muted ink falls below AA on linen, honey and saffron. Size and state marks carry
+        // the hierarchy there; retain full ink so metadata and passed prayers remain legible.
         if prefersLightForeground { return AynamaColor.parchmentMuted }
-        return self == .dhuhr ? AynamaColor.inkMuted : AynamaColor.ink
+        return AynamaColor.ink
     }
 
     private func hex(_ value: Int) -> Color {

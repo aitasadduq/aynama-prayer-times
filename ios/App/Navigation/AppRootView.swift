@@ -7,6 +7,7 @@ struct AppRootView: View {
     @State private var tab = 0
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var scheme
     @Query(sort: [SortDescriptor(\ProfileRecord.sortOrder), SortDescriptor(\ProfileRecord.profileID)])
     private var records: [ProfileRecord]
     @StateObject private var alerts = PrayerAlertSettings()
@@ -34,6 +35,7 @@ struct AppRootView: View {
                 .tabItem { Label("Settings", systemImage: tab == 3 ? "gearshape.fill" : "gearshape").symbolVariant(.none) }.tag(3)
         }
         .preferredColorScheme(testAppearance)
+        .tint(NeutralPalette(scheme: testAppearance ?? scheme).accent)
         .onAppear { ScreenshotFixtures.seed(context) }
         .font(AynamaFont.body)
         .environmentObject(alerts)

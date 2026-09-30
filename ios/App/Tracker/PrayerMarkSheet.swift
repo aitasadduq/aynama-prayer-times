@@ -62,10 +62,8 @@ struct PrayerMarkSheet: View {
             }.frame(minHeight: 56).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityIdentifier(label)
-        .accessibilityAddTraits(.isButton)
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.45)
     }

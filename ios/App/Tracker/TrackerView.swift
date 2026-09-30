@@ -36,7 +36,7 @@ struct TrackerView: View {
                 }
                 let outstanding = marks.filter { $0.profileID == profile.id && $0.status == .missed }.count
                 if outstanding > 0 {
-                    Text("\(outstanding) prayers outstanding").font(AynamaFont.bodySM)
+                    Text("\(outstanding) \(outstanding == 1 ? "prayer" : "prayers") outstanding").font(AynamaFont.bodySM)
                         .foregroundStyle(palette.muted).padding(.top, 8)
                 }
                 HStack(spacing: 4) {

@@ -87,6 +87,7 @@ final class DesignParityUITests: XCTestCase {
         fajr.tap()
         capture(app, "14-prayer-mark-sheet")
         XCTAssertTrue(app.buttons["I prayed this"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons.matching(identifier: "I prayed this").count, 1)
         XCTAssertFalse(app.buttons["I prayed this"].isEnabled)
         app.buttons["I didn't pray this"].tap()
         XCTAssertTrue(app.staticTexts["2 prayers outstanding"].waitForExistence(timeout: 5))
