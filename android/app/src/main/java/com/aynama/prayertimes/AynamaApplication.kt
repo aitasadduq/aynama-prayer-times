@@ -3,10 +3,12 @@ package com.aynama.prayertimes
 import android.app.Application
 import android.content.SharedPreferences
 import android.util.Log
+import androidx.core.content.edit
 import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.notifications.NotificationHelper
 import com.aynama.prayertimes.notifications.resolveNotificationProfile
 import com.aynama.prayertimes.shared.CalculationMethodKey
+import com.aynama.prayertimes.shared.withRedetectedTimezone
 import com.aynama.prayertimes.shared.data.db.AynamaDatabase
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
@@ -46,6 +48,7 @@ class AynamaApplication : Application() {
         NotificationHelper.createChannels(this)
         appScope.launch {
             if (BuildConfig.DEBUG) seedDebugProfilesIfEmpty()
+            redetectLocationTimeZonesOnce()
             val profiles = profileRepository.observeAll().first()
             AlarmScheduler.scheduleAll(this@AynamaApplication, profiles)
             updateAllPrayerWidgets(this@AynamaApplication)
@@ -72,6 +75,21 @@ class AynamaApplication : Application() {
                 )
             }
         }
+    }
+
+    /**
+     * City profiles saved before DS32's fix hold the zone the old longitude guess picked, an hour
+     * off for Madrid, Lisbon, Detroit and others. Run before alarms and widgets read them.
+     */
+    private suspend fun redetectLocationTimeZonesOnce() {
+        if (prefs.getBoolean(KEY_LOCATION_ZONES_REDETECTED, false)) return
+        for (profile in profileRepository.observeAll().first()) {
+            val redetected = profile.withRedetectedTimezone { id ->
+                runCatching { android.icu.util.TimeZone.getRegion(id) }.getOrNull()
+            }
+            if (redetected != profile) profileRepository.update(redetected)
+        }
+        prefs.edit { putBoolean(KEY_LOCATION_ZONES_REDETECTED, true) }
     }
 
     private suspend fun seedDebugProfilesIfEmpty() {
@@ -102,5 +120,9 @@ class AynamaApplication : Application() {
                 useLocationTimezone = true,
             )
         )
+    }
+
+    companion object {
+        private const val KEY_LOCATION_ZONES_REDETECTED = "location_zones_redetected_ds32"
     }
 }

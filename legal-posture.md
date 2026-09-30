@@ -55,6 +55,12 @@ Sub-spec of `architecture-design.md`. Covers license obligations for all bundled
 - Each translation shipped as a separate SQLite file under `/assets/translations/{lang}/{translator}.db`.
 - Attribution per translation in the translation-picker UI.
 
+## Data: time zone boundaries (timezone-boundary-builder, ODbL 1.0)
+
+`android/shared-logic/src/main/resources/timezone-lookup.bin` is derived from timezone-boundary-builder (https://github.com/evansiroky/timezone-boundary-builder), itself built from OpenStreetMap data. Both are under the Open Database License 1.0. Requires:
+- Attribution: "Time zone boundaries © OpenStreetMap contributors, timezone-boundary-builder, ODbL 1.0."
+- The derived database stays under ODbL. It and `scripts/timezone-lookup/generate.py`, which rebuilds it from the pinned release, are both public in this repo.
+
 ## Trademark + name
 
 - "aynama" is the working project name. Check USPTO + EUIPO before first public release for conflicts. (Not done this review — add to TODOS.md.)
@@ -69,7 +75,7 @@ Sub-spec of `architecture-design.md`. Covers license obligations for all bundled
 ## Blocks on first public release
 
 - [ ] Adhan NOTICE / LICENSE files vendored.
-- [ ] About screen with Adhan + Tanzil attribution.
+- [ ] About screen with Adhan + Tanzil + OpenStreetMap/timezone-boundary-builder (ODbL) attribution.
 - [ ] Google Play listing includes license note.
 - [ ] Chosen project license (MIT vs Apache 2.0) decided and `LICENSE` file in repo root.
 - [ ] Trademark clearance on "aynama" (moved to TODOS.md).

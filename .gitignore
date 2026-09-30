@@ -62,3 +62,5 @@ DerivedData/
 
 # Package.resolved is deliberately NOT ignored. Adhan-Swift is pinned exactly, and committing
 # the resolution is what makes a CI checkout reproduce this exact dependency graph.
+scripts/timezone-lookup/*.zip
+scripts/timezone-lookup/*.tar.gz

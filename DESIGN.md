@@ -755,11 +755,12 @@ Each profile stores a location (GPS or city search). When a user travels and kee
 ### Data model
 
 - `timezone: String` — IANA timezone ID auto-detected at profile creation (e.g. `"Europe/London"`). Blank when detection fails.
-- `useLocationTimezone: Boolean` — user-controlled toggle; `false` by default (device timezone).
+- `useLocationTimezone: Boolean` — user-controlled toggle; on by default for new profiles. Profiles created before the option existed stay off until the user changes them.
 
 **Auto-detection rules:**
 - GPS profile: `ZoneId.systemDefault().id` (device is physically at the location).
-- City search: use `android.icu.util.TimeZone.getAvailableIDs(countryCode)` to get the country's timezone list. If exactly one zone, use it directly. If multiple zones, pick the one whose `rawOffset` is closest to `longitude / 15 × 3 600 000 ms` — the longitude-based approximation is accurate for nearly all major cities when constrained to the correct country.
+- City search: `LocationTimeZone.detect(countryCode, latitude, longitude)`. The Geocoder gives the country; a bundled boundary lookup (`timezone-lookup.bin`, generated from timezone-boundary-builder by `scripts/timezone-lookup/generate.py`) picks which of that country's zones the coordinates fall in, to about 1 km. Offline, no new dependency. Blank when the country is unknown or the device's tz database lacks the zone. Where the boundary data overlaps (Xinjiang), the smaller zone wins: Ürümqi gets `Asia/Urumqi`.
+- Profiles saved before this rule hold a zone from the old longitude guess, which was an hour off for Madrid, Lisbon, Detroit, Calgary, Surabaya and others (DS32). On the first launch after the fix, each city profile's zone is detected again, with the country taken from the stored zone. The toggle is left as the user set it.
 
 ### Profile edit sheet placement
 
@@ -783,7 +784,7 @@ When timezone auto-detection failed (blank `timezone`), the row is hidden entire
 
 ### Behavior
 
-- Default: toggle off — device timezone applies.
+- Default: toggle on for new profiles.
 - Toggle on: prayer times and alarm scheduling use `ZoneId.of(profile.timezone)`.
 - Toggle off: prayer times and alarm scheduling use `ZoneId.systemDefault()`.
 - The home screen ribbon, countdown, and alarm triggers all use the same resolved timezone (`profile.effectiveZoneId()`), so they stay consistent.
