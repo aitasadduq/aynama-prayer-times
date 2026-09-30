@@ -1,3 +1,5 @@
+import Foundation
+import OSLog
 import SharedLogic
 import SwiftData
 

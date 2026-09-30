@@ -123,7 +123,7 @@ final class PrayerAlertSettings: ObservableObject {
     }
     var profileID: Int64? {
         get { (defaults.object(forKey: "prayer_alert_profile") as? Int).map(Int64.init) }
-        set { defaults.set(newValue.map(Int.init), forKey: "prayer_alert_profile"); revision += 1 }
+        set { defaults.set(newValue.map { Int($0) }, forKey: "prayer_alert_profile"); revision += 1 }
     }
     var voice: AdhanVoice {
         get { AdhanVoice(rawValue: defaults.string(forKey: "adhan_voice") ?? "") ?? .makkah }
