@@ -48,11 +48,18 @@ def build() -> bytes:
         font["hmtx"][glyph] = (advance, left_bearing + (advance - old_advance) // 2)
 
     options = subset.Options()
+    # TrueType hinting can snap *equal* advances to different whole pixels on
+    # Android, depending on the digit outline (observed on API 36 at 72 px).
+    # The 72 pt display face is large enough that outline scaling is preferable.
+    options.hinting = False
     options.name_IDs = ["*"]  # Retain the embedded OFL copyright and licence notice.
     options.name_languages = ["*"]
     subsetter = subset.Subsetter(options=options)
     subsetter.populate(unicodes={ord(character) for character in CHARACTERS})
     subsetter.subset(font)
+    # Keep grayscale antialiasing but explicitly turn off grid fitting at every
+    # size (gasp bit 0), even on renderers that consider automatic hinting.
+    font["gasp"].gaspRange = {65535: 0xA}
 
     name = font["name"]
     names = {
