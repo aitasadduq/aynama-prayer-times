@@ -1,5 +1,14 @@
 import SwiftUI
 
+/// Native glass and its selected-item tint must use the appearance of the surface beneath it.
+struct NativeTabChrome {
+    let scheme: ColorScheme
+    init(surface: TimeOfDaySurface?, fallback: ColorScheme) {
+        scheme = surface.map { $0.prefersLightForeground ? .dark : .light } ?? fallback
+    }
+    var tint: Color { scheme == .dark ? AynamaColor.parchmentMuted : AynamaColor.saffronInk }
+}
+
 struct NeutralPalette {
     let scheme: ColorScheme
     var background: Color { scheme == .dark ? AynamaColor.ink : AynamaColor.parchment }

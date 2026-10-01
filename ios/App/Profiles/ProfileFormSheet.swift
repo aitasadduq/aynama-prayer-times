@@ -198,11 +198,7 @@ struct ProfileFormSheet: View {
         // Keep the detected zone when the toggle is off, so enabling it later remains possible.
         profile.timezone = timezone
         profile.useLocationTimezone = useLocationTimezone && !timezone.isEmpty
-        if profile.hijriOffset != hijriOffset {
-            profile.hijriOffset = hijriOffset
-            profile.hijriOffsetMonthKey = HijriCalendar.monthKey(
-                CalendarDate.from(AppClock.now, in: profile.effectiveTimeZone).plusDays(hijriOffset), in: profile.effectiveTimeZone)
-        }
+        profile.setHijriAdjustment(hijriOffset, now: AppClock.now)
         onSave(profile)
         dismiss()
     }

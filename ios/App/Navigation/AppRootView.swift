@@ -5,12 +5,14 @@ import SwiftUI
 struct AppRootView: View {
     @Binding var requestedProfileID: Int64?
     @State private var tab = 0
+    @State private var homeSurface: TimeOfDaySurface = .isha
+    @State private var qiblaSurface: TimeOfDaySurface?
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var scheme
     @Query(sort: [SortDescriptor(\ProfileRecord.sortOrder), SortDescriptor(\ProfileRecord.profileID)])
     private var records: [ProfileRecord]
-    @StateObject private var alerts = PrayerAlertSettings()
+    @StateObject private var alerts = PrayerAlertSettings.shared
 
     private var testAppearance: ColorScheme? {
         #if DEBUG
@@ -24,18 +26,28 @@ struct AppRootView: View {
     }
 
     var body: some View {
+        let chrome = NativeTabChrome(surface: tab == 0 ? homeSurface : tab == 1 ? qiblaSurface : nil,
+                                     fallback: testAppearance ?? scheme)
         TabView(selection: $tab) {
-            HomeView(requestedProfileID: $requestedProfileID)
+            HomeView(requestedProfileID: $requestedProfileID) { homeSurface = $0 }
+                .toolbarColorScheme(chrome.scheme, for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
                 .tabItem { Label("Prayers", systemImage: tab == 0 ? "house.fill" : "house").symbolVariant(.none) }.tag(0)
-            QiblaView()
+            QiblaView { qiblaSurface = $0 }
+                .toolbarColorScheme(chrome.scheme, for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
                 .tabItem { Label("Qibla", systemImage: tab == 1 ? "location.fill" : "location").symbolVariant(.none) }.tag(1)
             NavigationStack { TrackerView() }
+                .toolbarColorScheme(chrome.scheme, for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
                 .tabItem { Label("Tracker", systemImage: "calendar").symbolVariant(.none) }.tag(2)
             NavigationStack { SettingsView() }
+                .toolbarColorScheme(chrome.scheme, for: .tabBar)
+                .toolbarBackground(.visible, for: .tabBar)
                 .tabItem { Label("Settings", systemImage: tab == 3 ? "gearshape.fill" : "gearshape").symbolVariant(.none) }.tag(3)
         }
         .preferredColorScheme(testAppearance)
-        .tint((testAppearance ?? scheme) == .dark ? AynamaColor.parchmentMuted : AynamaColor.saffronInk)
+        .tint(chrome.tint)
         .onAppear { ScreenshotFixtures.seed(context) }
         .font(AynamaFont.body)
         .environmentObject(alerts)

@@ -631,7 +631,7 @@ Everything else on this list holds.
 ### iOS
 - The phone app shares Android's four destinations: Prayers, Qibla, Tracker, Settings. Notifications and Adhan voice use native pushes within Settings. Profiles and prayer details use native sheets.
 - Native tab and navigation bars use the iOS 26 Liquid Glass treatment when built with the iOS 26 SDK. Glass belongs to navigation chrome and utilitarian controls; the prayer ribbon and Qibla instrument remain directly on their phase surfaces. The Settings add button uses tinted glass, with a solid saffron fallback for Reduce Transparency and iOS 17–25.
-- Native glass-button labels use ink or parchment for text contrast. Tab icons and labels share one system tint: saffron-ink on light chrome, parchment-muted on dark chrome, where the native saffron label is only 4.03:1. The selected glass pill still identifies the active tab. Home scales row spacing and typography to the available page height while respecting Dynamic Type where space allows.
+- Native glass-button labels use ink or parchment for text contrast. Tab icons and labels share one tint: saffron-ink on light chrome, parchment-muted on dark chrome, where the native saffron label is only 4.03:1. Prayers and Qibla explicitly coordinate tab-bar appearance and tint with their active phase surface; neutral tabs follow the system appearance. The selected glass pill still identifies the active tab. Home scales row spacing and typography to the available page height while respecting Dynamic Type where space allows.
 - Home uses the profile/method and Hijri header, a left-aligned countdown in tabular Fraunces, Fraunces prayer names, and standalone prayer marks. The add control and page dots sit below the prayer list so all prayer times remain visible.
 - Home uses full ink for secondary text across light phase gradients: `ink-muted` is only 3.60:1 on honey, 1.60:1 on saffron, and 4.43:1 on midday linen. Dark phases use parchment-muted. Neutral parchment screens retain muted ink.
 - Current-prayer text and marks use parchment on Fajr and Maghrib, where saffron falls below AA (3.38:1 on predawn warmth, 2.86:1 on oxblood). Isha retains saffron; light phases use ink. The Qibla arrow keeps its saffron fill with a 1.5 pt outline in that high-contrast phase foreground.
@@ -1272,6 +1272,8 @@ straight on to Dhuhr. Only prayers count up.
 - Fraunces `display-xl` on the home hero, using the generated tabular countdown instance.
   Never centred — §5. The source variable Fraunces has no `tnum`; setting that feature alone
   does not make its digits tabular (§4 Numerals).
+- Android fits the complete countdown to the available width at every text size. Its internal
+  digit and unit order stays left-to-right inside right-to-left page layouts.
 - The prayer the number refers to is always named next to it. A bare signed number does not
   say whether Dhuhr is coming or has just started.
 

@@ -19,6 +19,15 @@ enum PrayerSchedule {
         entries(profile: profile, date: date).first { $0.event.prayer == prayer }?.instant
     }
 
+    /// The latest occurrence may belong to yesterday's prayer day even after civil midnight.
+    static func latestPrayerDay(_ prayer: Prayer, profile: Profile, now: Date) -> CalendarDate? {
+        let today = CalendarDate.from(now, in: profile.effectiveTimeZone)
+        return [today.minusDays(1), today].compactMap { day -> (CalendarDate, Date)? in
+            guard let instant = instant(prayer, profile: profile, date: day), instant <= now else { return nil }
+            return (day, instant)
+        }.max { $0.1 < $1.1 }?.0
+    }
+
     static func isInWindow(_ prayer: Prayer, profile: Profile, date: CalendarDate,
                            now: Date = AppClock.now) -> Bool {
         var days: [CalendarDate: PrayerTimesResult] = [:]

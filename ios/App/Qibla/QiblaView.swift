@@ -3,6 +3,7 @@ import SwiftData
 import SwiftUI
 
 struct QiblaView: View {
+    var onSurfaceChange: (TimeOfDaySurface?) -> Void = { _ in }
     @Query(sort: [SortDescriptor(\ProfileRecord.sortOrder), SortDescriptor(\ProfileRecord.profileID)])
     private var records: [ProfileRecord]
     @StateObject private var location = LocationService()
@@ -19,6 +20,9 @@ struct QiblaView: View {
         }
         .onAppear { if profile != nil { location.startCompass() } }
         .onDisappear { location.stop() }
+        .onChange(of: profile == nil, initial: true) { _, empty in
+            if empty { onSurfaceChange(nil) }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, profile != nil { location.startCompass() }
             else { location.stop() }
@@ -81,6 +85,7 @@ struct QiblaView: View {
             }.padding(.horizontal, 24).padding(.vertical, 16)
         }
         .foregroundStyle(surface.foreground).timeOfDaySurface(surface)
+        .onChange(of: surface, initial: true) { _, new in onSurfaceChange(new) }
         .onChange(of: delta) { _, value in
             let next = location.heading != nil && abs(value) < (aligned ? 7 : 5)
             if next && !aligned { UISelectionFeedbackGenerator().selectionChanged() }

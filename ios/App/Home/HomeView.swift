@@ -4,6 +4,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Binding var requestedProfileID: Int64?
+    var onSurfaceChange: (TimeOfDaySurface) -> Void = { _ in }
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var selection: SelectedProfile
     @Query(sort: [SortDescriptor(\ProfileRecord.sortOrder), SortDescriptor(\ProfileRecord.profileID)])
@@ -61,6 +62,7 @@ struct HomeView: View {
         .onChange(of: profiles, initial: true) { syncSelection() }
         .onChange(of: requestedProfileID) { showRequestedProfile() }
         .onChange(of: pagerSelection) { _, new in selection.id = new }
+        .onChange(of: surface, initial: true) { _, new in onSurfaceChange(new) }
     }
 
     private func create(_ profile: Profile) {
@@ -130,8 +132,9 @@ private struct ProfilePageView: View {
                 PrayerRibbon(rows: state.ribbonRows, surface: surface,
                              rowHeight: metrics.rowHeight, fontSize: metrics.rowFont,
                              markFontSize: metrics.markFont, scale: metrics.scale) { prayer in
-                    onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer,
-                                           date: CalendarDate.from(now, in: state.profile.effectiveTimeZone)))
+                    if let day = PrayerSchedule.latestPrayerDay(prayer, profile: state.profile, now: now) {
+                        onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer, date: day))
+                    }
                 }
                 if outstanding > 0 {
                     Text("\(outstanding) outstanding Qaḍā")

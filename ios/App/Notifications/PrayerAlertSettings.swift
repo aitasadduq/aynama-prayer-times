@@ -46,11 +46,10 @@ struct PlannedPrayerAlert: Equatable {
 enum PrayerAlertPlan {
     static func alertTime(prayer: Prayer, profile: Profile, date: CalendarDate,
                           configuration: PrayerAlertConfiguration) -> Date? {
-        guard let scheduled = PrayerSchedule.instant(prayer, profile: profile, date: date) else { return nil }
         if let fixed = configuration.fixedMinutes {
-            let occurrenceDate = CalendarDate.from(scheduled, in: profile.effectiveTimeZone)
-            return occurrenceDate.atTime(ClockTime(hour: fixed / 60, minute: fixed % 60), in: profile.effectiveTimeZone)
+            return date.atTime(ClockTime(hour: fixed / 60, minute: fixed % 60), in: profile.effectiveTimeZone)
         }
+        guard let scheduled = PrayerSchedule.instant(prayer, profile: profile, date: date) else { return nil }
         return scheduled.addingTimeInterval(Double(configuration.offsetMinutes * 60))
     }
 
@@ -108,15 +107,18 @@ enum PrayerAlertPlan {
 
 @MainActor
 final class PrayerAlertSettings: ObservableObject {
+    static let shared = PrayerAlertSettings()
     @Published private(set) var revision = 0
     @Published private(set) var authorization: UNAuthorizationStatus = .notDetermined
     @Published private(set) var schedulingError: String?
     private let defaults: UserDefaults
+    private let scheduler: PrayerAlertScheduler
     private var generation = 0
     private var configurations: [String: PrayerAlertConfiguration]
 
-    init(defaults: UserDefaults? = nil) {
+    init(defaults: UserDefaults? = nil, scheduler: PrayerAlertScheduler? = nil) {
         self.defaults = defaults ?? AynamaStore.preferences
+        self.scheduler = scheduler ?? .shared
         configurations = self.defaults.data(forKey: "prayer_alert_configurations")
             .flatMap { try? JSONDecoder().decode([String: PrayerAlertConfiguration].self, from: $0) } ?? [:]
     }
@@ -144,6 +146,12 @@ final class PrayerAlertSettings: ObservableObject {
         defaults.set(try? JSONEncoder().encode(configurations), forKey: "prayer_alert_configurations")
         revision += 1
     }
+    func removeProfile(id: Int64) {
+        configurations = configurations.filter { !$0.key.hasPrefix("\(id).") }
+        defaults.set(try? JSONEncoder().encode(configurations), forKey: "prayer_alert_configurations")
+        if profileID == id { defaults.removeObject(forKey: "prayer_alert_profile") }
+        revision += 1
+    }
     func requestPermission() async {
         do {
             enabled = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
@@ -158,17 +166,29 @@ final class PrayerAlertSettings: ObservableObject {
         guard generation == currentGeneration, !Task.isCancelled else { return }
         authorization = status
         schedulingError = nil
-        let pending = await center.pendingNotificationRequests()
+        let requests: [UNNotificationRequest]
+        if enabled, status == .authorized || status == .provisional,
+           let profile = profiles.first(where: { $0.id == profileID }) ?? profiles.first {
+            requests = notificationRequests(profile: profile)
+        } else {
+            requests = []
+        }
+        let work = scheduler.replace(with: requests)
+        let succeeded = await withTaskCancellationHandler {
+            await work.value
+        } onCancel: {
+            work.cancel()
+        }
         guard generation == currentGeneration, !Task.isCancelled else { return }
-        center.removePendingNotificationRequests(withIdentifiers: pending.filter { $0.identifier.hasPrefix("aynama.") }.map(\.identifier))
-        guard enabled, status == .authorized || status == .provisional,
-              let profile = profiles.first(where: { $0.id == profileID }) ?? profiles.first else { return }
+        if !succeeded { schedulingError = "Some alerts couldn't be scheduled. Open Aynama to try again." }
+    }
+
+    private func notificationRequests(profile: Profile) -> [UNNotificationRequest] {
         let settings = Dictionary(uniqueKeysWithValues: Prayer.allCases.map { ($0, configuration(profileID: profile.id, prayer: $0)) })
         let plan = PrayerAlertPlan.build(profile: profile, configurations: settings, imsak: imsak, now: AppClock.now)
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        for alert in plan {
-            guard generation == currentGeneration, !Task.isCancelled else { return }
+        return plan.map { alert in
             let content = UNMutableNotificationContent()
             content.title = alert.title
             content.body = alert.isImsak ? "10 minutes before Fajr · \(profile.name)" : profile.name
@@ -178,8 +198,7 @@ final class PrayerAlertSettings: ObservableObject {
             var triggerComponents = components
             triggerComponents.timeZone = calendar.timeZone
             let trigger = UNCalendarNotificationTrigger(dateMatching: triggerComponents, repeats: false)
-            do { try await center.add(UNNotificationRequest(identifier: alert.id, content: content, trigger: trigger)) }
-            catch { schedulingError = "Some alerts couldn't be scheduled. Open Aynama to try again." }
+            return UNNotificationRequest(identifier: alert.id, content: content, trigger: trigger)
         }
     }
 }

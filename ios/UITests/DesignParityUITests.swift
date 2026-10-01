@@ -2,13 +2,14 @@ import XCTest
 
 final class DesignParityUITests: XCTestCase {
     @MainActor
-    private func launch(dark: Bool = false, store: String = UUID().uuidString, largeText: Bool = false) -> XCUIApplication {
+    private func launch(dark: Bool = false, store: String = UUID().uuidString, largeText: Bool = false,
+                        now: String = "2026-09-30T12:15:00Z") -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchEnvironment["AYNAMA_UI_TEST_STORE"] = store
         app.launchEnvironment["AYNAMA_SCREENSHOT_FIXTURES"] = "1"
         app.launchEnvironment["AYNAMA_TEST_APPEARANCE"] = dark ? "dark" : "light"
-        app.launchEnvironment["AYNAMA_TEST_NOW"] = "2026-09-30T12:15:00Z"
+        app.launchEnvironment["AYNAMA_TEST_NOW"] = now
         app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-AppleInterfaceStyle", dark ? "Dark" : "Light"]
         if largeText { app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"] }
         app.launch()
@@ -73,6 +74,17 @@ final class DesignParityUITests: XCTestCase {
         app.buttons["Notifications"].tap()
         XCTAssertTrue(app.staticTexts["PRAYERS"].waitForExistence(timeout: 5))
         capture(app, "11-notifications-dark")
+    }
+
+    @MainActor
+    func testNightPhaseKeepsNativeTabsVisibleInLightMode() {
+        let app = launch(now: "2026-09-30T21:15:00Z")
+        assertPrayerListFits(app)
+        XCTAssertTrue(app.tabBars.buttons["Prayers"].isSelected)
+        capture(app, "15-prayers-night-light")
+        app.tabBars.buttons["Qibla"].tap()
+        XCTAssertTrue(app.staticTexts["Qibla"].waitForExistence(timeout: 5))
+        capture(app, "16-qibla-night-light")
     }
 
     @MainActor

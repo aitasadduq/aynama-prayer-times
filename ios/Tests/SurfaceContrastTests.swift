@@ -5,6 +5,17 @@ import XCTest
 @testable import Aynama
 
 final class SurfaceContrastTests: XCTestCase {
+    func testTabAppearanceAndTintFollowThePhaseInEitherSystemAppearance() {
+        for system in [ColorScheme.light, .dark] {
+            for surface in [TimeOfDaySurface.fajr, .sunriseTransition, .dhuhr, .asr, .maghrib, .isha] {
+                let chrome = NativeTabChrome(surface: surface, fallback: system)
+                XCTAssertEqual(chrome.scheme, surface.prefersLightForeground ? .dark : .light)
+                XCTAssertGreaterThanOrEqual(contrast(chrome.tint, NeutralPalette(scheme: chrome.scheme).background), 4.5)
+            }
+            XCTAssertEqual(NativeTabChrome(surface: nil, fallback: system).scheme, system)
+        }
+    }
+
     func testNativeLabelsAndAccentsMeetAAInBothAppearances() {
         for scheme in [ColorScheme.light, .dark] {
             let palette = NeutralPalette(scheme: scheme)

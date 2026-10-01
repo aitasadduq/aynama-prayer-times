@@ -3,6 +3,7 @@ import SwiftData
 import SwiftUI
 
 struct SettingsView: View {
+    @EnvironmentObject private var alerts: PrayerAlertSettings
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
     @Query(sort: [SortDescriptor(\ProfileRecord.sortOrder), SortDescriptor(\ProfileRecord.profileID)])
@@ -63,7 +64,10 @@ struct SettingsView: View {
     }
 
     private func remove(_ profile: Profile) {
-        do { try ProfileRepository(context: context).delete(id: profile.id) }
+        do {
+            try ProfileRepository(context: context).delete(id: profile.id)
+            alerts.removeProfile(id: profile.id)
+        }
         catch { self.error = "Couldn't delete this profile. Please try again." }
     }
 }
