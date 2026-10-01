@@ -93,7 +93,7 @@ class CountdownLayoutTest {
                         val description = "$text, fontScale=$scale, $layout, glyph=$index"
                         assertTrue("Clipped or reversed: $description", glyph.left >= previousRight - 0.5.dp)
                         assertTrue("Offscreen: $description", glyph.right <= viewport.right + 0.5.dp)
-                        assertTrue("Missing glyph: $description", glyph.width > 0.dp)
+                        assertTrue("Missing glyph: $description", glyph.right > glyph.left)
                         compose.runOnIdle {
                             assertFalse("Partially clipped: $description", layouts.getValue(index).hasVisualOverflow)
                         }
