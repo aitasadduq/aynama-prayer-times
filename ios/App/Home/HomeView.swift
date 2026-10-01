@@ -94,7 +94,7 @@ private struct ProfilePageView: View {
     let onMark: (PrayerMarkTarget) -> Void
     @ScaledMetric(relativeTo: .footnote) private var headerSize: CGFloat = 13
     @ScaledMetric(relativeTo: .largeTitle) private var heroSize: CGFloat = 72
-    @ScaledMetric(relativeTo: .title1) private var subtitleSize: CGFloat = 32
+    @ScaledMetric(relativeTo: .title) private var subtitleSize: CGFloat = 32
     @ScaledMetric(relativeTo: .title3) private var rowSize: CGFloat = 20
     @ScaledMetric(relativeTo: .footnote) private var qazaSize: CGFloat = 13
     @Query private var marks: [QazaRecord]
