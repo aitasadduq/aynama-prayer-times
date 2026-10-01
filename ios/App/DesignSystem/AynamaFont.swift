@@ -58,6 +58,27 @@ enum AynamaFont {
     }()
     static let timelineTime = plex(size: 20, weight: 500, textStyle: .title3, tabular: true)
 
+    // Home receives sizes that already include Dynamic Type and viewport fitting from
+    // HomePageMetrics. Scaling them a second time would push the last prayer off screen.
+    static func homeCountdown(size: CGFloat) -> Font {
+        Font(UIFont(name: "AynamaCountdown-Regular", size: size)!)
+    }
+    static func homeSubtitle(size: CGFloat) -> Font {
+        fraunces(size: size, weight: 500, opticalSize: 48, textStyle: .title1, scaleForDynamicType: false)
+    }
+    static func homeRowName(size: CGFloat) -> Font {
+        fraunces(size: size, weight: 500, opticalSize: 20, textStyle: .title3, scaleForDynamicType: false)
+    }
+    static func homeRowTime(size: CGFloat) -> Font {
+        plex(size: size, weight: 500, textStyle: .title3, tabular: true, scaleForDynamicType: false)
+    }
+    static func homeMeta(size: CGFloat) -> Font {
+        plex(size: size, weight: 500, textStyle: .footnote, scaleForDynamicType: false)
+    }
+    static func homeMark(size: CGFloat) -> Font {
+        plex(size: size, weight: 500, textStyle: .body, tabular: true, scaleForDynamicType: false)
+    }
+
     // MARK: - Construction
 
     /// Fraunces' four axes. `SOFT` and `WONK` stay at the family defaults — the design uses
@@ -66,13 +87,15 @@ enum AynamaFont {
         size: CGFloat,
         weight: CGFloat,
         opticalSize: CGFloat,
-        textStyle: UIFont.TextStyle
+        textStyle: UIFont.TextStyle,
+        scaleForDynamicType: Bool = true
     ) -> Font {
         variableFont(
             named: "Fraunces",
             size: size,
             textStyle: textStyle,
-            axes: [axisTag("wght"): weight, axisTag("opsz"): opticalSize]
+            axes: [axisTag("wght"): weight, axisTag("opsz"): opticalSize],
+            scaleForDynamicType: scaleForDynamicType
         )
     }
 
@@ -80,14 +103,16 @@ enum AynamaFont {
         size: CGFloat,
         weight: CGFloat,
         textStyle: UIFont.TextStyle,
-        tabular: Bool = false
+        tabular: Bool = false,
+        scaleForDynamicType: Bool = true
     ) -> Font {
         variableFont(
             named: "IBM Plex Sans",
             size: size,
             textStyle: textStyle,
             axes: [axisTag("wght"): weight],
-            tabular: tabular
+            tabular: tabular,
+            scaleForDynamicType: scaleForDynamicType
         )
     }
 
@@ -96,13 +121,16 @@ enum AynamaFont {
         size: CGFloat,
         textStyle: UIFont.TextStyle,
         axes: [Int: CGFloat],
-        tabular: Bool = false
+        tabular: Bool = false,
+        scaleForDynamicType: Bool = true
     ) -> Font {
-        Font(uiFont(named: family, size: size, textStyle: textStyle, axes: axes, tabular: tabular))
+        Font(uiFont(named: family, size: size, textStyle: textStyle, axes: axes,
+                    tabular: tabular, scaleForDynamicType: scaleForDynamicType))
     }
 
     private static func uiFont(named family: String, size: CGFloat, textStyle: UIFont.TextStyle,
-                               axes: [Int: CGFloat], tabular: Bool = false) -> UIFont {
+                               axes: [Int: CGFloat], tabular: Bool = false,
+                               scaleForDynamicType: Bool = true) -> UIFont {
         var attributes: [UIFontDescriptor.AttributeName: Any] = [
             .family: family,
             kCTFontVariationAttribute as UIFontDescriptor.AttributeName: axes,
@@ -119,6 +147,7 @@ enum AynamaFont {
         }
         let descriptor = UIFontDescriptor(fontAttributes: attributes)
         let base = UIFont(descriptor: descriptor, size: size)
+        if !scaleForDynamicType { return base }
         // Dynamic Type, capped so `display-xl` at an accessibility size does not push the prayer
         // name off the screen entirely. §12 asks for Dynamic Type, not for unbounded growth.
         let scaled = UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base, maximumPointSize: size * 2)

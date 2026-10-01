@@ -92,7 +92,11 @@ private struct ProfilePageView: View {
     let page: ProfilePage
     let now: Date
     let onMark: (PrayerMarkTarget) -> Void
-    @ScaledMetric(relativeTo: .title3) private var minimumRowHeight = 56.0
+    @ScaledMetric(relativeTo: .footnote) private var headerSize: CGFloat = 13
+    @ScaledMetric(relativeTo: .largeTitle) private var heroSize: CGFloat = 72
+    @ScaledMetric(relativeTo: .title1) private var subtitleSize: CGFloat = 32
+    @ScaledMetric(relativeTo: .title3) private var rowSize: CGFloat = 20
+    @ScaledMetric(relativeTo: .footnote) private var qazaSize: CGFloat = 13
     @Query private var marks: [QazaRecord]
 
     var body: some View {
@@ -111,49 +115,62 @@ private struct ProfilePageView: View {
     private func ready(_ state: ProfileUiState) -> some View {
         let surface = state.phase.surface
         return GeometryReader { geometry in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text("\(state.profile.name) · \(state.profile.calculationMethod.shortName)")
-                            Spacer(minLength: 8)
-                            Text(state.hijriDateText)
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(state.profile.name) · \(state.profile.calculationMethod.shortName)")
-                            Text(state.hijriDateText)
-                        }
-                    }
-                    .font(AynamaFont.bodySM).foregroundStyle(surface.foregroundMuted)
-                    .accessibilityIdentifier("profile-header")
-                    CountdownHero(text: state.countdownText, isElapsed: state.countdownIsElapsed,
-                                  prayerName: state.countdownPrayerName, prayerTime: state.countdownPrayerTime, surface: surface)
-                    PrayerRibbon(rows: state.ribbonRows, surface: surface,
-                                 rowHeight: max(min(112, minimumRowHeight), (geometry.size.height - 270) / CGFloat(state.ribbonRows.count)),
-                                 progress: ribbonPosition(state)) { prayer in
-                        onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer,
-                                               date: CalendarDate.from(now, in: state.profile.effectiveTimeZone)))
-                    }
-                    let outstanding = marks.filter { $0.profileID == state.profile.id && $0.status == .missed }.count
-                    if outstanding > 0 {
-                        Text("\(outstanding) outstanding Qaḍā").font(AynamaFont.bodySM)
-                            .foregroundStyle(surface.foregroundMuted)
-                    }
+            let outstanding = marks.filter { $0.profileID == state.profile.id && $0.status == .missed }.count
+            let metrics = HomePageMetrics(size: geometry.size, rows: state.ribbonRows.count,
+                                          hasQaza: outstanding > 0, headerSize: headerSize,
+                                          heroSize: heroSize, subtitleSize: subtitleSize,
+                                          rowSize: rowSize, qazaSize: qazaSize)
+            VStack(alignment: .leading, spacing: 0) {
+                header(state, metrics: metrics, surface: surface)
+                Spacer().frame(height: metrics.headerGap)
+                CountdownHero(text: state.countdownText, isElapsed: state.countdownIsElapsed,
+                              prayerName: state.countdownPrayerName, prayerTime: state.countdownPrayerTime,
+                              surface: surface, metrics: metrics)
+                Spacer().frame(height: metrics.heroGap)
+                PrayerRibbon(rows: state.ribbonRows, surface: surface,
+                             rowHeight: metrics.rowHeight, fontSize: metrics.rowFont,
+                             markFontSize: metrics.markFont, scale: metrics.scale) { prayer in
+                    onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer,
+                                           date: CalendarDate.from(now, in: state.profile.effectiveTimeZone)))
                 }
-                .padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }.scrollBounceBehavior(.basedOnSize).timeOfDaySurface(surface)
+                if outstanding > 0 {
+                    Text("\(outstanding) outstanding Qaḍā")
+                        .font(AynamaFont.homeMeta(size: metrics.qazaFont))
+                        .foregroundStyle(surface.foregroundMuted)
+                        .padding(.top, metrics.qazaGap)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, metrics.horizontalPadding)
+            .padding(.top, metrics.topPadding).padding(.bottom, metrics.bottomPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .timeOfDaySurface(surface)
         }
     }
 
-    private func ribbonPosition(_ state: ProfileUiState) -> Double? {
-        let date = CalendarDate.from(now, in: state.profile.effectiveTimeZone)
-        let entries = PrayerSchedule.entries(profile: state.profile, date: date)
-        guard let index = entries.lastIndex(where: { $0.instant <= now }), index + 1 < entries.count else { return nil }
-        let start = entries[index].instant
-        let interval = entries[index + 1].instant.timeIntervalSince(start)
-        let fraction = interval > 0 ? now.timeIntervalSince(start) / interval : 0
-        return Double(index + (state.isRamadan ? 1 : 0)) + min(1, max(0, fraction))
+    @ViewBuilder
+    private func header(_ state: ProfileUiState, metrics: HomePageMetrics,
+                        surface: TimeOfDaySurface) -> some View {
+        let profile = Text("\(state.profile.name) · \(state.profile.calculationMethod.shortName)")
+        let hijri = Text(state.hijriDateText)
+        Group {
+            if metrics.headerStacked {
+                VStack(alignment: .leading, spacing: 2 * metrics.scale) {
+                    profile
+                    hijri
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    profile
+                    Spacer(minLength: 0)
+                    hijri
+                }
+            }
+        }
+        .font(AynamaFont.homeMeta(size: metrics.headerFont))
+        .foregroundStyle(surface.foregroundMuted)
+        .lineLimit(1).minimumScaleFactor(0.7)
+        .accessibilityIdentifier("profile-header")
     }
 }
 

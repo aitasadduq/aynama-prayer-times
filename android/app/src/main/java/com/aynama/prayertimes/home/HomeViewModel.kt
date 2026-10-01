@@ -23,7 +23,7 @@ import com.aynama.prayertimes.shared.timeline.TimelineEntry
 import com.aynama.prayertimes.shared.timeline.buildTimeline
 import com.aynama.prayertimes.shared.timeline.countdownAt
 import com.aynama.prayertimes.shared.timeline.displayName
-import com.aynama.prayertimes.shared.timeline.format
+import com.aynama.prayertimes.shared.timeline.formatCompact
 import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
 import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
@@ -89,7 +89,7 @@ sealed interface RibbonRow {
 data class ProfileUiState(
     val profile: Profile,
     val ribbonRows: List<RibbonRow>,
-    /** Already signed and padded per DESIGN.md §19 — render it verbatim. */
+    /** Compact signed Home countdown per DESIGN.md §19 — render it verbatim. */
     val countdownText: String,
     /** True while counting up from a prayer that has started; false while counting down to one. */
     val countdownIsElapsed: Boolean,
@@ -299,7 +299,7 @@ class HomeViewModel(
         return ProfileUiState(
             profile = profile,
             ribbonRows = deriveRibbonRows(times, profile.asrMadhab, localNow, today, ramadan, timeFormatter),
-            countdownText = countdown?.format() ?: NO_COUNTDOWN,
+            countdownText = countdown?.formatCompact() ?: NO_COUNTDOWN,
             countdownIsElapsed = countdown is PrayerCountdown.Elapsed,
             countdownPrayerName = countdown?.entry?.displayName() ?: "",
             countdownPrayerTime = countdown?.entry?.time?.format(timeFormatter) ?: "",
@@ -317,7 +317,7 @@ class HomeViewModel(
         // Only reachable when today has times but neither neighbouring day does, so the
         // timeline has no event on one side of now. Em dashes rather than "00:00:00", which
         // would read as a prayer that just started.
-        internal const val NO_COUNTDOWN = "--:--:--"
+        internal const val NO_COUNTDOWN = "--"
 
         internal const val UNAVAILABLE_POLAR_REASON =
             "The sun doesn't fully rise or set at this location today, so there are no times " +

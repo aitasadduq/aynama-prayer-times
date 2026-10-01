@@ -105,6 +105,23 @@ public enum PrayerCountdown: Hashable, Sendable {
     public func formatted() -> String {
         (isElapsed ? "" : "-") + formatDuration(duration)
     }
+
+    /// Compact Home display: show the largest two units, or seconds alone below a minute.
+    public func compactFormatted() -> String {
+        let total = Int(max(duration.components.seconds, 0))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+        let value: String
+        if hours > 0 {
+            value = "\(hours)h \(String(format: "%02d", minutes))m"
+        } else if minutes > 0 {
+            value = "\(minutes)m \(String(format: "%02d", seconds))s"
+        } else {
+            value = "\(seconds)s"
+        }
+        return (isElapsed ? "" : "-") + value
+    }
 }
 
 /// Build the ordered event timeline for `days`, resolved in `timeZone`.

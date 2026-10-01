@@ -283,7 +283,7 @@ Code builds these ad hoc. PR #12 M8 asks for them to become named styles.
 ┌──────────────────────────────────┐
 │ London · MWL     11 Rabīʻ II 1448│  ← body-sm, 70% of foreground
 │                                  │
-│ -02:18:07                        │  ← display-xl, left-aligned, signed (§19)
+│ -2h 18m                          │  ← display-xl, left-aligned, signed (§19)
 │ Asr · 4:14 PM                    │  ← display-md: the prayer the countdown refers to
 │                                  │
 │  ✓  Fajr                5:12 AM  │  ← passed: muted token, ✓
@@ -303,14 +303,14 @@ Code builds these ad hoc. PR #12 M8 asks for them to become named styles.
 - Both are `body-sm` at 70% of the foreground, on one line, truncated with an ellipsis.
 
 **Hero**
-- The countdown is the largest thing on screen: `display-xl`, left-aligned, following §19. It reads "-02:18:07" while counting down to an event, and "00:15:42", with no sign, for the first 30 minutes after a prayer begins. (`main` has centred it since 2026-05-29; #22 restored the left alignment on `agent-main`.)
+- The countdown is the largest thing on screen: `display-xl`, left-aligned, following §19. Home uses compact units: `-2h 18m` while counting down to an event, `15m 42s` with no sign after a prayer begins, and `10s` below one minute. (`main` has centred it since 2026-05-29; #22 restored the left alignment on `agent-main`.)
 - It counts to the next event, **Sunrise included**. Between Fajr and sunrise it counts to Sunrise, when Fajr's time ends; this is v1 feature #3, "time until the prayer becomes Qaḍā". Sunrise never counts up (§19).
-- If no event can be found on one side of now, it shows `--:--:--`.
+- If no event can be found on one side of now, it shows `--`.
 - Below it, in `display-md` and also left-aligned: the prayer the countdown refers to and that prayer's time, "Asr · 4:14 PM". While counting up, that's the prayer that has just begun.
 
 **Timeline rows**
 
-Six rows (seven in Ramadan) are spread evenly over the remaining height. Each row has a 20 dp mark slot, a 12 dp gap, the name in `title` (Fraunces), and the time right-aligned at `title` size in IBM Plex Sans. States:
+On iOS, six rows (seven in Ramadan) fit in the visible Home area above the profile controls and tab bar, including on compact phones. Scale the hero, prayer names, times, row heights and gaps together from the available width and height; do not hide the last prayers below a scroll boundary. Each row has a mark slot, a gap, the name in Fraunces, and the time right-aligned in IBM Plex Sans. Keep the text legible while fitting the full list. States:
 
 - **Passed:** the phase's muted token (`ink-muted` on light phases, `parchment-muted` on dark phases) at full opacity, with a ✓. The April spec said 60% opacity, but alpha over a gradient was unreadable.
 - **Current:** an 8 dp filled dot. The dot and text are `saffron` on dark phases and `ink` on light phases, because saffron on the light gradients fails contrast (§3).
@@ -330,7 +330,7 @@ Interaction:
 
 **Qaḍā line.** When the profile has missed prayers: "{n} outstanding Qaḍā", `body-sm` at 60%.
 
-**Not built yet — the ribbon of §9.** The design calls for a vertical rule joining the marks, and a tick that travels down it between the current and the next prayer, like a sundial shadow. Android v1's "tick" is the static dot on the current row (DS6).
+The marks stand alone. There is no vertical rule or moving tick to the left of the rows on either phone platform (§9).
 
 Never on this list: coloured left borders, cards per row, or row background fills.
 
@@ -340,7 +340,7 @@ Never on this list: coloured left borders, cards per row, or row background fill
 
 - There is one page per profile, in creation order (there's no reordering UI yet).
 - There's no add page. A saffron **Add profile** FAB at the bottom right opens the profile sheet in place (§21).
-- The FAB floats 56 dp above the bottom edge, on the side where the timeline's times are right-aligned, and nothing pads the timeline to clear it. On shorter phones it likely covers part of the Isha row's time. Not checked on a device (DS37).
+- The FAB floats above the bottom edge beside the profile dots. On iOS, the complete timeline fits above those controls on compact phones; Android's FAB overlap remains an open finding (DS37).
 - Dots sit under the pager, one per profile. The selected dot is 8 dp `saffron`; the others are 5 dp at 30% of the foreground, 6 dp apart.
 - The whole screen takes the active page's phase surface. Paging between profiles in different phases cross-fades over 3 s.
 - Paging never changes the structure; only the times, labels and surface change.
@@ -579,7 +579,7 @@ direction.
 |---|---|---|
 | Surface cycle | Steps at each prayer boundary with a 3 s cross-fade. Paging to a profile in another phase also cross-fades. | ✓ |
 | Prayer-time transitions | 400 ms ease-out cross-fade of the hero and timeline. Never a hard cut. | ✗ The text swaps with no fade; only the surface fades (DS28). |
-| Countdown tick | Every second, because the countdown shows seconds (§19). No rolling digits. | ✓ |
+| Countdown tick | The state updates every second. Home shows seconds below an hour and changes by the minute above an hour (§19). No rolling digits. | ✓ |
 | Widget and live-notification countdowns | The system ticks them every second in its own format; §19's platform exception says what that allows. | ✓ |
 | Qibla rose | Spring physics (damping 0.8, stiffness 100). The raw heading is low-pass filtered, so there's no magnetic-needle jitter. | ✓ |
 | Qibla hint colour | 300 ms tween. | ✓ |
@@ -591,20 +591,16 @@ direction.
 
 ---
 
-## 9. Two Deliberate Departures
+## 9. Two Deliberate Design Choices
 
 These are the things no prayer app does. They are the product.
 
 1. **Typographic Qibla** — saffron arrow on a single quiet ring, framed by a Fraunces degree readout. Not a compass-with-needle, not a cardinal-ring legend, not a tick dial. The single ring frames the arrow; it is not graduated, not a progress arc, and carries no cardinal labels except a single whispered "N". §5.
-2. **Prayer timeline ribbon** — vertical line with moving sundial tick, not a circular countdown ring. §5.
+2. **Typographic prayer timeline** — one uncluttered list with distinct passed, current and upcoming states. The marks are independent; there is no connecting rule or moving tick. §5.
 
 If a future surface proposal reintroduces a circular countdown ring, a graduated cardinal dial (N/E/S/W ring with tick marks), or a 3D Kaaba render, reject it at design review. These are the two non-negotiable differentiators.
 
-> **Android v1 status.**
-> - Departure 1 has shipped, with the addition of the Qibla panels (§5).
-> - Departure 2 is only half built. The timeline and its passed, current and upcoming states exist; the vertical line and the moving tick do not (DS6).
->
-> Until DS6 is built, or this section is formally amended under §14, the moving tick remains required.
+> Both platforms use the standalone prayer marks. The earlier vertical-rule and moving-tick proposal was withdrawn to match the shipped Android list.
 
 ---
 
@@ -635,8 +631,8 @@ Everything else on this list holds.
 ### iOS
 - The phone app shares Android's four destinations: Prayers, Qibla, Tracker, Settings. Notifications and Adhan voice use native pushes within Settings. Profiles and prayer details use native sheets.
 - Native tab and navigation bars use the iOS 26 Liquid Glass treatment when built with the iOS 26 SDK. Glass belongs to navigation chrome and utilitarian controls; the prayer ribbon and Qibla instrument remain directly on their phase surfaces. The Settings add button uses tinted glass, with a solid saffron fallback for Reduce Transparency and iOS 17–25.
-- Native glass-button labels use ink or parchment for text contrast. Tab icons and labels share one system tint: saffron-ink on light chrome, parchment-muted on dark chrome, where the native saffron label is only 4.03:1. The selected glass pill still identifies the active tab. Home ribbon row spacing scales with Dynamic Type alongside its text, keeping the ruled timeline aligned.
-- Home uses the profile/method and Hijri header, a left-aligned countdown in tabular Fraunces, Fraunces prayer names, and a connected ribbon with a moving time tick. The add control and page dots sit below the scrollable content so they do not cover prayer times.
+- Native glass-button labels use ink or parchment for text contrast. Tab icons and labels share one system tint: saffron-ink on light chrome, parchment-muted on dark chrome, where the native saffron label is only 4.03:1. The selected glass pill still identifies the active tab. Home scales row spacing and typography to the available page height while respecting Dynamic Type where space allows.
+- Home uses the profile/method and Hijri header, a left-aligned countdown in tabular Fraunces, Fraunces prayer names, and standalone prayer marks. The add control and page dots sit below the prayer list so all prayer times remain visible.
 - Home uses full ink for secondary text across light phase gradients: `ink-muted` is only 3.60:1 on honey, 1.60:1 on saffron, and 4.43:1 on midday linen. Dark phases use parchment-muted. Neutral parchment screens retain muted ink.
 - Current-prayer text and marks use parchment on Fajr and Maghrib, where saffron falls below AA (3.38:1 on predawn warmth, 2.86:1 on oxblood). Isha retains saffron; light phases use ink. The Qibla arrow keeps its saffron fill with a 1.5 pt outline in that high-contrast phase foreground.
 - Settings, Tracker, notifications and profile/mark sheets follow the system appearance on warm ink or parchment. Rows expand with Dynamic Type. Historical on-time marking is disabled outside the actual prayer window; marks use the profile's calendar day.
@@ -682,7 +678,7 @@ Everything else on this list holds.
 
 | Element | Announcement |
 |---|---|
-| Home countdown | "Asr in 02:18:07"; while counting up, "Dhuhr began 00:15:42 ago" |
+| Home countdown | "Asr in 2 hours 18 minutes"; while counting up, "15 minutes 42 seconds since Dhuhr" |
 | Home page | "Profile page 1 of 3: London" |
 | Timeline row | "Fajr 5:12 AM, passed" (or "current", "upcoming"); "Sunrise 6:48 AM"; "Imsak 5:02 AM" |
 | Add profile FAB | "Add profile" |
@@ -1243,8 +1239,10 @@ widgets, in the live notification, in the WearOS app and complications, and — 
 platforms exist — on iOS and watchOS. Before this spec each surface derived its own version, and they disagreed about what
 happens in the minutes just after a prayer begins.
 
-One rule now governs all of them, implemented once in
-`shared-logic/.../shared/timeline/PrayerTimeline.kt`. UI may differ; the number may not.
+One timeline rule now governs all of them, implemented once in
+`shared-logic/.../shared/timeline/PrayerTimeline.kt`. Every surface uses the same target,
+direction and duration. The Home presentation may abbreviate units; system-ticked surfaces
+use the platform format below.
 
 ### The rule
 
@@ -1264,9 +1262,13 @@ straight on to Dhuhr. Only prayers count up.
 
 ### Format
 
-- `HH:MM:SS`, zero-padded, minus sign only while counting down.
+- The canonical shared value remains `HH:MM:SS`, zero-padded, with a minus sign only while
+  counting down. It remains available to integrations and parity tests.
+- Android and iOS Home show the largest two units: `-1h 10m` above an hour, `-10m 25s`
+  below an hour, `-10s` below a minute, and `0s` at the instant. Minutes are always shown
+  with hours; seconds are zero-padded beside minutes. Count-up has no minus sign.
 - Hours are not wrapped at 24. A gap longer than a day (possible at high latitudes) reads
-  `-31:04:12` rather than silently restarting.
+  `-31h 04m` on Home rather than silently restarting.
 - Fraunces `display-xl` on the home hero, using the generated tabular countdown instance.
   Never centred — §5. The source variable Fraunces has no `tnum`; setting that feature alone
   does not make its digits tabular (§4 Numerals).
@@ -1288,7 +1290,7 @@ natively in the launcher process, which is what makes a live countdown possible 
 without a per-second update job — but the format belongs to the platform's `Chronometer`,
 which emits `MM:SS` under an hour and `H:MM:SS` above it, and cannot be zero-padded.
 
-Widgets therefore render `-12:35` where the app renders `-00:12:35`. The sign is ours (the
+Widgets therefore render `-12:35` where Home renders `-12m 35s`. The sign is ours (the
 Chronometer format string carries it); the padding is not. **The state and the direction are
 identical** — only the padding differs. Do not "fix" this by replacing the Chronometer with
 a periodic update job; that trades a live countdown for a stale one.
@@ -1678,7 +1680,6 @@ Where the shipped Android app stands against this document's rules. Each gap has
 |---|---|---|
 | §3 — AA contrast | ✗ Saffron text on light surfaces. The Home timeline on every phase but Isha (§3 table). Dark-mode colours. Light `onPrimary` on saffron. | DS1, DS2, DS3, DS4 |
 | §4 / §10 — no Roboto or system sans | ✗ Every button, menu item and time-picker label, plus two direct `labelSmall` uses. The watch app bundles no fonts. | DS5, DS36 |
-| §9 — the moving sundial tick | ✗ A static dot on the current row. | DS6 |
 | §18 — the Hijri adjustment is correct | ✗ The lapse lands on the wrong day. With +1 the Ramadan state appears on the user's Eid, or is missing on their first fast day; with −1 Ramadan's end is never delayed. | DS7 |
 | §6 — app icon | ✗ No launcher icon; the launch window is platform grey. | DS8 |
 | §4 — tabular numerals | ◐ Home countdowns use tabular Fraunces on both platforms; Android widget countdowns still use proportional Fraunces. IBM Plex times are fine. | DS9 |

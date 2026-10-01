@@ -43,6 +43,24 @@ class PrayerTimelineTest {
     private fun countdownText(time: LocalTime, date: LocalDate = today): String =
         countdownAt(timeline(), at(time, date))!!.format()
 
+    @Test
+    fun compactHomeCountdownUsesLargestTwoUnits() {
+        val entry = timeline().first()
+        fun text(seconds: Int, elapsed: Boolean = false): String {
+            val duration = Duration.ofSeconds(seconds.toLong())
+            val countdown = if (elapsed) PrayerCountdown.Elapsed(entry, duration)
+                else PrayerCountdown.Remaining(entry, duration)
+            return countdown.formatCompact()
+        }
+        assertEquals("-31h 04m", text(31 * 3600 + 4 * 60 + 12))
+        assertEquals("-1h 10m", text(3600 + 10 * 60))
+        assertEquals("-10m 25s", text(10 * 60 + 25))
+        assertEquals("-1m 00s", text(60))
+        assertEquals("-10s", text(10))
+        assertEquals("0s", text(0, elapsed = true))
+        assertEquals("59s", text(59, elapsed = true))
+    }
+
     // --- Direction and sign -----------------------------------------------------
 
     @Test

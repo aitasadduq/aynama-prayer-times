@@ -331,10 +331,6 @@ How the evidence was gathered:
 
 ### Composition, iconography & motion
 
-- [ ] **[DS6]** `HomeScreen.kt:440-455` (and `:310-317`) — The prayer timeline has no vertical rule and no moving tick; "current" is a static 8 dp dot. That's DESIGN.md §9's second deliberate departure, and TODOS Phase 2 had it checked off.
-
-  **Fix:** Build it: a 1.5 dp rule in the muted token through the mark column, and a tick placed between the current and next rows by the elapsed fraction of that interval. Use the existing 1 s clock, and move the tick at most once a minute. Otherwise, amend §9 through the DESIGN.md §14 process. *(Origin: design-doc sync 2026-09-23)*
-
 - [ ] **[DS8]** `AndroidManifest.xml:15-20` and `res/values/themes.xml:3` — The app has no `android:icon` or `android:roundIcon`, so the launcher, recents, system settings and the Android 12+ splash show the platform's default icon. The window theme is `android:Theme.Material.NoActionBar`, so the launch window before Compose draws is the platform's dark grey, not `ink`.
 
   **Fix:** Design an adaptive launcher icon with a monochrome layer (DESIGN.md §6). Give `Theme.Aynama` window and splash colours from the tokens. *(Origin: design-doc sync 2026-09-23)*

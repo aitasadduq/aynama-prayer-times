@@ -4,8 +4,10 @@ import SwiftUI
 struct PrayerRibbon: View {
     let rows: [RibbonRow]
     let surface: TimeOfDaySurface
-    var rowHeight: CGFloat = 56
-    var progress: Double?
+    let rowHeight: CGFloat
+    let fontSize: CGFloat
+    let markFontSize: CGFloat
+    let scale: CGFloat
     let onMark: (Prayer) -> Void
 
     var body: some View {
@@ -15,38 +17,34 @@ struct PrayerRibbon: View {
                     Button { onMark(prayer) } label: { rowView(row) }.buttonStyle(.plain)
                         .accessibilityLabel("\(title(row)) at \(row.displayTime), \(state == .current ? "current" : "passed")")
                         .accessibilityHint("Record this prayer")
-                } else { rowView(row).accessibilityElement(children: .combine) }
-            }
-        }
-        .background(alignment: .topLeading) {
-            Rectangle().fill(surface.foregroundMuted.opacity(0.25))
-                .frame(width: 1.5, height: CGFloat(max(0, rows.count - 1)) * rowHeight)
-                .offset(x: 9, y: rowHeight / 2)
-        }
-        .overlay(alignment: .topLeading) {
-            if let progress {
-                Rectangle().fill(surface.activeForeground).frame(width: 18, height: 2)
-                    .offset(x: 1, y: rowHeight / 2 + CGFloat(progress) * rowHeight)
-                    .accessibilityHidden(true)
+                        .accessibilityIdentifier("home-row-\(title(row))")
+                } else {
+                    rowView(row).accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("home-row-\(title(row))")
+                }
             }
         }
     }
 
     private func rowView(_ row: RibbonRow) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 12 * scale) {
             ZStack {
                 if case let .prayer(_, _, _, state) = row {
                     if state == .passed {
-                        Text("✓").font(AynamaFont.monoNum).foregroundStyle(surface.foregroundMuted)
+                        Text("✓").font(AynamaFont.homeMark(size: markFontSize))
+                            .foregroundStyle(surface.foregroundMuted)
                     } else if state == .current {
-                        Circle().fill(surface.activeForeground).frame(width: 8, height: 8)
+                        Circle().fill(surface.activeForeground).frame(width: 8 * scale, height: 8 * scale)
                     }
                 }
-            }.frame(width: 20).accessibilityHidden(true)
-            Text(title(row)).font(AynamaFont.title)
-            Spacer(minLength: 8)
-            Text(row.displayTime).font(AynamaFont.timelineTime).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
-        }.foregroundStyle(color(row)).frame(minHeight: rowHeight).contentShape(Rectangle())
+            }.frame(width: 20 * scale).accessibilityHidden(true)
+            Text(title(row)).font(AynamaFont.homeRowName(size: fontSize))
+                .lineLimit(1).minimumScaleFactor(0.8)
+            Spacer(minLength: 4 * scale)
+            Text(row.displayTime).font(AynamaFont.homeRowTime(size: fontSize))
+                .monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+        }.foregroundStyle(color(row)).frame(maxWidth: .infinity).frame(height: rowHeight)
+            .contentShape(Rectangle())
     }
     private func title(_ row: RibbonRow) -> String {
         switch row {

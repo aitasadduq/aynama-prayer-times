@@ -5,6 +5,24 @@ import XCTest
 @testable import Aynama
 
 final class DesignParityTests: XCTestCase {
+    func testHomeCompositionFitsCompactAndAccessibilityViewports() {
+        for height in [CGFloat(380), 480, 650] {
+            for rows in [6, 7] {
+                for typeScale in [CGFloat(1), 2] {
+                    let metrics = HomePageMetrics(
+                        size: CGSize(width: 320, height: height), rows: rows, hasQaza: true,
+                        headerSize: 13 * typeScale, heroSize: 72 * typeScale,
+                        subtitleSize: 32 * typeScale, rowSize: 20 * typeScale,
+                        qazaSize: 13 * typeScale
+                    )
+                    XCTAssertLessThanOrEqual(metrics.occupiedHeight, height + 0.01)
+                    XCTAssertGreaterThanOrEqual(metrics.rowHeight, metrics.rowFont * 1.8)
+                    XCTAssertLessThanOrEqual(metrics.heroFont * 1.2, height)
+                }
+            }
+        }
+    }
+
     func testCountdownFrauncesHasEqualDigitAdvances() throws {
         let font = try XCTUnwrap(UIFont(name: "AynamaCountdown-Regular", size: 72))
         let widths = "0123456789".map {

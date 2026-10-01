@@ -22,12 +22,21 @@ final class DesignParityUITests: XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
     }
+    @MainActor
+    private func assertPrayerListFits(_ app: XCUIApplication) {
+        for name in ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"] {
+            let row = app.descendants(matching: .any)["home-row-\(name)"]
+            XCTAssertTrue(row.waitForExistence(timeout: 5), "Missing \(name) row")
+            XCTAssertTrue(row.isHittable, "\(name) should be visible above the tab bar")
+        }
+    }
 
     @MainActor
     func testScreenshotsAndNativeNavigation() {
         let app = launch()
         for title in ["Prayers", "Qibla", "Tracker", "Settings"] { XCTAssertTrue(app.tabBars.buttons[title].exists) }
         XCTAssertTrue(app.buttons["New profile"].isHittable)
+        assertPrayerListFits(app)
         capture(app, "01-prayers-light")
         app.tabBars.buttons["Qibla"].tap()
         XCTAssertTrue(app.staticTexts["Qibla"].waitForExistence(timeout: 5))
@@ -70,6 +79,7 @@ final class DesignParityUITests: XCTestCase {
     func testLargeTextScreenshotsKeepProfileControlsReachable() {
         let app = launch(largeText: true)
         XCTAssertTrue(app.buttons["New profile"].isHittable)
+        assertPrayerListFits(app)
         capture(app, "12-prayers-large-text")
         app.tabBars.buttons["Settings"].tap()
         XCTAssertTrue(app.staticTexts["Profiles"].waitForExistence(timeout: 5))

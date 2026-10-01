@@ -204,6 +204,20 @@ fun PrayerCountdown.format(): String {
     return sign + formatDuration(duration)
 }
 
+/** Compact Home display: show the largest two units, or seconds alone below a minute. */
+fun PrayerCountdown.formatCompact(): String {
+    val total = duration.seconds.coerceAtLeast(0L)
+    val hours = total / 3600
+    val minutes = (total % 3600) / 60
+    val seconds = total % 60
+    val value = when {
+        hours > 0 -> "%dh %02dm".format(hours, minutes)
+        minutes > 0 -> "%dm %02ds".format(minutes, seconds)
+        else -> "${seconds}s"
+    }
+    return (if (this is PrayerCountdown.Remaining) "-" else "") + value
+}
+
 internal fun formatDuration(duration: Duration): String {
     val total = duration.seconds.coerceAtLeast(0L)
     return "%02d:%02d:%02d".format(total / 3600, (total % 3600) / 60, total % 60)

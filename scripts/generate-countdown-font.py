@@ -21,7 +21,7 @@ TARGETS = (
     ROOT / "ios/App/Resources/Fonts/AynamaCountdown.ttf",
     ROOT / "android/app/src/main/res/font/aynama_countdown.ttf",
 )
-CHARACTERS = "0123456789:-"
+CHARACTERS = "0123456789:- hms"
 FAMILY = "Aynama Countdown"
 POSTSCRIPT = "AynamaCountdown-Regular"
 
