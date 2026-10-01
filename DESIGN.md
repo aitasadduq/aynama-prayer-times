@@ -208,11 +208,11 @@ Compose pins weight and optical size per style through font variation settings. 
 Every time display uses tabular figures. **Non-negotiable — prayer times must not visually drift.** What the bundled files actually provide:
 
 - **IBM Plex Sans:** figures are tabular by default. Every digit is 600/1000 em, so Plex times never drift. The file has no `tnum` feature, so `fontFeatureSettings = "tnum"` in code does nothing (and nothing is needed).
-- **Fraunces:** figures in the bundled variable font are **proportional**. At the default instance, "1" is 1024/2000 em and "0" is 1461. The file has no `tnum` feature. The Home hero therefore uses a separate static instance at wght 400 / opsz 144 with equal digit advances on Android and iOS; the source variable font remains unchanged for other display text.
+- **Fraunces:** figures in the bundled variable font are **proportional**. At the default instance, "1" is 1024/2000 em and "0" is 1461. The file has no `tnum` feature. The Home hero therefore uses a separate static instance at wght 400 / opsz 144 with equal digit advances on Android and iOS; the source variable font remains unchanged for other display text. Android can still round those equal font advances to different pixel widths, so its Home layout gives every digit a fixed cell measured from the widest rendered digit.
 
 Android v1 set two changing numbers in proportional Fraunces: the Home countdown hero and the widget countdowns. The Home hero now uses the tabular Fraunces instance on both platforms, resolving its part of DS9. Android widget countdowns still use the proportional source font and can drift. The Qibla degree readout also uses source Fraunces, but it shows the fixed Qibla bearing, so it doesn't change on screen.
 
-**Rule:** numbers that change in place use IBM Plex Sans or a verified tabular Fraunces instance. Do not rely on `tnum` with the bundled source Fraunces font. The tabular countdown instance is generated reproducibly by `scripts/generate-countdown-font.py` and is limited to countdown glyphs.
+**Rule:** numbers that change in place use IBM Plex Sans or a verified tabular Fraunces layout. Do not rely on `tnum` with the bundled source Fraunces font. The countdown instance is generated reproducibly by `scripts/generate-countdown-font.py` and is limited to countdown glyphs; Android also fixes digit cell widths at render time.
 
 ### Type scale
 

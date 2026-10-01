@@ -289,14 +289,9 @@ private fun ProfilePageContent(
 
         // Left-aligned, not centred: architecture-design.md lists a centred home countdown
         // as a banned pattern, and DESIGN.md §5 draws it flush left.
-        Text(
-            text = profileState.countdownText,
-            style = MaterialTheme.typography.displayLarge,
-            textAlign = TextAlign.Start,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = countdownLabel },
-        )
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+            CountdownDigits(profileState.countdownText, countdownLabel)
+        }
 
         Text(
             text = "${profileState.countdownPrayerName} · ${profileState.countdownPrayerTime}",
