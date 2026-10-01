@@ -26,7 +26,7 @@ class CountdownLayoutTest {
         }
 
         fun width() = compose.onNodeWithContentDescription("Countdown")
-            .getUnclippedBoundsInRoot().width
+            .getUnclippedBoundsInRoot().let { it.right - it.left }
 
         val first = width()
         for (value in listOf("-11:11:11", "-33:33:33", "-88:88:88")) {
