@@ -208,11 +208,11 @@ Compose pins weight and optical size per style through font variation settings. 
 Every time display uses tabular figures. **Non-negotiable — prayer times must not visually drift.** What the bundled files actually provide:
 
 - **IBM Plex Sans:** figures are tabular by default. Every digit is 600/1000 em, so Plex times never drift. The file has no `tnum` feature, so `fontFeatureSettings = "tnum"` in code does nothing (and nothing is needed).
-- **Fraunces:** figures are **proportional**. At the default instance, "1" is 1024/2000 em and "0" is 1461. The file has no `tnum` feature either, so Fraunces cannot set a number that changes in place without drifting.
+- **Fraunces:** figures in the bundled variable font are **proportional**. At the default instance, "1" is 1024/2000 em and "0" is 1461. The file has no `tnum` feature. The Home hero therefore uses a separate static instance at wght 400 / opsz 144 with equal digit advances on Android and iOS; the source variable font remains unchanged for other display text.
 
-Android v1 sets two changing numbers in Fraunces anyway: the Home countdown hero and the widget countdowns. The hero is left-aligned and changes every second (§19), so whenever a digit changes width, every character after it shifts (DS9). The Qibla degree readout is also Fraunces with a no-op `tnum`, but it shows the fixed Qibla bearing, so it doesn't change on screen.
+Android v1 set two changing numbers in proportional Fraunces: the Home countdown hero and the widget countdowns. The Home hero now uses the tabular Fraunces instance on both platforms, resolving its part of DS9. Android widget countdowns still use the proportional source font and can drift. The Qibla degree readout also uses source Fraunces, but it shows the fixed Qibla bearing, so it doesn't change on screen.
 
-**Rule until DS9 is resolved:** numbers that change in place are set in IBM Plex Sans. Fraunces numerals are for numbers that don't change on screen. The alternative is to bundle a Fraunces build that has tabular figures.
+**Rule:** numbers that change in place use IBM Plex Sans or a verified tabular Fraunces instance. Do not rely on `tnum` with the bundled source Fraunces font. The tabular countdown instance is generated reproducibly by `scripts/generate-countdown-font.py` and is limited to countdown glyphs.
 
 ### Type scale
 
@@ -636,7 +636,7 @@ Everything else on this list holds.
 - The phone app shares Android's four destinations: Prayers, Qibla, Tracker, Settings. Notifications and Adhan voice use native pushes within Settings. Profiles and prayer details use native sheets.
 - Native tab and navigation bars use the iOS 26 Liquid Glass treatment when built with the iOS 26 SDK. Glass belongs to navigation chrome and utilitarian controls; the prayer ribbon and Qibla instrument remain directly on their phase surfaces. The Settings add button uses tinted glass, with a solid saffron fallback for Reduce Transparency and iOS 17–25.
 - Native glass-button labels use ink or parchment for text contrast. Tab icons and labels share one system tint: saffron-ink on light chrome, parchment-muted on dark chrome, where the native saffron label is only 4.03:1. The selected glass pill still identifies the active tab. Home ribbon row spacing scales with Dynamic Type alongside its text, keeping the ruled timeline aligned.
-- Home uses the profile/method and Hijri header, a left-aligned countdown in tabular IBM Plex, Fraunces prayer names, and a connected ribbon with a moving time tick. The add control and page dots sit below the scrollable content so they do not cover prayer times.
+- Home uses the profile/method and Hijri header, a left-aligned countdown in tabular Fraunces, Fraunces prayer names, and a connected ribbon with a moving time tick. The add control and page dots sit below the scrollable content so they do not cover prayer times.
 - Home uses full ink for secondary text across light phase gradients: `ink-muted` is only 3.60:1 on honey, 1.60:1 on saffron, and 4.43:1 on midday linen. Dark phases use parchment-muted. Neutral parchment screens retain muted ink.
 - Current-prayer text and marks use parchment on Fajr and Maghrib, where saffron falls below AA (3.38:1 on predawn warmth, 2.86:1 on oxblood). Isha retains saffron; light phases use ink. The Qibla arrow keeps its saffron fill with a 1.5 pt outline in that high-contrast phase foreground.
 - Settings, Tracker, notifications and profile/mark sheets follow the system appearance on warm ink or parchment. Rows expand with Dynamic Type. Historical on-time marking is disabled outside the actual prayer window; marks use the profile's calendar day.
@@ -1267,9 +1267,9 @@ straight on to Dhuhr. Only prayers count up.
 - `HH:MM:SS`, zero-padded, minus sign only while counting down.
 - Hours are not wrapped at 24. A gap longer than a day (possible at high latitudes) reads
   `-31:04:12` rather than silently restarting.
-- Fraunces `display-xl` on the home hero, tabular numerals (`tnum`). Never centred — §5.
-  The bundled Fraunces has no tabular figures, so until DS9 is settled the digits drift
-  (§4 Numerals).
+- Fraunces `display-xl` on the home hero, using the generated tabular countdown instance.
+  Never centred — §5. The source variable Fraunces has no `tnum`; setting that feature alone
+  does not make its digits tabular (§4 Numerals).
 - The prayer the number refers to is always named next to it. A bare signed number does not
   say whether Dhuhr is coming or has just started.
 
@@ -1681,7 +1681,7 @@ Where the shipped Android app stands against this document's rules. Each gap has
 | §9 — the moving sundial tick | ✗ A static dot on the current row. | DS6 |
 | §18 — the Hijri adjustment is correct | ✗ The lapse lands on the wrong day. With +1 the Ramadan state appears on the user's Eid, or is missing on their first fast day; with −1 Ramadan's end is never delayed. | DS7 |
 | §6 — app icon | ✗ No launcher icon; the launch window is platform grey. | DS8 |
-| §4 — tabular numerals | ✗ The Fraunces countdowns drift. IBM Plex times are fine. | DS9 |
+| §4 — tabular numerals | ◐ Home countdowns use tabular Fraunces on both platforms; Android widget countdowns still use proportional Fraunces. IBM Plex times are fine. | DS9 |
 | §4 — Fraunces only at 400/500 | ? Widgets probably render Fraunces Black. | DS10 |
 | §18 — the same Hijri date on every device | ✗ It depends on the device's region. | DS11 |
 | §17 — one time zone per profile everywhere | ~ Mark dates and the Notifications screen's date use the device's date. | DS12 |

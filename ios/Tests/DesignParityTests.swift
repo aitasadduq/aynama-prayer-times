@@ -1,9 +1,20 @@
 import SharedLogic
 import SwiftData
+import UIKit
 import XCTest
 @testable import Aynama
 
 final class DesignParityTests: XCTestCase {
+    func testCountdownFrauncesHasEqualDigitAdvances() throws {
+        let font = try XCTUnwrap(UIFont(name: "AynamaCountdown-Regular", size: 72))
+        let widths = "0123456789".map {
+            NSString(string: String($0)).size(withAttributes: [.font: font]).width
+        }
+        for width in widths.dropFirst() {
+            XCTAssertEqual(width, widths[0], accuracy: 0.01)
+        }
+    }
+
     private var london: Profile {
         Profile(id: 1, name: "London", latitude: 51.5074, longitude: -0.1278,
                 calculationMethod: .mwl, asrMadhab: .shafii, timezone: "Europe/London", useLocationTimezone: true)

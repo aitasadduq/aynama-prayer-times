@@ -291,7 +291,7 @@ private fun ProfilePageContent(
         // as a banned pattern, and DESIGN.md §5 draws it flush left.
         Text(
             text = profileState.countdownText,
-            style = MaterialTheme.typography.displayLarge.copy(fontFeatureSettings = "tnum"),
+            style = MaterialTheme.typography.displayLarge,
             textAlign = TextAlign.Start,
             modifier = Modifier
                 .fillMaxWidth()

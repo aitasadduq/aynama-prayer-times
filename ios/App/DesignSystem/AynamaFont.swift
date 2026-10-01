@@ -50,8 +50,12 @@ enum AynamaFont {
     /// shuffle sideways as the digits change.
     static let monoNum = plex(size: 17, weight: 500, textStyle: .body, tabular: true)
 
-    /// The bundled Fraunces has proportional figures; Plex keeps the live clock stable (§4).
-    static let countdown = plex(size: 72, weight: 400, textStyle: .largeTitle, tabular: true)
+    /// Static Fraunces 400/144 with equal digit advances. The source variable face has no tnum.
+    static let countdown: Font = {
+        let face = UIFont(name: "AynamaCountdown-Regular", size: 72)!
+        return Font(uiFont: UIFontMetrics(forTextStyle: .largeTitle)
+            .scaledFont(for: face, maximumPointSize: 144))
+    }()
     static let timelineTime = plex(size: 20, weight: 500, textStyle: .title3, tabular: true)
 
     // MARK: - Construction
