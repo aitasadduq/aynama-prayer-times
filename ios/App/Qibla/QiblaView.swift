@@ -8,6 +8,9 @@ struct QiblaView: View {
     private var records: [ProfileRecord]
     @StateObject private var location = LocationService()
     @State private var aligned = false
+    // A TabView keeps this view alive on other tabs, where scene activation must not restart
+    // the compass and location fix.
+    @State private var isVisible = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     private var profile: Profile? { (records.first(where: \.isGps) ?? records.first)?.profile }
@@ -18,13 +21,19 @@ struct QiblaView: View {
                 TimelineView(.periodic(from: .now, by: 60)) { _ in instrument(profile) }
             } else { ProfileRequiredView(title: "Set up a prayer profile to find Qibla direction") }
         }
-        .onAppear { if profile != nil { location.startCompass() } }
-        .onDisappear { location.stop() }
+        .onAppear {
+            isVisible = true
+            if profile != nil { location.startCompass() }
+        }
+        .onDisappear {
+            isVisible = false
+            location.stop()
+        }
         .onChange(of: profile == nil, initial: true) { _, empty in
             if empty { onSurfaceChange(nil) }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active, profile != nil { location.startCompass() }
+            if phase == .active, isVisible, profile != nil { location.startCompass() }
             else { location.stop() }
         }
     }

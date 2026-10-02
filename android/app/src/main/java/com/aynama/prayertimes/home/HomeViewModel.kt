@@ -28,8 +28,8 @@ import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
 import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -218,15 +218,20 @@ class HomeViewModel(
      *
      * Runs off the main thread: [AlarmScheduler.scheduleAll] does binder work for every
      * reserved alarm slot and reads each placed widget's Glance state off disk.
+     *
+     * Runs in [viewModelScope], not the caller's: the caller's scope dies with the Prayers
+     * screen, and a tab switch right after Save must not cancel the alarm and widget refresh.
      */
-    suspend fun createProfile(profile: Profile, context: Context): Long =
-        withContext(Dispatchers.IO) {
+    suspend fun createProfile(profile: Profile, context: Context): Long {
+        val appContext = context.applicationContext
+        return viewModelScope.async(Dispatchers.IO) {
             val existing = profileRepository.observeAll().first()
             val id = profileRepository.insert(profile.copy(sortOrder = existing.size))
-            AlarmScheduler.scheduleAll(context, profileRepository.observeAll().first())
-            updateAllPrayerWidgets(context)
+            AlarmScheduler.scheduleAll(appContext, profileRepository.observeAll().first())
+            updateAllPrayerWidgets(appContext)
             id
-        }
+        }.await()
+    }
 
     /** Today's times for [profile], or null when the location has none (polar day/night). */
     private fun cachedPrayerTimes(profile: Profile, date: LocalDate): PrayerTimesResult? {

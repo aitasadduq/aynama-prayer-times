@@ -11,6 +11,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.util.Locale
 
 class PrayerTimelineTest {
 
@@ -59,6 +60,20 @@ class PrayerTimelineTest {
         assertEquals("-10s", text(10))
         assertEquals("0s", text(0, elapsed = true))
         assertEquals("59s", text(59, elapsed = true))
+    }
+
+    @Test
+    fun countdownDigitsIgnoreTheDeviceLocale() {
+        val original = Locale.getDefault()
+        try {
+            Locale.setDefault(Locale.forLanguageTag("ar-EG"))
+            val entry = timeline().first()
+            val remaining = PrayerCountdown.Remaining(entry, Duration.ofSeconds(3600 + 5 * 60 + 7))
+            assertEquals("-01:05:07", remaining.format())
+            assertEquals("-1h 05m", remaining.formatCompact())
+        } finally {
+            Locale.setDefault(original)
+        }
     }
 
     // --- Direction and sign -----------------------------------------------------

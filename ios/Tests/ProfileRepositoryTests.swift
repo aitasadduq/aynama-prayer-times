@@ -24,6 +24,31 @@ final class ProfileRepositoryTests: XCTestCase {
     }
 
     @MainActor
+    func testDeletingTheNewestProfileNeverHandsItsIDToTheNextOne() throws {
+        let suite = "ProfileRepositoryTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let container = AynamaStore.makeContainer(inMemory: true)
+        let repository = ProfileRepository(context: ModelContext(container), defaults: defaults)
+        let home = try repository.insert(profile("Home"))
+        let newest = try repository.insert(profile("Office"))
+
+        try repository.delete(id: newest)
+        let next = try repository.insert(profile("Travel"))
+
+        // A notification or deep link that still names the deleted id must not open Travel.
+        XCTAssertNotEqual(next, newest)
+        XCTAssertEqual(next, newest + 1)
+        XCTAssertEqual(repository.all().map(\.id), [home, next])
+
+        // The mark survives a fresh repository, as it would an app relaunch.
+        try repository.delete(id: next)
+        let afterRelaunch = try ProfileRepository(context: ModelContext(container), defaults: defaults)
+            .insert(profile("Hajj"))
+        XCTAssertEqual(afterRelaunch, next + 1)
+    }
+
+    @MainActor
     func testUpdatePreservesIdentityAndPersistsFormFields() throws {
         let container = AynamaStore.makeContainer(inMemory: true)
         let repository = ProfileRepository(context: ModelContext(container))

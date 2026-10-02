@@ -1,5 +1,7 @@
 package com.aynama.prayertimes.shared
 
+import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.batoulapps.adhan.CalculationMethod
 import com.batoulapps.adhan.Coordinates
 import com.batoulapps.adhan.data.DateComponents
@@ -96,6 +98,31 @@ class AdhanWrapper {
             isha = isha.toLocalTime(timezone),
         )
     }
+
+    /**
+     * Yesterday, today and tomorrow for [profile], in its own zone, with undefined days dropped.
+     *
+     * The window the countdown timeline needs: an event on each side of now at every moment,
+     * including after Isha and before Fajr. Near the polar circles one day can be undefined while
+     * its neighbours are fine, so days are dropped one at a time rather than failing the set.
+     * Coordinates out of range still throw: that is a corrupt profile, not a polar one.
+     * The counterpart of iOS `AdhanWrapper.timelineDays(for:around:)`.
+     */
+    fun timelineDays(profile: Profile, today: LocalDate): Map<LocalDate, PrayerTimesResult> =
+        (-1L..1L).mapNotNull { offset ->
+            val date = today.plusDays(offset)
+            try {
+                date to getPrayerTimes(
+                    latitude = profile.latitude,
+                    longitude = profile.longitude,
+                    date = date,
+                    timezone = profile.effectiveZoneId(),
+                    method = profile.calculationMethod,
+                )
+            } catch (e: PrayerTimesUnavailableException) {
+                null
+            }
+        }.toMap()
 
     // adhan-java builds its Dates from Calendar.getInstance() and never clears the
     // MILLISECOND field, so every result carries the wall-clock millisecond of the

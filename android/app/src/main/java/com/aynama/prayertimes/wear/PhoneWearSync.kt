@@ -2,11 +2,14 @@ package com.aynama.prayertimes.wear
 
 import android.content.Context
 import android.util.Log
+import com.aynama.prayertimes.notifications.resolveNotificationProfile
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.sync.ProfileCodec
 import com.aynama.prayertimes.shared.sync.WearSyncContract
 import com.google.android.gms.wearable.PutDataMapRequest
 import com.google.android.gms.wearable.Wearable
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -48,4 +51,23 @@ object PhoneWearSync {
     }
 
     private const val TAG = "PhoneWearSync"
+}
+
+/** One profile set and the id of the profile the watch should treat as active. */
+internal data class WatchPublication(val profiles: List<Profile>, val activeProfileId: Long)
+
+/**
+ * Everything the watch should be sent, re-emitted whenever either input changes.
+ *
+ * The active profile is the phone's alerts profile, which lives in a preference rather than in
+ * the profiles table, so a change made only in Notification settings has to republish too.
+ */
+internal fun watchPublications(
+    profiles: Flow<List<Profile>>,
+    notificationProfileId: Flow<Long>,
+): Flow<WatchPublication> = combine(profiles, notificationProfileId) { list, savedId ->
+    WatchPublication(
+        profiles = list,
+        activeProfileId = resolveNotificationProfile(savedId, list)?.id ?: WearSyncContract.NO_ACTIVE_PROFILE,
+    )
 }

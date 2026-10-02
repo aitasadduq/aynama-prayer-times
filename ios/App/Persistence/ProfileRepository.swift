@@ -10,10 +10,17 @@ import SwiftData
 @MainActor
 struct ProfileRepository {
 
-    let context: ModelContext
+    /// The highest id ever handed out. Kept outside the store so a deleted profile's id is never
+    /// given to a new one, matching Room's AUTOINCREMENT on Android: notifications, deep links and
+    /// widget configurations that still name the old id must not open a different place.
+    static let idHighWaterKey = "profile_id_high_water"
 
-    init(context: ModelContext) {
+    let context: ModelContext
+    private let defaults: UserDefaults
+
+    init(context: ModelContext, defaults: UserDefaults = AynamaStore.preferences) {
         self.context = context
+        self.defaults = defaults
     }
 
     func all() -> [Profile] {
@@ -40,10 +47,12 @@ struct ProfileRepository {
     func insert(_ profile: Profile) throws -> Int64 {
         let existing = records()
         var toInsert = profile
-        toInsert.id = (existing.map(\.profileID).max() ?? 0) + 1
+        let highWater = Int64(defaults.integer(forKey: Self.idHighWaterKey))
+        toInsert.id = max(existing.map(\.profileID).max() ?? 0, highWater) + 1
         toInsert.sortOrder = existing.count
         context.insert(ProfileRecord(from: toInsert))
         try context.save()
+        defaults.set(Int(toInsert.id), forKey: Self.idHighWaterKey)
         return toInsert.id
     }
 

@@ -92,6 +92,9 @@ fun HomeScreen(
         is HomeUiState.Loaded -> LoadedContent(
             state = state,
             requestedProfileId = profileToShow,
+            // A profile just saved here is certain to reach the pager, but the Room emission
+            // can land after the id comes back. Wait for it instead of dropping the request.
+            awaitRequestedProfile = createdProfileId != NO_WIDGET_PROFILE,
             onProfileShown = {
                 if (createdProfileId != NO_WIDGET_PROFILE) createdProfileId = NO_WIDGET_PROFILE
                 else onProfileShown()
@@ -123,6 +126,7 @@ fun HomeScreen(
 private fun LoadedContent(
     state: HomeUiState.Loaded,
     requestedProfileId: Long,
+    awaitRequestedProfile: Boolean,
     onProfileShown: () -> Unit,
     onAddProfile: () -> Unit,
     onDismissRamadanBanner: () -> Unit,
@@ -153,9 +157,11 @@ private fun LoadedContent(
     // Ids, not the pages themselves: those carry a countdown that changes every second, and
     // restarting this effect at 1 Hz would cancel an in-flight scroll.
     val profileIds = state.pages.map { it.profile.id }
-    LaunchedEffect(requestedProfileId, profileIds) {
+    LaunchedEffect(requestedProfileId, profileIds, awaitRequestedProfile) {
         if (requestedProfileId == NO_WIDGET_PROFILE) return@LaunchedEffect
         val target = profileIds.indexOf(requestedProfileId)
+        // Not here yet: keep the request, and this effect runs again when the ids change.
+        if (target < 0 && awaitRequestedProfile) return@LaunchedEffect
         // A profile deleted since the widget last rendered leaves the pager where it is,
         // rather than snapping to an unrelated one.
         if (target >= 0) pagerState.scrollToPage(target)

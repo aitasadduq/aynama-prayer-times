@@ -3,17 +3,17 @@
 #
 # WHY THIS EXISTS
 #
-# On this machine `xcodebuild` reports zero iOS destinations — device and simulator alike —
-# because Xcode's iOS 26.5 platform support component is not installed:
+# A fallback for a machine where `xcodebuild` reports zero iOS destinations — device and
+# simulator alike — because Xcode's iOS platform support component is not installed:
 #
 #   { platform:iOS, name:Any iOS Device, error:iOS 26.5 is not installed.
 #     Please download and install the platform from Xcode > Settings > Components. }
 #
-# The simulator *runtimes* (iOS 18.6 and 26.3) are installed and `simctl` can boot them, and the
-# iPhoneSimulator26.5 SDK is on disk — but xcodebuild will not pair them, so `-destination`,
-# `-sdk` and `generic/platform=iOS Simulator` all fail before compiling a single file. Fix it
-# with `xcodebuild -downloadPlatform iOS` (a multi-gigabyte download) or Xcode > Settings >
-# Components.
+# The simulator *runtimes* can be installed and bootable with `simctl`, and the simulator SDK on
+# disk, while xcodebuild still will not pair them, so `-destination`, `-sdk` and
+# `generic/platform=iOS Simulator` all fail before compiling a single file. Fix it with
+# `xcodebuild -downloadPlatform iOS` (a multi-gigabyte download) or Xcode > Settings >
+# Components; CI and a machine with the component use `xcodebuild test` instead (README.md).
 #
 # Until then this script gives the one guarantee that does not need a destination: that the app's
 # Swift actually compiles against the real iOS SDK, with the real SwiftUI and SwiftData. It is a

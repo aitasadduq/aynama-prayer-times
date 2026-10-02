@@ -37,7 +37,6 @@ import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.notifications.resolveNotificationProfile
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
-import com.aynama.prayertimes.shared.PrayerTimesUnavailableException
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
@@ -260,7 +259,7 @@ private suspend fun loadPrayerWidgetState(context: Context, profileId: Long): Pr
     // A widget bound to a location with no computable times must render a message, not throw:
     // this runs inside Glance's render and inside PrayerWidgetUpdateReceiver, and an escaping
     // throw from the receiver kills the process on every rollover alarm.
-    val days = profileDays(profile, today)
+    val days = AdhanWrapper().timelineDays(profile, today)
     val todayTimes = days[today] ?: run {
         Log.w("PrayerWidget", "no times today for profile ${profile.id} (${profile.name})")
         return PrayerWidgetState.unavailable(SystemClock.elapsedRealtime(), profile.id, profile.name)
@@ -367,32 +366,6 @@ internal data class PrayerWidgetState(
 
 private fun gregorianFormatter(): DateTimeFormatter =
     DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
-
-/**
- * Yesterday, today and tomorrow for [profile], skipping days with no computable times.
- *
- * The countdown timeline needs an event on each side of now: before Fajr the current event
- * is last night's Isha, after Isha the next one is tomorrow's Fajr. Near the polar circles a
- * single day can be undefined while its neighbours are fine, so days are dropped individually
- * rather than failing the set.
- */
-internal fun profileDays(profile: Profile, today: LocalDate): Map<LocalDate, PrayerTimesResult> {
-    val adhan = AdhanWrapper()
-    return (-1L..1L).mapNotNull { offset ->
-        val date = today.plusDays(offset)
-        try {
-            date to adhan.getPrayerTimes(
-                latitude = profile.latitude,
-                longitude = profile.longitude,
-                date = date,
-                timezone = profile.effectiveZoneId(),
-                method = profile.calculationMethod,
-            )
-        } catch (e: PrayerTimesUnavailableException) {
-            null
-        }
-    }.toMap()
-}
 
 /**
  * Three-letter widget abbreviation, derived from the day-aware name so a Friday Dhuhr

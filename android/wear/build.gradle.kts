@@ -36,6 +36,14 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // The offline zone table in shared-logic serves the phone's city search. The watch never
+    // looks up a zone, so it should not carry the 627 KB.
+    packaging {
+        resources {
+            excludes += "/timezone-lookup.bin"
+        }
+    }
 }
 
 dependencies {
@@ -57,9 +65,7 @@ dependencies {
 
     implementation(libs.wear.tiles)
     implementation(libs.kotlinx.coroutines.guava)
-    implementation(libs.wear.tiles.material)
     implementation(libs.wear.protolayout)
-    implementation(libs.wear.protolayout.material)
     implementation(libs.wear.protolayout.expression)
     implementation(libs.wear.watchface.complications.data.source)
     implementation(libs.play.services.wearable)

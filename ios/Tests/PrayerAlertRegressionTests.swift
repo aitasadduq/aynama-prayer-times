@@ -74,12 +74,12 @@ final class PrayerAlertRegressionTests: XCTestCase {
     }
 
     @MainActor
-    func testDeletingAndReusingAProfileIDDoesNotRestoreAlertPreferences() throws {
+    func testDeletingAProfileClearsItsAlertPreferencesAndItsIDIsNotReused() throws {
         let suite = "PrayerAlertRegressionTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let container = AynamaStore.makeContainer(inMemory: true)
-        let repository = ProfileRepository(context: ModelContext(container))
+        let repository = ProfileRepository(context: ModelContext(container), defaults: defaults)
         let first = try repository.insert(london)
         let deleted = try repository.insert(london)
         let settings = PrayerAlertSettings(defaults: defaults)
@@ -90,9 +90,10 @@ final class PrayerAlertRegressionTests: XCTestCase {
         try repository.delete(id: deleted)
         settings.removeProfile(id: deleted)
         let recreated = try repository.insert(london)
-        XCTAssertEqual(recreated, deleted, "Exercise the ID-reuse case")
+        XCTAssertNotEqual(recreated, deleted, "A deleted profile's ID is never handed out again")
         let reloaded = PrayerAlertSettings(defaults: defaults)
         XCTAssertNil(reloaded.profileID)
+        XCTAssertEqual(reloaded.configuration(profileID: deleted, prayer: .fajr), .init())
         XCTAssertEqual(reloaded.configuration(profileID: recreated, prayer: .fajr), .init())
         XCTAssertEqual(reloaded.configuration(profileID: first, prayer: .fajr), custom)
     }

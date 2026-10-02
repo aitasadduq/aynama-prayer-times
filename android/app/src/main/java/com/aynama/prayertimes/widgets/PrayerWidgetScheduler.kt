@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.PrayerTimesResult
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
@@ -92,7 +93,7 @@ object PrayerWidgetScheduler {
         val date = Instant.ofEpochMilli(nowEpochMs).atZone(zone).toLocalDate()
         val updates = buildWidgetUpdateSchedule(
             profile = profile,
-            days = profileDays(profile, date),
+            days = AdhanWrapper().timelineDays(profile, date),
             zone = zone,
             nowEpochMs = nowEpochMs,
             profileSlot = profileSlot,

@@ -13,6 +13,7 @@ import com.google.android.gms.wearable.DataMap
 import com.google.android.gms.wearable.DataMapItem
 import com.google.android.gms.wearable.Wearable
 import com.google.android.gms.wearable.WearableListenerService
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.tasks.await
 
@@ -48,8 +49,12 @@ object WearProfileSync {
      * A payload that cannot be decoded is ignored, not treated as an empty set: one damaged or
      * newer-versioned message must not wipe a watch that is working perfectly well from the
      * last good one.
+     *
+     * [phoneSeen] decides whether this counts as hearing from the phone. A pull re-reads the
+     * watch's own copy of the Data Layer, which succeeds with the phone off, so only a pull made
+     * while a phone is connected, or a change pushed by the phone, moves [WearSyncState.lastSyncedAt].
      */
-    suspend fun apply(context: Context, dataMap: DataMap) {
+    suspend fun apply(context: Context, dataMap: DataMap, phoneSeen: Boolean) {
         val app = context.applicationContext as WearApplication
         val profiles = ProfileCodec.decode(dataMap.getString(WearSyncContract.KEY_PROFILES))
         if (profiles == null) {
@@ -59,7 +64,8 @@ object WearProfileSync {
         app.profileRepository.mirror(profiles)
         app.syncState.activeProfileId =
             dataMap.getLong(WearSyncContract.KEY_ACTIVE_PROFILE_ID, WearSyncContract.NO_ACTIVE_PROFILE)
-        app.syncState.lastSyncedAt = System.currentTimeMillis()
+        app.syncState.lastSyncedAt =
+            nextSyncStamp(app.syncState.lastSyncedAt, phoneSeen, System.currentTimeMillis())
         // The profile set decides which prayer times a complication shows, so a sync that
         // changed it must not wait for the next armed refresh to reach the watch face.
         ComplicationUpdateScheduler.requestUpdateNow(context)
@@ -76,8 +82,9 @@ object WearProfileSync {
         try {
             val uri = Uri.Builder().scheme("wear").path(WearSyncContract.PATH_PROFILES).build()
             val items = Wearable.getDataClient(context).getDataItems(uri).await()
+            val phoneSeen = isPhoneConnected { Wearable.getNodeClient(context).connectedNodes.await() }
             items.use { buffer ->
-                buffer.firstOrNull()?.let { apply(context, DataMapItem.fromDataItem(it).dataMap) }
+                buffer.firstOrNull()?.let { apply(context, DataMapItem.fromDataItem(it).dataMap, phoneSeen) }
             }
         } catch (e: Exception) {
             // No paired phone is the normal case for a watch used standalone, and it must not
@@ -88,6 +95,23 @@ object WearProfileSync {
 
     private const val TAG = "WearProfileSync"
 }
+
+/**
+ * Whether a phone is connected right now. A missing or failing Play services node API answers
+ * "no", so the watch never claims to have seen a phone it could not reach.
+ */
+internal suspend fun isPhoneConnected(connectedNodes: suspend () -> List<*>): Boolean =
+    try {
+        connectedNodes().isNotEmpty()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
+    }
+
+/** The sync stamp after an apply: now if the phone was seen, otherwise unchanged. */
+internal fun nextSyncStamp(previous: Long, phoneSeen: Boolean, now: Long): Long =
+    if (phoneSeen) now else previous
 
 /** Receives profile changes pushed from the phone. */
 class WearProfileSyncService : WearableListenerService() {
@@ -100,7 +124,11 @@ class WearProfileSyncService : WearableListenerService() {
             // service stays alive for their duration, so blocking here is the contract rather
             // than a shortcut — launching into a scope would race the service being torn down.
             runBlocking {
-                WearProfileSync.apply(applicationContext, DataMapItem.fromDataItem(event.dataItem).dataMap)
+                WearProfileSync.apply(
+                    applicationContext,
+                    DataMapItem.fromDataItem(event.dataItem).dataMap,
+                    phoneSeen = true,
+                )
             }
         }
     }

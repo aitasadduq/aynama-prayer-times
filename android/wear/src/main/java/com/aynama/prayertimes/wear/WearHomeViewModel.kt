@@ -4,8 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aynama.prayertimes.shared.AdhanWrapper
-import com.aynama.prayertimes.shared.PrayerTimesResult
-import com.aynama.prayertimes.shared.PrayerTimesUnavailableException
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
@@ -28,7 +26,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -122,7 +119,7 @@ class WearHomeViewModel(
     internal fun buildPage(profile: Profile, now: Instant): WearProfilePage? {
         val zone = profile.effectiveZoneId()
         val today = now.atZone(zone).toLocalDate()
-        val timeline = buildTimeline(daysFor(profile, today), profile.asrMadhab, zone)
+        val timeline = buildTimeline(adhan.timelineDays(profile, today), profile.asrMadhab, zone)
         val countdown = countdownAt(timeline, now) ?: return null
         val current = currentEntry(timeline, now)
         return WearProfilePage(
@@ -146,22 +143,6 @@ class WearHomeViewModel(
         isCurrent = entry.event != TimelineEvent.SUNRISE && entry.instant == current?.instant,
         isPast = !entry.instant.isAfter(now),
     )
-
-    private fun daysFor(profile: Profile, today: LocalDate): Map<LocalDate, PrayerTimesResult> =
-        (-1L..1L).mapNotNull { offset ->
-            val date = today.plusDays(offset)
-            try {
-                date to adhan.getPrayerTimes(
-                    latitude = profile.latitude,
-                    longitude = profile.longitude,
-                    date = date,
-                    timezone = profile.effectiveZoneId(),
-                    method = profile.calculationMethod,
-                )
-            } catch (e: PrayerTimesUnavailableException) {
-                null
-            }
-        }.toMap()
 
     companion object {
         /**

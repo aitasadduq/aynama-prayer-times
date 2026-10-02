@@ -1,6 +1,9 @@
 package com.aynama.prayertimes.notifications
 
 import android.content.SharedPreferences
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 
 enum class AdhanVoice(val displayName: String, val caption: String = "") {
     MAKKAH("Makkah", "Al-Masjid Al-Haram"),
@@ -25,6 +28,16 @@ class NotificationPreferences(private val prefs: SharedPreferences) {
     var notificationProfileId: Long
         get() = prefs.getLong(KEY_NOTIFICATION_PROFILE, -1L)
         set(value) = prefs.edit().putLong(KEY_NOTIFICATION_PROFILE, value).apply()
+
+    /** [notificationProfileId] now, then again each time it changes. */
+    fun notificationProfileIdFlow(): Flow<Long> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_NOTIFICATION_PROFILE) trySend(notificationProfileId)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        send(notificationProfileId)
+        awaitClose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
 
     // Global (not profile-scoped)
     var masterEnabled: Boolean

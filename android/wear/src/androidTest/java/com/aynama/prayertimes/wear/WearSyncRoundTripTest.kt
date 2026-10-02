@@ -47,6 +47,7 @@ class WearSyncRoundTripTest {
 
     private lateinit var saved: List<Profile>
     private var savedActive = -1L
+    private var savedLastSync = 0L
 
     private val london = Profile(
         id = 101,
@@ -74,12 +75,14 @@ class WearSyncRoundTripTest {
     fun setUp() = runBlocking {
         saved = app.profileRepository.observeAll().first()
         savedActive = app.syncState.activeProfileId
+        savedLastSync = app.syncState.lastSyncedAt
     }
 
     @After
     fun tearDown() = runBlocking {
         app.profileRepository.mirror(saved)
         app.syncState.activeProfileId = savedActive
+        app.syncState.lastSyncedAt = savedLastSync
     }
 
     /** Publish the way the phone does, then let the watch pull it. */
@@ -97,6 +100,7 @@ class WearSyncRoundTripTest {
 
     @Test
     fun profilesArriveOnTheWatch() = runBlocking {
+        val before = app.syncState.lastSyncedAt
         phonePublishes(listOf(london, makkah), activeId = makkah.id)
 
         assertEquals(listOf("London", "Makkah"), mirrored().map { it.name })
@@ -104,7 +108,14 @@ class WearSyncRoundTripTest {
         // the same place.
         assertEquals(listOf(101L, 102L), mirrored().map { it.id })
         assertEquals(makkah.id, app.syncState.activeProfileId)
-        assertTrue("last sync should be recorded", app.syncState.lastSyncedAt > 0L)
+        // The pull reads the watch's own Data Layer copy. It counts as hearing from the phone
+        // only when one is connected, and this unpaired emulator normally has none.
+        if (isPhoneConnected { Wearable.getNodeClient(context).connectedNodes.await() }) {
+            val stamp = app.syncState.lastSyncedAt
+            assertTrue("a connected phone should be recorded", stamp > 0L && stamp >= before)
+        } else {
+            assertEquals("no phone, so no sync recorded", before, app.syncState.lastSyncedAt)
+        }
     }
 
     @Test

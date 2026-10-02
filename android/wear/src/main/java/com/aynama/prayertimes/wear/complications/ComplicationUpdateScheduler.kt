@@ -24,8 +24,10 @@ private const val GUARD_MS = 2_000L
 /**
  * When the prayer complication is refreshed.
  *
- * This is architecture-design.md **Reviewer Concern #5** — WearOS has no timeline API like
- * watchOS, so a data source is asked for one value at a time and must say when to ask again.
+ * This is architecture-design.md **Reviewer Concern #5**. This data source answers one value at
+ * a time and says when to ask again. Wear OS does also offer timeline complications
+ * (`ComplicationDataTimeline` in the same library), which would let the system swap entries
+ * itself with no alarm; that is the upgrade path if the alarm chain ever proves unreliable.
  *
  * The answer is not a periodic refresh. The content changes when the *prayer state* changes —
  * a prayer starting, or its 30-minute count-up window closing — which does not fall on any

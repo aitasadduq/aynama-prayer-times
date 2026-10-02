@@ -7,12 +7,13 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.util.Locale
 
 /**
  * The single source of truth for "what prayer is it, and how long until the next one".
  *
  * Every surface that shows a countdown — the home screen, the four widgets, the live
- * notification, and the watch apps once they exist — resolves it here rather than
+ * notification, and the Wear OS app, complication and tile — resolves it here rather than
  * re-deriving slightly different rules from a [PrayerTimesResult]. The rules are stated
  * once, in [countdownAt], and the formatting once, in [format].
  *
@@ -211,14 +212,16 @@ fun PrayerCountdown.formatCompact(): String {
     val minutes = (total % 3600) / 60
     val seconds = total % 60
     val value = when {
-        hours > 0 -> "%dh %02dm".format(hours, minutes)
-        minutes > 0 -> "%dm %02ds".format(minutes, seconds)
+        hours > 0 -> "%dh %02dm".format(Locale.ROOT, hours, minutes)
+        minutes > 0 -> "%dm %02ds".format(Locale.ROOT, minutes, seconds)
         else -> "${seconds}s"
     }
     return (if (this is PrayerCountdown.Remaining) "-" else "") + value
 }
 
+// Locale.ROOT: an Arabic or Persian device locale would otherwise emit Eastern Arabic digits,
+// which the countdown font and Home's fixed digit cells don't cover, and which iOS never shows.
 internal fun formatDuration(duration: Duration): String {
     val total = duration.seconds.coerceAtLeast(0L)
-    return "%02d:%02d:%02d".format(total / 3600, (total % 3600) / 60, total % 60)
+    return "%02d:%02d:%02d".format(Locale.ROOT, total / 3600, (total % 3600) / 60, total % 60)
 }

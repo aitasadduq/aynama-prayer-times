@@ -3,6 +3,14 @@
 
     <uses-feature android:name="android.hardware.type.watch" />
 
+    <!-- The complication refresh is an exact alarm at each prayer and each count-up flip.
+         Without these, Wear OS 4+ reports canScheduleExactAlarms() == false and every refresh
+         falls back to an inexact alarm the system may deliver long after the prayer. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+
     <application
         android:name=".WearApplication"
         android:allowBackup="true"

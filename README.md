@@ -16,7 +16,7 @@ Open-source Muslim prayer times & spiritual companion app for Android, iOS, Wear
 |---|---|
 | Android (phone + widgets) | v1 — in development. Built so far: prayer times with multiple profiles, Qibla, prayer tracker, notifications, four home-screen widgets, an optional live countdown notification |
 | WearOS | v2 — in progress: watch app, complications and tile, with profiles synced from the phone |
-| iOS (phone + widgets) | v3 — in progress: Swift domain logic, the profile pager, prayer ribbon and profile creation; simulator tests run in CI |
+| iOS (phone + widgets) | v3 — in progress: Swift domain logic, the profile pager and prayer ribbon, profiles, Qibla, tracker, settings and prayer alerts; widgets and Live Activity not started; simulator tests run in CI |
 | watchOS | v3 — not started |
 
 ## Architecture

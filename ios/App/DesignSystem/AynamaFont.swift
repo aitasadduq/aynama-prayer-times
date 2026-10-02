@@ -20,9 +20,6 @@ enum AynamaFont {
     /// 72pt / 1.0 — the countdown hero, and nothing else.
     static let displayXL = fraunces(size: 72, weight: 400, opticalSize: 144, textStyle: .largeTitle)
 
-    /// 48pt / 1.05 — screen headers.
-    static let displayLG = fraunces(size: 48, weight: 500, opticalSize: 96, textStyle: .largeTitle)
-
     /// 32pt / 1.1 — card headers, and the prayer name under the countdown.
     static let displayMD = fraunces(size: 32, weight: 500, opticalSize: 48, textStyle: .title1)
 
@@ -49,14 +46,6 @@ enum AynamaFont {
     /// Tabular figures are non-negotiable in §4: prayer times sit in a column and must not
     /// shuffle sideways as the digits change.
     static let monoNum = plex(size: 17, weight: 500, textStyle: .body, tabular: true)
-
-    /// Static Fraunces 400/144 with equal digit advances. The source variable face has no tnum.
-    static let countdown: Font = {
-        let face = UIFont(name: "AynamaCountdown-Regular", size: 72)!
-        return Font(UIFontMetrics(forTextStyle: .largeTitle)
-            .scaledFont(for: face, maximumPointSize: 144))
-    }()
-    static let timelineTime = plex(size: 20, weight: 500, textStyle: .title3, tabular: true)
 
     // Home receives sizes that already include Dynamic Type and viewport fitting from
     // HomePageMetrics. Scaling them a second time would push the last prayer off screen.
@@ -175,13 +164,5 @@ enum AynamaFont {
     /// A four-character axis tag as the integer CoreText wants ('wght' → 0x77676874).
     private static func axisTag(_ tag: String) -> Int {
         tag.utf8.reduce(0) { ($0 << 8) | Int($1) }
-    }
-}
-
-extension Text {
-    /// `-00:12:35` and friends. Tabular numerals plus a fixed width per digit so the hero does
-    /// not jitter every second (§4, §8 — the countdown ticks every second, always).
-    func countdownNumerals() -> some View {
-        self.monospacedDigit()
     }
 }

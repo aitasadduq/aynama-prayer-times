@@ -446,6 +446,8 @@ How the evidence was gathered:
 
   **Fix:** Derive the ribbon and phase from the shared timeline's instants, as the countdown and the widgets do, instead of comparing `LocalTime`s. Add a `HomeRibbonStateTest` built from real London 2026-06-21 MWL output, not the synthetic 00:25 Isha. *(Origin: 2026-09-24 review)*
 
+  **iOS has the same bug.** `derivePhase` and `deriveRibbonRows` in `ios/SharedLogic/Sources/SharedLogic/Day/PrayerDayState.swift` are line-for-line ports with the same `times.isha < times.fajr` guard, and `PrayerDayStateTests` has no equal-clock-time case. Fix both platforms together. *(Origin: PR #39 review)*
+
 - [ ] **[DS34]** `HomeScreen.kt:231` vs `TrackerViewModel.kt:98,105` — Home saves a mark under the profile page it was made on; the Tracker shows only the default (first) profile's marks. A prayer marked on any other Home page never appears in the Tracker's Today rows, history, weekly line or outstanding count, and each Home page counts only its own marks. Deleting a profile also deletes its marks (`QazaEntry` cascades), with no confirmation (PR #15 M10).
 
   **Fix:** Decide the model: marks belong to the person rather than the location profile (store them once, or migrate), or Home always marks against the Tracker's profile. Document it in §5 and §16, and mention the deleted history in M10's delete dialog. *(Origin: 2026-09-24 review)*

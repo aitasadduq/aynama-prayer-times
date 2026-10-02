@@ -316,7 +316,9 @@ private fun LocationSection(
     val context = LocalContext.current
     var isSearching by remember { mutableStateOf(!hasSelection) }
     var query by remember { mutableStateOf("") }
-    var suggestions by remember { mutableStateOf<List<Address>>(emptyList()) }
+    // Each suggestion carries its zone, resolved on IO: the first lookup loads the 600 KB
+    // boundary table, which must not happen on the main thread inside the tap handler.
+    var suggestions by remember { mutableStateOf<List<Pair<Address, String>>>(emptyList()) }
 
     val permLauncher = rememberLauncherForActivityResult(RequestPermission()) { granted ->
         if (granted) onGpsRequested()
@@ -328,7 +330,9 @@ private fun LocationSection(
             return@LaunchedEffect
         }
         delay(400)
-        suggestions = withContext(Dispatchers.IO) { searchCity(context, query) }
+        suggestions = withContext(Dispatchers.IO) {
+            searchCity(context, query).map { it to LocationTimeZone.detect(it.countryCode, it.latitude, it.longitude) }
+        }
     }
 
     if (!isSearching && hasSelection) {
@@ -369,14 +373,13 @@ private fun LocationSection(
 
         if (suggestions.isNotEmpty()) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                suggestions.forEach { address ->
+                suggestions.forEach { (address, tz) ->
                     val cityLabel = buildCityLabel(address)
                     Text(
                         text = cityLabel,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                val tz = LocationTimeZone.detect(address.countryCode, address.latitude, address.longitude)
                                 onLocationSelected(address.latitude, address.longitude, cityLabel, tz)
                                 isSearching = false
                                 query = ""

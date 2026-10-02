@@ -2,8 +2,6 @@ package com.aynama.prayertimes.wear.complications
 
 import android.content.Context
 import com.aynama.prayertimes.shared.AdhanWrapper
-import com.aynama.prayertimes.shared.PrayerTimesResult
-import com.aynama.prayertimes.shared.PrayerTimesUnavailableException
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.aynama.prayertimes.shared.timeline.PrayerCountdown
@@ -14,7 +12,6 @@ import com.aynama.prayertimes.shared.timeline.nextTransition
 import com.aynama.prayertimes.wear.WearApplication
 import kotlinx.coroutines.flow.first
 import java.time.Instant
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -82,24 +79,8 @@ object PrayerComplicationData {
     }
 
     private fun timelineFor(profile: Profile, now: Instant) = buildTimeline(
-        days = days(profile, now.atZone(profile.effectiveZoneId()).toLocalDate()),
+        days = AdhanWrapper().timelineDays(profile, now.atZone(profile.effectiveZoneId()).toLocalDate()),
         asrMadhab = profile.asrMadhab,
         zone = profile.effectiveZoneId(),
     )
-
-    private fun days(profile: Profile, today: LocalDate): Map<LocalDate, PrayerTimesResult> =
-        (-1L..1L).mapNotNull { offset ->
-            val date = today.plusDays(offset)
-            try {
-                date to AdhanWrapper().getPrayerTimes(
-                    latitude = profile.latitude,
-                    longitude = profile.longitude,
-                    date = date,
-                    timezone = profile.effectiveZoneId(),
-                    method = profile.calculationMethod,
-                )
-            } catch (e: PrayerTimesUnavailableException) {
-                null
-            }
-        }.toMap()
 }

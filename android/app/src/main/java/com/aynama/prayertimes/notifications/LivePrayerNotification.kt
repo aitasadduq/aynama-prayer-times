@@ -11,8 +11,6 @@ import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.MainActivity
 import com.aynama.prayertimes.R
 import com.aynama.prayertimes.shared.AdhanWrapper
-import com.aynama.prayertimes.shared.PrayerTimesResult
-import com.aynama.prayertimes.shared.PrayerTimesUnavailableException
 import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.aynama.prayertimes.shared.timeline.PrayerCountdown
@@ -23,7 +21,6 @@ import com.aynama.prayertimes.shared.timeline.nextTransition
 import com.aynama.prayertimes.widgets.EXTRA_WIDGET_PROFILE_ID
 import kotlinx.coroutines.flow.first
 import java.time.Instant
-import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -148,30 +145,10 @@ object LivePrayerNotification {
     }
 
     private fun timelineFor(profile: Profile, now: Instant) = buildTimeline(
-        days = profileDays(profile, now.atZone(profile.effectiveZoneId()).toLocalDate()),
+        days = AdhanWrapper().timelineDays(profile, now.atZone(profile.effectiveZoneId()).toLocalDate()),
         asrMadhab = profile.asrMadhab,
         zone = profile.effectiveZoneId(),
     )
-
-    // Yesterday/today/tomorrow, days with no computable times dropped. Same window the home
-    // pager and the widgets build: the countdown needs an event on each side of now.
-    private fun profileDays(profile: Profile, today: LocalDate): Map<LocalDate, PrayerTimesResult> {
-        val adhan = AdhanWrapper()
-        return (-1L..1L).mapNotNull { offset ->
-            val date = today.plusDays(offset)
-            try {
-                date to adhan.getPrayerTimes(
-                    latitude = profile.latitude,
-                    longitude = profile.longitude,
-                    date = date,
-                    timezone = profile.effectiveZoneId(),
-                    method = profile.calculationMethod,
-                )
-            } catch (e: PrayerTimesUnavailableException) {
-                null
-            }
-        }.toMap()
-    }
 
     private fun timeFormatter(zone: java.time.ZoneId): DateTimeFormatter =
         DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault()).withZone(zone)
