@@ -6,7 +6,7 @@ import SharedLogic
 struct ProfileUiState: Equatable {
     let profile: Profile
     let ribbonRows: [RibbonRow]
-    /// Already signed and padded per DESIGN.md §19 — render it verbatim.
+    /// Compact signed Home countdown per DESIGN.md §19 — render it verbatim.
     let countdownText: String
     /// True while counting up from a prayer that has started; false while counting down to one.
     let countdownIsElapsed: Bool
@@ -47,7 +47,7 @@ enum ProfilePage: Equatable, Identifiable {
 final class HomeModel {
 
     private(set) var pages: [ProfilePage] = []
-    private(set) var now: Date = .now
+    private(set) var now: Date = AppClock.now
 
     private let adhan = AdhanWrapper()
     private var tickTask: Task<Void, Never>?
@@ -91,7 +91,7 @@ final class HomeModel {
                 // once a second forever. There is no `deinit` to cancel it from: `tickTask` is
                 // main-actor isolated and `deinit` is not, so the loop has to end itself.
                 guard let self else { return }
-                self.now = .now
+                self.now = AppClock.now
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -141,7 +141,7 @@ final class HomeModel {
                 isRamadan: ramadan,
                 formatter: { [self] in format($0, in: zone, on: today) }
             ),
-            countdownText: countdown?.formatted() ?? Self.noCountdown,
+            countdownText: countdown?.compactFormatted() ?? Self.noCountdown,
             countdownIsElapsed: countdown?.isElapsed ?? false,
             countdownPrayerName: countdown?.entry.displayName ?? "",
             countdownPrayerTime: countdown.map { format($0.entry.time, in: zone, on: $0.entry.date) } ?? "",
@@ -219,7 +219,7 @@ final class HomeModel {
     // Only reachable when today has times but neither neighbouring day does, so the timeline has
     // no event on one side of now. Em dashes rather than "00:00:00", which would read as a prayer
     // that has just started.
-    static let noCountdown = "--:--:--"
+    static let noCountdown = "--"
 
     static let polarReason = """
         The sun doesn't fully rise or set at this location today, so there are no times to \

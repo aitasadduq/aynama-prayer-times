@@ -90,10 +90,20 @@ enum TimeOfDaySurface {
         }
     }
 
+    var accent: Color { prefersLightForeground ? AynamaColor.saffron : AynamaColor.saffronInk }
+
+    var activeForeground: Color {
+        // Saffron meets AA on Isha's ink, but not on predawn warmth or oxblood.
+        self == .isha ? AynamaColor.saffron : foreground
+    }
+
     var foreground: Color { prefersLightForeground ? AynamaColor.parchment : AynamaColor.ink }
 
     var foregroundMuted: Color {
-        prefersLightForeground ? AynamaColor.parchmentMuted : AynamaColor.inkMuted
+        // Muted ink falls below AA on linen, honey and saffron. Size and state marks carry
+        // the hierarchy there; retain full ink so metadata and passed prayers remain legible.
+        if prefersLightForeground { return AynamaColor.parchmentMuted }
+        return AynamaColor.ink
     }
 
     private func hex(_ value: Int) -> Color {

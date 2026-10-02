@@ -45,6 +45,25 @@ struct PrayerTimelineTests {
         countdownAt(timeline(), now: at(hour, minute, second))!.formatted()
     }
 
+    @Test("Home countdown uses compact units at every boundary")
+    func compactHomeCountdown() {
+        let entry = timeline().first!
+        func text(_ seconds: Int, elapsed: Bool = false) -> String {
+            let duration = Duration.seconds(seconds)
+            let countdown: PrayerCountdown = elapsed
+                ? .elapsed(entry: entry, duration: duration)
+                : .remaining(entry: entry, duration: duration)
+            return countdown.compactFormatted()
+        }
+        #expect(text(31 * 3600 + 4 * 60 + 12) == "-31h 04m")
+        #expect(text(3600 + 10 * 60) == "-1h 10m")
+        #expect(text(10 * 60 + 25) == "-10m 25s")
+        #expect(text(60) == "-1m 00s")
+        #expect(text(10) == "-10s")
+        #expect(text(0, elapsed: true) == "0s")
+        #expect(text(59, elapsed: true) == "59s")
+    }
+
     // MARK: - Direction and sign
 
     @Test("before a prayer it counts down with a minus sign")

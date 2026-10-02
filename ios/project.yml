@@ -59,8 +59,13 @@ targets:
     info:
       path: App/Info.plist
       properties:
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.aynama.prayertimes.refresh
+        UIBackgroundModes:
+          - fetch
         UIAppFonts:
           - Fraunces.ttf
+          - AynamaCountdown.ttf
           - IBMPlexSans.ttf
         # Without a launch screen the app is given a compatibility-mode canvas smaller than the
         # device, which letterboxes every surface: the FAB lands on the ribbon's time column and

@@ -5,6 +5,11 @@ import android.os.PowerManager
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleCallback
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
@@ -54,8 +59,28 @@ class BatteryPromptTest {
                 "the battery prompt was never requested",
                 app.prefs.getBoolean(MainActivity.KEY_BATTERY_OPT_REQUESTED, false),
             )
+            val automation = instrumentation.uiAutomation
+            automation.waitForIdle(500, 10_000)
+            // Global Back is asynchronous. Keep this Activity alive until the system
+            // prompt has closed, so the action cannot dismiss the next test's Activity.
+            val resumed = CountDownLatch(1)
+            val lifecycle = ActivityLifecycleMonitorRegistry.getInstance()
+            val onResumed = ActivityLifecycleCallback { activity, stage ->
+                if (activity is MainActivity && stage == Stage.RESUMED) resumed.countDown()
+            }
+            instrumentation.runOnMainSync { lifecycle.addLifecycleCallback(onResumed) }
+            try {
+                assertTrue(
+                    "the battery prompt could not be dismissed",
+                    automation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK),
+                )
+                assertTrue(
+                    "the app did not resume after dismissing the battery prompt",
+                    resumed.await(10, TimeUnit.SECONDS),
+                )
+            } finally {
+                instrumentation.runOnMainSync { lifecycle.removeLifecycleCallback(onResumed) }
+            }
         }
-        // Dismiss the system prompt the launch opened, so it does not sit over later tests.
-        instrumentation.uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
     }
 }

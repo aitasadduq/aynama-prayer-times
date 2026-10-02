@@ -29,6 +29,10 @@ enum AynamaFont {
     /// 20pt / 1.25 — section titles.
     static let title = fraunces(size: 20, weight: 500, opticalSize: 20, textStyle: .title3)
 
+    static let qiblaTitle = fraunces(size: 28, weight: 500, opticalSize: 32, textStyle: .title1)
+    static let qiblaDegree = fraunces(size: 56, weight: 400, opticalSize: 96, textStyle: .largeTitle)
+    static let north = fraunces(size: 16, weight: 500, opticalSize: 20, textStyle: .subheadline)
+
     // MARK: - Body (IBM Plex Sans)
 
     /// 17pt / 1.45 — primary reading.
@@ -46,6 +50,35 @@ enum AynamaFont {
     /// shuffle sideways as the digits change.
     static let monoNum = plex(size: 17, weight: 500, textStyle: .body, tabular: true)
 
+    /// Static Fraunces 400/144 with equal digit advances. The source variable face has no tnum.
+    static let countdown: Font = {
+        let face = UIFont(name: "AynamaCountdown-Regular", size: 72)!
+        return Font(UIFontMetrics(forTextStyle: .largeTitle)
+            .scaledFont(for: face, maximumPointSize: 144))
+    }()
+    static let timelineTime = plex(size: 20, weight: 500, textStyle: .title3, tabular: true)
+
+    // Home receives sizes that already include Dynamic Type and viewport fitting from
+    // HomePageMetrics. Scaling them a second time would push the last prayer off screen.
+    static func homeCountdown(size: CGFloat) -> Font {
+        Font(UIFont(name: "AynamaCountdown-Regular", size: size)!)
+    }
+    static func homeSubtitle(size: CGFloat) -> Font {
+        fraunces(size: size, weight: 500, opticalSize: 48, textStyle: .title1, scaleForDynamicType: false)
+    }
+    static func homeRowName(size: CGFloat) -> Font {
+        fraunces(size: size, weight: 500, opticalSize: 20, textStyle: .title3, scaleForDynamicType: false)
+    }
+    static func homeRowTime(size: CGFloat) -> Font {
+        plex(size: size, weight: 500, textStyle: .title3, tabular: true, scaleForDynamicType: false)
+    }
+    static func homeMeta(size: CGFloat) -> Font {
+        plex(size: size, weight: 500, textStyle: .footnote, scaleForDynamicType: false)
+    }
+    static func homeMark(size: CGFloat) -> Font {
+        plex(size: size, weight: 500, textStyle: .body, tabular: true, scaleForDynamicType: false)
+    }
+
     // MARK: - Construction
 
     /// Fraunces' four axes. `SOFT` and `WONK` stay at the family defaults — the design uses
@@ -54,13 +87,15 @@ enum AynamaFont {
         size: CGFloat,
         weight: CGFloat,
         opticalSize: CGFloat,
-        textStyle: UIFont.TextStyle
+        textStyle: UIFont.TextStyle,
+        scaleForDynamicType: Bool = true
     ) -> Font {
         variableFont(
             named: "Fraunces",
             size: size,
             textStyle: textStyle,
-            axes: [axisTag("wght"): weight, axisTag("opsz"): opticalSize]
+            axes: [axisTag("wght"): weight, axisTag("opsz"): opticalSize],
+            scaleForDynamicType: scaleForDynamicType
         )
     }
 
@@ -68,14 +103,16 @@ enum AynamaFont {
         size: CGFloat,
         weight: CGFloat,
         textStyle: UIFont.TextStyle,
-        tabular: Bool = false
+        tabular: Bool = false,
+        scaleForDynamicType: Bool = true
     ) -> Font {
         variableFont(
             named: "IBM Plex Sans",
             size: size,
             textStyle: textStyle,
             axes: [axisTag("wght"): weight],
-            tabular: tabular
+            tabular: tabular,
+            scaleForDynamicType: scaleForDynamicType
         )
     }
 
@@ -84,8 +121,16 @@ enum AynamaFont {
         size: CGFloat,
         textStyle: UIFont.TextStyle,
         axes: [Int: CGFloat],
-        tabular: Bool = false
+        tabular: Bool = false,
+        scaleForDynamicType: Bool = true
     ) -> Font {
+        Font(uiFont(named: family, size: size, textStyle: textStyle, axes: axes,
+                    tabular: tabular, scaleForDynamicType: scaleForDynamicType))
+    }
+
+    private static func uiFont(named family: String, size: CGFloat, textStyle: UIFont.TextStyle,
+                               axes: [Int: CGFloat], tabular: Bool = false,
+                               scaleForDynamicType: Bool = true) -> UIFont {
         var attributes: [UIFontDescriptor.AttributeName: Any] = [
             .family: family,
             kCTFontVariationAttribute as UIFontDescriptor.AttributeName: axes,
@@ -102,10 +147,29 @@ enum AynamaFont {
         }
         let descriptor = UIFontDescriptor(fontAttributes: attributes)
         let base = UIFont(descriptor: descriptor, size: size)
+        if !scaleForDynamicType { return base }
         // Dynamic Type, capped so `display-xl` at an accessibility size does not push the prayer
         // name off the screen entirely. §12 asks for Dynamic Type, not for unbounded growth.
-        let scaled = UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base, maximumPointSize: size * 1.6)
-        return Font(scaled)
+        let scaled = UIFontMetrics(forTextStyle: textStyle).scaledFont(for: base, maximumPointSize: size * 2)
+        return scaled
+    }
+
+    @MainActor
+    static func configureNativeTypography() {
+        let body = uiFont(named: "IBM Plex Sans", size: 17, textStyle: .body, axes: [axisTag("wght"): 400])
+        let caption = uiFont(named: "IBM Plex Sans", size: 11, textStyle: .caption1, axes: [axisTag("wght"): 500])
+        let foreground = UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(AynamaColor.parchment) : UIColor(AynamaColor.ink)
+        }
+        UINavigationBar.appearance().titleTextAttributes = [.font: body, .foregroundColor: foreground]
+        UITabBarItem.appearance().setTitleTextAttributes([.font: caption, .foregroundColor: foreground], for: .normal)
+        UITabBarItem.appearance().setTitleTextAttributes([.font: caption, .foregroundColor: foreground], for: .selected)
+        UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(AynamaColor.saffron)
+        UISegmentedControl.appearance().backgroundColor = UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(AynamaColor.inkMuted) : UIColor(AynamaColor.parchmentMuted)
+        }
+        UISegmentedControl.appearance().setTitleTextAttributes([.font: body, .foregroundColor: foreground], for: .normal)
+        UISegmentedControl.appearance().setTitleTextAttributes([.font: body, .foregroundColor: UIColor(AynamaColor.ink)], for: .selected)
     }
 
     /// A four-character axis tag as the integer CoreText wants ('wght' → 0x77676874).

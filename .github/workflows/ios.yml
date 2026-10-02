@@ -48,8 +48,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode 16.4
-        run: sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
+      - name: Select Xcode with the iOS 26 SDK
+        run: |
+          python3 - <<'PYCODE'
+          import re
+          import subprocess
+          from pathlib import Path
+
+          candidates = []
+          for app in Path("/Applications").glob("Xcode_*.app"):
+              version = tuple(int(part) for part in re.findall(r"\d+", app.stem))
+              if version and version[0] >= 26:
+                  candidates.append((version, app))
+          if not candidates:
+              raise SystemExit("An Xcode 26+ installation is required to validate Liquid Glass")
+          selected = max(candidates)[1] / "Contents/Developer"
+          subprocess.run(["sudo", "xcode-select", "--switch", str(selected)], check=True)
+          print(f"Selected {selected}")
+          PYCODE
 
       - name: Report toolchain
         run: swift --version
@@ -87,8 +103,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode 16.4
-        run: sudo xcode-select --switch /Applications/Xcode_16.4.app/Contents/Developer
+      - name: Select Xcode with the iOS 26 SDK
+        run: |
+          python3 - <<'PYCODE'
+          import re
+          import subprocess
+          from pathlib import Path
+
+          candidates = []
+          for app in Path("/Applications").glob("Xcode_*.app"):
+              version = tuple(int(part) for part in re.findall(r"\d+", app.stem))
+              if version and version[0] >= 26:
+                  candidates.append((version, app))
+          if not candidates:
+              raise SystemExit("An Xcode 26+ installation is required to validate Liquid Glass")
+          selected = max(candidates)[1] / "Contents/Developer"
+          subprocess.run(["sudo", "xcode-select", "--switch", str(selected)], check=True)
+          print(f"Selected {selected}")
+          PYCODE
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -108,10 +140,10 @@ jobs:
 
           devices = json.loads(Path(os.environ["RUNNER_TEMP"], "simulators.json").read_text())["devices"]
           iphones = [device for runtime, entries in sorted(devices.items(), reverse=True)
-                     if ".iOS-" in runtime for device in entries
+                     if ".iOS-26" in runtime for device in entries
                      if device["name"].startswith("iPhone") and device["isAvailable"]]
           if not iphones:
-              raise SystemExit("No installed iPhone simulator is available")
+              raise SystemExit("No installed iOS 26 iPhone simulator is available")
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               output.write(f"udid={iphones[0]['udid']}\n")
           print(f"Testing on {iphones[0]['name']} ({iphones[0]['udid']})")
@@ -128,6 +160,26 @@ jobs:
             -parallel-testing-enabled NO \
             -resultBundlePath "$RUNNER_TEMP/Aynama.xcresult" \
             CODE_SIGNING_ALLOWED=NO test
+
+      - name: Export app screenshots
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/ios-screenshots"
+          if [ -d "$RUNNER_TEMP/Aynama.xcresult" ]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/Aynama.xcresult" \
+              --output-path "$RUNNER_TEMP/ios-attachments"
+            python3 scripts/ios/collect-screenshots.py "$RUNNER_TEMP/ios-attachments" "$RUNNER_TEMP/ios-screenshots"
+            cp "$RUNNER_TEMP/ios-attachments/manifest.json" "$RUNNER_TEMP/ios-screenshots/manifest.json"
+          fi
+
+      - name: Upload app screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-screenshots
+          path: ${{ runner.temp }}/ios-screenshots
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Upload simulator test results
         if: always()

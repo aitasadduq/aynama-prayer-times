@@ -35,7 +35,6 @@ Tracked items from plan reviews. Must-decide-before-code items are in `.gstack/p
 
 ## Design decisions raised by the 2026-09-23 sync
 
-- [ ] **Moving sundial tick (DS6).** Build the vertical rule and the moving tick, or formally amend DESIGN.md §9. It's one of the Two Deliberate Departures.
 - [ ] **Hijri adjustment lapse rule (DS7).** With +1, the app shows Ramadan, with an Imsak alarm, on the user's Eid, and a +1 saved the evening before the first fast misses the first day entirely. Decide what should happen when the adjusted month ends.
 - [ ] **Hijri calendar variant (DS11).** ICU picks Umm al-Qura or civil from the device's region. Pin one explicitly.
 - [ ] **Polar-day convention** (REVIEW-FINDINGS PR #21 C1). Nearest latitude, nearest day, or fixed proportions.
@@ -338,14 +337,14 @@ Depends on: Phase 1.
 
 **Prayer timeline ribbon (DESIGN.md §5)**
 - [x] Countdown hero: Fraunces `display-xl` (72sp), left-aligned, signed per DESIGN.md §19 — *`main` has centred it since 2026-05-29 (`b028aa3`); #22 restored the left alignment*
-- [ ] Countdown hero digits don't drift — **not met:** the bundled Fraunces has proportional figures and no `tnum` feature, so `fontFeatureSettings = "tnum"` does nothing (DS9)
+- [x] Countdown hero digits don't drift — generated Fraunces countdown face has equal digit advances on Android and iOS
 - [x] Prayer line: Fraunces `display-md`, "Asr · 4:14 PM" — *below the countdown, not above it, naming the prayer the countdown refers to (the one just begun while counting up)*
 - [x] Header line: IBM Plex `body-sm` — *shows "Profile · method" plus the Hijri date, not "Home · London"*
 - [x] Prayer rows — 3 visual states:
   - Passed: `ink-muted` (light phases) / `parchment-muted` (dark) at **full** opacity (not 60%), ✓ glyph
   - Current: 8dp dot; saffron on dark phases, ink on light phases
   - Upcoming: `ink`, full opacity, no decoration
-- [ ] Current: saffron tick that **moves down** the ribbon as time passes — **not built.** The "tick" is a static dot, and there's no vertical line (DS6).
+- [x] Current: a standalone 8 dp dot, with no vertical rule, matching the revised Home timeline design.
 - [x] Sunrise row: `ink-muted`, no dot, time-reference only
 - [x] Tap on prayer row → opens mark-prayer bottom sheet (passed and current prayers only)
 - [x] Time-of-day surface: slow cross-fade gradient per prayer phase (`animateColorAsState(tween(3000))`, 6 phases)
@@ -367,7 +366,7 @@ Depends on: Phase 1.
 - [x] First Ramadan open: dismissible banner, shown once per Hijri year (dismissed year in SharedPreferences) — *the copy is just "Ramaḍān Mubārak", with no Imsak mention*
 
 **Accessibility**
-- [x] TalkBack countdown — *reads "Asr in 02:14:00", or "Dhuhr began 00:15:42 ago", not the full sentence*
+- [x] TalkBack countdown — reads compact units in words, for example "Asr in 1 hour 10 minutes"
 - [x] Prayer row announces: "Fajr 5:12 AM, passed"
 - [ ] Profile switcher: accessibility action "Switch to next profile" — **not built.** Pages announce "Profile page 1 of 3: London"; navigation relies on the pager's default scroll actions.
 

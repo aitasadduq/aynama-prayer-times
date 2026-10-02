@@ -282,21 +282,16 @@ private fun ProfilePageContent(
         val countdownLabel = when {
             profileState.countdownPrayerName.isEmpty() -> "No countdown available"
             profileState.countdownIsElapsed ->
-                "${profileState.countdownPrayerName} began ${profileState.countdownText} ago"
+                "${profileState.countdownPrayerName} began ${spokenCompactCountdown(profileState.countdownText)} ago"
             else ->
-                "${profileState.countdownPrayerName} in ${profileState.countdownText.removePrefix("-")}"
+                "${profileState.countdownPrayerName} in ${spokenCompactCountdown(profileState.countdownText)}"
         }
 
         // Left-aligned, not centred: architecture-design.md lists a centred home countdown
         // as a banned pattern, and DESIGN.md §5 draws it flush left.
-        Text(
-            text = profileState.countdownText,
-            style = MaterialTheme.typography.displayLarge.copy(fontFeatureSettings = "tnum"),
-            textAlign = TextAlign.Start,
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = countdownLabel },
-        )
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
+            CountdownDigits(profileState.countdownText, countdownLabel)
+        }
 
         Text(
             text = "${profileState.countdownPrayerName} · ${profileState.countdownPrayerTime}",
@@ -673,6 +668,17 @@ private fun LoadingContent() {
             .background(Ink),
     )
 }
+
+private fun spokenCompactCountdown(text: String): String =
+    Regex("(\\d+)([hms])").replace(text.removePrefix("-")) { match ->
+        val value = match.groupValues[1].toInt()
+        val unit = when (match.groupValues[2]) {
+            "h" -> "hour"
+            "m" -> "minute"
+            else -> "second"
+        }
+        "$value $unit${if (value == 1) "" else "s"}"
+    }
 
 private fun CalculationMethodKey.taqweemName(): String = when (this) {
     CalculationMethodKey.MWL -> "MWL"
