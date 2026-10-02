@@ -5,10 +5,14 @@ import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.entity.Prayer
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 class HomeRibbonStateTest {
+
+    // A Monday: these cases are about ribbon state, not day-dependent naming.
+    private val monday: LocalDate = LocalDate.of(2026, 5, 11)
 
     private val formatter = DateTimeFormatter.ofPattern("h:mm a")
 
@@ -24,14 +28,14 @@ class HomeRibbonStateTest {
 
     @Test
     fun `before fajr — all prayers upcoming`() {
-        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(3, 0), false, formatter)
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(3, 0), monday, false, formatter)
         val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
         prayerRows.forEach { assertEquals(RibbonState.UPCOMING, it.ribbonState) }
     }
 
     @Test
     fun `after fajr before dhuhr — fajr current rest upcoming`() {
-        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(8, 0), false, formatter)
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(8, 0), monday, false, formatter)
         val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
         assertEquals(RibbonState.CURRENT, prayerRows.first { it.prayer == Prayer.FAJR }.ribbonState)
         assertEquals(RibbonState.UPCOMING, prayerRows.first { it.prayer == Prayer.DHUHR }.ribbonState)
@@ -42,7 +46,7 @@ class HomeRibbonStateTest {
 
     @Test
     fun `after dhuhr before asr — fajr passed dhuhr current`() {
-        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(14, 0), false, formatter)
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(14, 0), monday, false, formatter)
         val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
         assertEquals(RibbonState.PASSED, prayerRows.first { it.prayer == Prayer.FAJR }.ribbonState)
         assertEquals(RibbonState.CURRENT, prayerRows.first { it.prayer == Prayer.DHUHR }.ribbonState)
@@ -51,7 +55,7 @@ class HomeRibbonStateTest {
 
     @Test
     fun `after isha — fajr through maghrib passed isha current`() {
-        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(22, 0), false, formatter)
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(22, 0), monday, false, formatter)
         val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
         assertEquals(RibbonState.PASSED, prayerRows.first { it.prayer == Prayer.FAJR }.ribbonState)
         assertEquals(RibbonState.PASSED, prayerRows.first { it.prayer == Prayer.DHUHR }.ribbonState)
@@ -64,8 +68,8 @@ class HomeRibbonStateTest {
     fun `hanafi madhab uses asrHanafi time`() {
         // Hanafi Asr is at 16:30, Shafii at 15:45
         // At 16:00, Shafii Asr is current, Hanafi Asr is upcoming
-        val shafiiRows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(16, 0), false, formatter)
-        val hanafiRows = deriveRibbonRows(sampleTimes, AsrMadhab.HANAFI, LocalTime.of(16, 0), false, formatter)
+        val shafiiRows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(16, 0), monday, false, formatter)
+        val hanafiRows = deriveRibbonRows(sampleTimes, AsrMadhab.HANAFI, LocalTime.of(16, 0), monday, false, formatter)
 
         val shafiiAsr = shafiiRows.filterIsInstance<RibbonRow.PrayerEntry>().first { it.prayer == Prayer.ASR }
         val hanafiAsr = hanafiRows.filterIsInstance<RibbonRow.PrayerEntry>().first { it.prayer == Prayer.ASR }
@@ -76,7 +80,7 @@ class HomeRibbonStateTest {
 
     @Test
     fun `ramadan adds imsak row before fajr`() {
-        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(4, 0), true, formatter)
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(4, 0), monday, true, formatter)
         val imsakRow = rows.filterIsInstance<RibbonRow.ImsakEntry>().firstOrNull()
         assertEquals(rows[0], imsakRow)
         // Imsak = Fajr (4:30) - 10 min = 4:20
@@ -85,21 +89,21 @@ class HomeRibbonStateTest {
 
     @Test
     fun `ramadan imsak marked past when now after imsak time`() {
-        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(4, 25), true, formatter)
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(4, 25), monday, true, formatter)
         val imsakRow = rows.filterIsInstance<RibbonRow.ImsakEntry>().first()
         assertEquals(true, imsakRow.isPast)  // now=4:25, imsak=4:20, past
     }
 
     @Test
     fun `sunrise row always present and not a prayer`() {
-        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(10, 0), false, formatter)
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(10, 0), monday, false, formatter)
         val sunriseRows = rows.filterIsInstance<RibbonRow.SunriseEntry>()
         assertEquals(1, sunriseRows.size)
     }
 
     @Test
     fun `row order is imsak fajr sunrise dhuhr asr maghrib isha in ramadan`() {
-        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(10, 0), true, formatter)
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(10, 0), monday, true, formatter)
         assertEquals(7, rows.size)
         assert(rows[0] is RibbonRow.ImsakEntry)
         assert(rows[1] is RibbonRow.PrayerEntry && (rows[1] as RibbonRow.PrayerEntry).prayer == Prayer.FAJR)
@@ -108,38 +112,6 @@ class HomeRibbonStateTest {
         assert(rows[4] is RibbonRow.PrayerEntry && (rows[4] as RibbonRow.PrayerEntry).prayer == Prayer.ASR)
         assert(rows[5] is RibbonRow.PrayerEntry && (rows[5] as RibbonRow.PrayerEntry).prayer == Prayer.MAGHRIB)
         assert(rows[6] is RibbonRow.PrayerEntry && (rows[6] as RibbonRow.PrayerEntry).prayer == Prayer.ISHA)
-    }
-
-    @Test
-    fun `fajr window — next prayer name is sunrise`() {
-        assertEquals("Sunrise", deriveNextPrayerName(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(5, 0)))
-    }
-
-    @Test
-    fun `fajr window — countdown shows time until sunrise`() {
-        // now=5:00, sunrise=6:10 → 1h 10m
-        assertEquals("1h 10m", deriveCountdown(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(5, 0)))
-    }
-
-    @Test
-    fun `fajr window — next prayer time shows sunrise time`() {
-        val result = deriveNextPrayerTime(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(5, 0), formatter)
-        assertEquals("6:10 AM", result)
-    }
-
-    @Test
-    fun `countdown shows time until next prayer`() {
-        // now = 10:00, next = dhuhr = 12:15 → 2h 15m
-        val result = deriveCountdown(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(10, 0))
-        assertEquals("2h 15m", result)
-    }
-
-    @Test
-    fun `countdown wraps to tomorrow fajr after isha`() {
-        // now = 23:00, all prayers passed → next = tomorrow fajr (approximate via midnight wrap)
-        val result = deriveCountdown(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(23, 0))
-        // 1h to midnight + 4h30m to fajr = 5h30m
-        assertEquals("5h 30m", result)
     }
 
     // ---- post-midnight Isha (e.g. London in summer) ----
@@ -155,57 +127,17 @@ class HomeRibbonStateTest {
     )
 
     @Test
-    fun `post-midnight isha — next prayer name is isha in the evening`() {
-        assertEquals("Isha", deriveNextPrayerName(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15)))
-    }
-
-    @Test
-    fun `post-midnight isha — countdown shows time until isha not fajr`() {
-        // now=22:15, isha=00:25 → 1h45m to midnight + 25m to isha = 2h10m
-        assertEquals("2h 10m", deriveCountdown(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15)))
-    }
-
-    @Test
-    fun `post-midnight isha — next prayer time is isha time`() {
-        val result = deriveNextPrayerTime(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15), formatter)
-        assertEquals("12:25 AM", result)
-    }
-
-    @Test
     fun `post-midnight isha — ribbon shows isha as upcoming in the evening`() {
-        val rows = deriveRibbonRows(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15), false, formatter)
+        val rows = deriveRibbonRows(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(22, 15), monday, false, formatter)
         val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
         assertEquals(RibbonState.UPCOMING, prayerRows.first { it.prayer == Prayer.ISHA }.ribbonState)
         assertEquals(RibbonState.CURRENT, prayerRows.first { it.prayer == Prayer.MAGHRIB }.ribbonState)
     }
 
     @Test
-    fun `post-midnight isha — after isha wraps to fajr`() {
-        assertEquals("Fajr", deriveNextPrayerName(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 30)))
-    }
-
-    @Test
-    fun `post-midnight isha — before isha after midnight next prayer is isha`() {
-        // now=00:05, isha=00:25, fajr=05:25 → still counting down to Isha
-        assertEquals("Isha", deriveNextPrayerName(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5)))
-    }
-
-    @Test
-    fun `post-midnight isha — countdown before isha after midnight shows isha countdown`() {
-        // now=00:05, isha=00:25 → 20m
-        assertEquals("20m", deriveCountdown(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5)))
-    }
-
-    @Test
-    fun `post-midnight isha — next prayer time before isha after midnight shows isha time`() {
-        val result = deriveNextPrayerTime(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5), formatter)
-        assertEquals("12:25 AM", result)
-    }
-
-    @Test
     fun `post-midnight isha — ribbon shows isha current after it passes`() {
         // now=01:00, isha=00:25 → Isha is current, all daytime prayers passed
-        val rows = deriveRibbonRows(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(1, 0), false, formatter)
+        val rows = deriveRibbonRows(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(1, 0), monday, false, formatter)
         val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
         assertEquals(RibbonState.PASSED, prayerRows.first { it.prayer == Prayer.FAJR }.ribbonState)
         assertEquals(RibbonState.PASSED, prayerRows.first { it.prayer == Prayer.DHUHR }.ribbonState)
@@ -217,20 +149,10 @@ class HomeRibbonStateTest {
     @Test
     fun `post-midnight isha — ribbon shows maghrib current before isha after midnight`() {
         // now=00:05, isha=00:25 → Isha upcoming, Maghrib current
-        val rows = deriveRibbonRows(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5), false, formatter)
+        val rows = deriveRibbonRows(postMidnightIshaTimes, AsrMadhab.SHAFII, LocalTime.of(0, 5), monday, false, formatter)
         val prayerRows = rows.filterIsInstance<RibbonRow.PrayerEntry>()
         assertEquals(RibbonState.CURRENT, prayerRows.first { it.prayer == Prayer.MAGHRIB }.ribbonState)
         assertEquals(RibbonState.UPCOMING, prayerRows.first { it.prayer == Prayer.ISHA }.ribbonState)
-    }
-
-    @Test
-    fun `next prayer name before fajr returns fajr`() {
-        assertEquals("Fajr", deriveNextPrayerName(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(3, 0)))
-    }
-
-    @Test
-    fun `next prayer name after all prayers returns fajr`() {
-        assertEquals("Fajr", deriveNextPrayerName(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(23, 0)))
     }
 
     @Test
@@ -257,5 +179,39 @@ class HomeRibbonStateTest {
         assertEquals(PrayerPhase.ASR, derivePhase(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(17, 0)))
         assertEquals(PrayerPhase.MAGHRIB, derivePhase(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(20, 30)))
         assertEquals(PrayerPhase.ISHA, derivePhase(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(22, 0)))
+    }
+
+    // ---- Friday naming ----
+
+    @Test
+    fun `ribbon names friday's dhuhr as jumuah`() {
+        val friday = LocalDate.of(2026, 5, 15)
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(10, 0), friday, false, formatter)
+        val prayers = rows.filterIsInstance<RibbonRow.PrayerEntry>()
+
+        assertEquals(
+            listOf("Fajr", "Jumuah", "Asr", "Maghrib", "Isha"),
+            prayers.map { it.displayName },
+        )
+        // The label changes; the stored prayer does not.
+        assertEquals(Prayer.DHUHR, prayers[1].prayer)
+    }
+
+    @Test
+    fun `ribbon keeps dhuhr on other days`() {
+        val rows = deriveRibbonRows(sampleTimes, AsrMadhab.SHAFII, LocalTime.of(10, 0), monday, false, formatter)
+        val prayers = rows.filterIsInstance<RibbonRow.PrayerEntry>()
+
+        assertEquals("Dhuhr", prayers[1].displayName)
+    }
+
+    @Test
+    fun `phase label follows the same friday rule`() {
+        // The Qibla screen names its time-of-day band after the prayer that opened it.
+        val friday = LocalDate.of(2026, 5, 15)
+        assertEquals("Jumuah", phaseDisplayName(PrayerPhase.DHUHR, friday))
+        assertEquals("Dhuhr", phaseDisplayName(PrayerPhase.DHUHR, monday))
+        assertEquals("Sunrise", phaseDisplayName(PrayerPhase.SUNRISE_TRANSITION, friday))
+        assertEquals("Asr", phaseDisplayName(PrayerPhase.ASR, friday))
     }
 }

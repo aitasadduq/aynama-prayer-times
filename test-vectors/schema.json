@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/aitasadduq/aynama-prayer-times/main/test-vectors/schema.json",
   "title": "Prayer Times Test Vector",
-  "description": "Validates prayer-times test vector files under test-vectors/prayer-times/. Enforced by vectors.yml CI on every commit.",
+  "description": "Validates prayer-times test vector files under test-vectors/prayer-times/. Enforced by the `vectors` job in .github/workflows/ios.yml, which runs scripts/validate-vectors.py on every commit that touches a vector.",
   "type": "object",
   "required": ["method", "tolerance_minutes", "reference", "cases"],
   "additionalProperties": false,

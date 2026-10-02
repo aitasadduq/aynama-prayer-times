@@ -23,3 +23,4 @@ dependencyResolutionManagement {
 rootProject.name = "aynama"
 include(":app")
 include(":shared-logic")
+include(":wear")

@@ -54,6 +54,12 @@ dependencies {
     implementation(libs.compose.material.icons.extended)
 
     implementation(project(":shared-logic"))
+    implementation(libs.play.services.wearable)
+    implementation(libs.kotlinx.coroutines.play.services)
+    // play-services-wearable drags in androidx.fragment 1.0.0, which resolves below the 1.3.0
+    // the ActivityResult APIs require — older FragmentActivity never called
+    // super.onRequestPermissionsResult, so the notification permission result would be lost.
+    implementation(libs.androidx.fragment)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
 

@@ -1,0 +1,25 @@
+{
+  "method": "UMM_AL_QURA",
+  "tolerance_minutes": 1,
+  "reference": "Adhan-Kotlin com.batoulapps.adhan:adhan:1.2.1",
+  "cases": [
+    {
+      "description": "Riyadh, Saudi Arabia \u2014 Umm al-Qura's home method, summer solstice",
+      "input": {
+        "latitude": 24.7136,
+        "longitude": 46.6753,
+        "date": "2026-06-21",
+        "timezone": "Asia/Riyadh"
+      },
+      "expected": {
+        "fajr": "03:33",
+        "sunrise": "05:05",
+        "dhuhr": "11:55",
+        "asr_shafii": "15:16",
+        "asr_hanafi": "16:38",
+        "maghrib": "18:45",
+        "isha": "20:15"
+      }
+    }
+  ]
+}

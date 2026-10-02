@@ -171,6 +171,17 @@ fun NotificationSettingsScreen(
                 // OTHER section
                 item { SectionHeader(title = "OTHER") }
                 item {
+                    LiveNotificationRow(
+                        enabled = state.liveNotificationEnabled,
+                        onToggle = { vm.setLiveNotificationEnabled(it) },
+                    )
+                    HorizontalDivider(
+                        color = ParchmentMuted,
+                        thickness = 0.5.dp,
+                        modifier = Modifier.padding(start = 24.dp),
+                    )
+                }
+                item {
                     ImsakRow(
                         enabled = state.imsakEnabled,
                         isRamadan = state.isRamadan,
@@ -459,6 +470,53 @@ private fun AdhanVoiceRow(
             contentDescription = null,
             tint = InkMuted,
         )
+    }
+}
+
+/**
+ * The always-on countdown notification. Same 64pt two-line shape as [ImsakRow] — both are
+ * opt-in behaviours that need a sentence of explanation, unlike the plain per-prayer toggles.
+ */
+@Composable
+private fun LiveNotificationRow(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .padding(horizontal = 24.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Live countdown",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    text = "Keep the current prayer and its countdown in the shade",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = InkMuted,
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle,
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = Saffron,
+                    uncheckedTrackColor = ParchmentMuted,
+                    checkedThumbColor = Parchment,
+                    uncheckedThumbColor = Parchment,
+                    uncheckedBorderColor = ParchmentMuted,
+                ),
+            )
+        }
     }
 }
 

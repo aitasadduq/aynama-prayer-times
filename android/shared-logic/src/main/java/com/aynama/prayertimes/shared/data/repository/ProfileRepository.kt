@@ -26,6 +26,9 @@ class ProfileRepository(private val dao: ProfileDao) {
 
     suspend fun delete(profile: Profile) = dao.delete(profile)
 
+    /** @see ProfileDao.mirror — the watch's copy of the phone's profile set. */
+    suspend fun mirror(profiles: List<Profile>) = dao.mirror(profiles)
+
     suspend fun setGpsProfile(
         name: String,
         latitude: Double,

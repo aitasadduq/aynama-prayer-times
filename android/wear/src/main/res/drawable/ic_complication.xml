@@ -1,0 +1,13 @@
+<!-- The app mark at complication scale: a single filled dot, the same one DESIGN.md §7 puts
+     in front of the prayer time. Anything more detailed is unreadable at 40px and reads as
+     visual noise on a watch face that is mostly someone else's design. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?android:attr/colorControlNormal">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12,4a8,8 0 1,0 0,16a8,8 0 1,0 0,-16z" />
+</vector>

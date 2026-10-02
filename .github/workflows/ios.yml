@@ -1,0 +1,219 @@
+name: Android and iOS CI
+
+on:
+  push:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+# Nothing here writes to the repository, and a new workflow inherits whatever the repository
+# default happens to be. Say it explicitly instead.
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vectors:
+    # schema.json has described itself as "enforced by vectors.yml CI on every commit" since it
+    # was written, and nothing enforced it. This is that check.
+    #
+    # It gates the macOS job rather than running beside it: the vectors are what iOS is held to,
+    # so a malformed or incomplete one should fail before ten minutes of a 10x runner are spent
+    # comparing against it. Linux, so it costs almost nothing.
+    name: Test vectors - schema
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install jsonschema
+        run: python3 -m pip install --quiet jsonschema
+
+      - name: Validate the vectors
+        run: python3 scripts/validate-vectors.py
+
+  shared-logic:
+    # Domain rules and Adhan-Swift <-> Adhan-Kotlin parity run without a simulator.
+    name: SharedLogic - domain and Adhan parity
+    runs-on: macos-15
+    timeout-minutes: 15
+    needs: vectors
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode with the iOS 26 SDK
+        run: |
+          python3 - <<'PYCODE'
+          import re
+          import subprocess
+          from pathlib import Path
+
+          candidates = []
+          for app in Path("/Applications").glob("Xcode_*.app"):
+              version = tuple(int(part) for part in re.findall(r"\d+", app.stem))
+              if version and version[0] >= 26:
+                  candidates.append((version, app))
+          if not candidates:
+              raise SystemExit("An Xcode 26+ installation is required to validate Liquid Glass")
+          selected = max(candidates)[1] / "Contents/Developer"
+          subprocess.run(["sudo", "xcode-select", "--switch", str(selected)], check=True)
+          print(f"Selected {selected}")
+          PYCODE
+
+      - name: Report toolchain
+        run: swift --version
+
+      - name: Assert the Adhan-Swift pin has not drifted
+        # Before the tests, not after: a drifted pin fails the parity suite with twelve mystery
+        # deltas, and the whole point of this step is to say why in one line instead.
+        #
+        # All three facts are checked against scripts/reference-versions.json, because each can
+        # rot on its own. A hand-edited Package.swift could widen the requirement without moving
+        # the resolution until someone next resolves; a hand-edited Package.resolved could keep
+        # the version string while pointing at a different revision, which is why the commit SHA
+        # is recorded at all.
+        run: |
+          pinned=$(python3 -c "import json; print(json.load(open('scripts/reference-versions.json'))['adhan-swift'])")
+          commit=$(python3 -c "import json; print(json.load(open('scripts/reference-versions.json'))['adhan-swift-commit'])")
+          grep -q "exact: \"$pinned\"" ios/SharedLogic/Package.swift \
+            || { echo "::error::Package.swift does not pin adhan-swift exact: $pinned"; exit 1; }
+          grep -q "\"version\" : \"$pinned\"" ios/SharedLogic/Package.resolved \
+            || { echo "::error::Package.resolved is not at adhan-swift $pinned"; exit 1; }
+          grep -q "\"revision\" : \"$commit\"" ios/SharedLogic/Package.resolved \
+            || { echo "::error::Package.resolved is not at adhan-swift revision $commit"; exit 1; }
+
+      - name: Test
+        working-directory: ios/SharedLogic
+        run: swift test
+
+  app:
+    # The app target. The Xcode project is generated from ios/project.yml rather than committed,
+    # so this job regenerates it and fails if the checked-in yml no longer describes a buildable
+    # project — a .pbxproj in git is a merge-conflict generator and nobody reviews one.
+    name: iOS simulator - persistence and UI tests
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode with the iOS 26 SDK
+        run: |
+          python3 - <<'PYCODE'
+          import re
+          import subprocess
+          from pathlib import Path
+
+          candidates = []
+          for app in Path("/Applications").glob("Xcode_*.app"):
+              version = tuple(int(part) for part in re.findall(r"\d+", app.stem))
+              if version and version[0] >= 26:
+                  candidates.append((version, app))
+          if not candidates:
+              raise SystemExit("An Xcode 26+ installation is required to validate Liquid Glass")
+          selected = max(candidates)[1] / "Contents/Developer"
+          subprocess.run(["sudo", "xcode-select", "--switch", str(selected)], check=True)
+          print(f"Selected {selected}")
+          PYCODE
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Select an installed iPhone simulator
+        id: simulator
+        run: |
+          xcrun simctl list devices available --json > "$RUNNER_TEMP/simulators.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          devices = json.loads(Path(os.environ["RUNNER_TEMP"], "simulators.json").read_text())["devices"]
+          iphones = [device for runtime, entries in sorted(devices.items(), reverse=True)
+                     if ".iOS-26" in runtime for device in entries
+                     if device["name"].startswith("iPhone") and device["isAvailable"]]
+          if not iphones:
+              raise SystemExit("No installed iOS 26 iPhone simulator is available")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"udid={iphones[0]['udid']}\n")
+          print(f"Testing on {iphones[0]['name']} ({iphones[0]['udid']})")
+          PY
+
+      - name: Build and test on the simulator
+        working-directory: ios
+        env:
+          SIMULATOR_UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          xcodebuild -project Aynama.xcodeproj -scheme Aynama \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
+            -destination-timeout 120 -configuration Debug \
+            -parallel-testing-enabled NO \
+            -resultBundlePath "$RUNNER_TEMP/Aynama.xcresult" \
+            CODE_SIGNING_ALLOWED=NO test
+
+      - name: Export app screenshots
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/ios-screenshots"
+          if [ -d "$RUNNER_TEMP/Aynama.xcresult" ]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/Aynama.xcresult" \
+              --output-path "$RUNNER_TEMP/ios-attachments"
+            python3 scripts/ios/collect-screenshots.py "$RUNNER_TEMP/ios-attachments" "$RUNNER_TEMP/ios-screenshots"
+            cp "$RUNNER_TEMP/ios-attachments/manifest.json" "$RUNNER_TEMP/ios-screenshots/manifest.json"
+          fi
+
+      - name: Upload app screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-screenshots
+          path: ${{ runner.temp }}/ios-screenshots
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload simulator test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: ${{ runner.temp }}/Aynama.xcresult
+          if-no-files-found: warn
+          retention-days: 14
+
+  android:
+    name: Android
+    uses: ./.github/workflows/android.yml
+
+  mobile-ci:
+    # Configure this stable check as required on main and agent-main. A failed, cancelled or
+    # skipped platform job must never turn into a successful merge gate.
+    name: Android and iOS
+    if: always()
+    needs: [vectors, shared-logic, app, android]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every platform check to pass
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          results = json.loads(os.environ["JOB_RESULTS"])
+          failed = [job for job, result in results.items() if result["result"] != "success"]
+          if failed:
+              raise SystemExit(f"Required CI checks did not pass: {', '.join(failed)}")
+          print("All Android and iOS checks passed")
+          PY

@@ -1,0 +1,25 @@
+{
+  "method": "SINGAPORE",
+  "tolerance_minutes": 1,
+  "reference": "Adhan-Kotlin com.batoulapps.adhan:adhan:1.2.1",
+  "cases": [
+    {
+      "description": "Singapore \u2014 1.3N, near-constant day length year round",
+      "input": {
+        "latitude": 1.3521,
+        "longitude": 103.8198,
+        "date": "2026-03-21",
+        "timezone": "Asia/Singapore"
+      },
+      "expected": {
+        "fajr": "05:52",
+        "sunrise": "07:09",
+        "dhuhr": "13:13",
+        "asr_shafii": "16:14",
+        "asr_hanafi": "17:27",
+        "maghrib": "19:15",
+        "isha": "20:24"
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "method": "DUBAI",
+  "tolerance_minutes": 1,
+  "reference": "Adhan-Kotlin com.batoulapps.adhan:adhan:1.2.1",
+  "cases": [
+    {
+      "description": "Dubai, United Arab Emirates \u2014 spring equinox",
+      "input": {
+        "latitude": 25.2048,
+        "longitude": 55.2708,
+        "date": "2026-03-21",
+        "timezone": "Asia/Dubai"
+      },
+      "expected": {
+        "fajr": "05:05",
+        "sunrise": "06:19",
+        "dhuhr": "12:29",
+        "asr_shafii": "15:56",
+        "asr_hanafi": "16:52",
+        "maghrib": "18:33",
+        "isha": "19:48"
+      }
+    }
+  ]
+}

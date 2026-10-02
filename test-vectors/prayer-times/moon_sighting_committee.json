@@ -1,0 +1,25 @@
+{
+  "method": "MOON_SIGHTING_COMMITTEE",
+  "tolerance_minutes": 1,
+  "reference": "Adhan-Kotlin com.batoulapps.adhan:adhan:1.2.1",
+  "cases": [
+    {
+      "description": "Toronto, Canada \u2014 Moonsighting Committee's season-adjusted twilight, EDT",
+      "input": {
+        "latitude": 43.6532,
+        "longitude": -79.3832,
+        "date": "2026-06-21",
+        "timezone": "America/Toronto"
+      },
+      "expected": {
+        "fajr": "03:43",
+        "sunrise": "05:36",
+        "dhuhr": "13:24",
+        "asr_shafii": "17:26",
+        "asr_hanafi": "18:40",
+        "maghrib": "21:06",
+        "isha": "22:22"
+      }
+    }
+  ]
+}

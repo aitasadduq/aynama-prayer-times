@@ -3,13 +3,17 @@ package com.aynama.prayertimes
 import android.app.Application
 import android.content.SharedPreferences
 import android.util.Log
+import androidx.core.content.edit
 import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.notifications.NotificationHelper
 import com.aynama.prayertimes.shared.CalculationMethodKey
+import com.aynama.prayertimes.shared.withRedetectedTimezone
 import com.aynama.prayertimes.shared.data.db.AynamaDatabase
 import com.aynama.prayertimes.shared.data.entity.AsrMadhab
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
+import com.aynama.prayertimes.wear.PhoneWearSync
+import com.aynama.prayertimes.wear.watchPublications
 import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -43,10 +47,50 @@ class AynamaApplication : Application() {
         NotificationHelper.createChannels(this)
         appScope.launch {
             if (BuildConfig.DEBUG) seedDebugProfilesIfEmpty()
+            redetectLocationTimeZonesOnce()
             val profiles = profileRepository.observeAll().first()
             AlarmScheduler.scheduleAll(this@AynamaApplication, profiles)
             updateAllPrayerWidgets(this@AynamaApplication)
         }
+        publishProfilesToWatch()
+    }
+
+    /**
+     * Keep any paired watch's mirror current.
+     *
+     * Collected from the repository and the alerts-profile preference rather than called at each
+     * mutation site: creating, editing and deleting a profile, and choosing a different alerts
+     * profile, all end in a Flow emission, so one collector covers every path — including ones
+     * added later, which is exactly where a per-call-site hook would rot.
+     */
+    private fun publishProfilesToWatch() {
+        appScope.launch {
+            watchPublications(
+                profiles = profileRepository.observeAll(),
+                notificationProfileId = notificationPreferences.notificationProfileIdFlow(),
+            ).collect { publication ->
+                PhoneWearSync.publish(
+                    context = this@AynamaApplication,
+                    profiles = publication.profiles,
+                    activeProfileId = publication.activeProfileId,
+                )
+            }
+        }
+    }
+
+    /**
+     * City profiles saved before DS32's fix hold the zone the old longitude guess picked, an hour
+     * off for Madrid, Lisbon, Detroit and others. Run before alarms and widgets read them.
+     */
+    private suspend fun redetectLocationTimeZonesOnce() {
+        if (prefs.getBoolean(KEY_LOCATION_ZONES_REDETECTED, false)) return
+        for (profile in profileRepository.observeAll().first()) {
+            val redetected = profile.withRedetectedTimezone { id ->
+                runCatching { android.icu.util.TimeZone.getRegion(id) }.getOrNull()
+            }
+            if (redetected != profile) profileRepository.update(redetected)
+        }
+        prefs.edit { putBoolean(KEY_LOCATION_ZONES_REDETECTED, true) }
     }
 
     private suspend fun seedDebugProfilesIfEmpty() {
@@ -77,5 +121,9 @@ class AynamaApplication : Application() {
                 useLocationTimezone = true,
             )
         )
+    }
+
+    companion object {
+        private const val KEY_LOCATION_ZONES_REDETECTED = "location_zones_redetected_ds32"
     }
 }

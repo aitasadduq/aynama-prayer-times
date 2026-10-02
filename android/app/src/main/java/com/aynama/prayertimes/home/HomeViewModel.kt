@@ -1,10 +1,12 @@
 package com.aynama.prayertimes.home
 
+import android.content.Context
 import android.content.SharedPreferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aynama.prayertimes.AynamaApplication
+import com.aynama.prayertimes.notifications.AlarmScheduler
 import com.aynama.prayertimes.notifications.RamadanDetector
 import com.aynama.prayertimes.shared.AdhanWrapper
 import com.aynama.prayertimes.shared.CalculationMethodKey
@@ -16,7 +18,17 @@ import com.aynama.prayertimes.shared.data.entity.Profile
 import com.aynama.prayertimes.shared.data.entity.effectiveZoneId
 import com.aynama.prayertimes.shared.data.repository.ProfileRepository
 import com.aynama.prayertimes.shared.data.repository.QazaRepository
+import com.aynama.prayertimes.shared.timeline.PrayerCountdown
+import com.aynama.prayertimes.shared.timeline.TimelineEntry
+import com.aynama.prayertimes.shared.timeline.buildTimeline
+import com.aynama.prayertimes.shared.timeline.countdownAt
+import com.aynama.prayertimes.shared.timeline.displayName
+import com.aynama.prayertimes.shared.timeline.formatCompact
+import com.aynama.prayertimes.shared.timeline.prayerDisplayName
 import com.aynama.prayertimes.shared.data.entity.QazaStatus
+import com.aynama.prayertimes.widgets.updateAllPrayerWidgets
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
@@ -27,10 +39,12 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -39,6 +53,21 @@ import java.time.temporal.ChronoUnit
 
 enum class PrayerPhase { FAJR, SUNRISE_TRANSITION, DHUHR, ASR, MAGHRIB, ISHA }
 
+/**
+ * The label for a time-of-day phase — day-aware, so a Friday afternoon reads "Jumuah".
+ *
+ * A phase is named after the prayer that opened it, so it follows the same naming rule as
+ * every other display of that day's prayer (DESIGN.md §20).
+ */
+fun phaseDisplayName(phase: PrayerPhase, date: LocalDate): String = when (phase) {
+    PrayerPhase.FAJR -> prayerDisplayName(Prayer.FAJR, date)
+    PrayerPhase.SUNRISE_TRANSITION -> "Sunrise"
+    PrayerPhase.DHUHR -> prayerDisplayName(Prayer.DHUHR, date)
+    PrayerPhase.ASR -> prayerDisplayName(Prayer.ASR, date)
+    PrayerPhase.MAGHRIB -> prayerDisplayName(Prayer.MAGHRIB, date)
+    PrayerPhase.ISHA -> prayerDisplayName(Prayer.ISHA, date)
+}
+
 enum class RibbonState { PASSED, CURRENT, UPCOMING }
 
 sealed interface RibbonRow {
@@ -46,6 +75,8 @@ sealed interface RibbonRow {
 
     data class PrayerEntry(
         val prayer: Prayer,
+        /** Day-aware — "Jumuah" on a Friday. Resolved here so the UI never re-derives it. */
+        val displayName: String,
         override val displayTime: String,
         val ribbonState: RibbonState,
     ) : RibbonRow
@@ -58,9 +89,13 @@ sealed interface RibbonRow {
 data class ProfileUiState(
     val profile: Profile,
     val ribbonRows: List<RibbonRow>,
+    /** Compact signed Home countdown per DESIGN.md §19 — render it verbatim. */
     val countdownText: String,
-    val nextPrayerName: String,
-    val nextPrayerTime: String,
+    /** True while counting up from a prayer that has started; false while counting down to one. */
+    val countdownIsElapsed: Boolean,
+    /** The prayer the countdown refers to: the one just started, or the one coming next. */
+    val countdownPrayerName: String,
+    val countdownPrayerTime: String,
     val currentPhase: PrayerPhase,
     val isRamadan: Boolean,
     val showRamadanBanner: Boolean,
@@ -108,7 +143,9 @@ class HomeViewModel(
         val method: CalculationMethodKey,
         val timezone: String,
     )
-    private val prayerTimesCache = mutableMapOf<PrayerCacheKey, PrayerTimesResult>()
+    // Null value = adhan has no times for that day (polar day/night). Cached like any other
+    // answer so a profile inside the polar circle does not re-run the calculation every tick.
+    private val prayerTimesCache = mutableMapOf<PrayerCacheKey, PrayerTimesResult?>()
     private val hijriCache = mutableMapOf<Triple<LocalDate, Int, String>, String>()
     private val ramadanCache = mutableMapOf<Triple<LocalDate, Int, String>, Boolean>()
     private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
@@ -116,9 +153,12 @@ class HomeViewModel(
     private val _uiState = MutableStateFlow<HomeUiState>(HomeUiState.Loading)
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    private val clockFlow: Flow<LocalTime> = flow {
+    // Instants, not wall times: the countdown crosses date boundaries and profiles can be
+    // pinned to a zone the device is not in. Each profile resolves this to its own local
+    // date and clock time.
+    private val clockFlow: Flow<Instant> = flow {
         while (true) {
-            emit(LocalTime.now())
+            emit(Instant.now())
             delay(1_000L)
         }
     }
@@ -137,21 +177,21 @@ class HomeViewModel(
 
         combine(profilesFlow, clockFlow, qazaCountsFlow(profilesFlow)) { profiles, now, qazaCounts ->
             if (profiles.isEmpty()) return@combine HomeUiState.Empty
-            val today = LocalDate.now()
             val hijriYear = RamadanDetector.currentHijriYear()
             val dismissedYear = prefs.getInt(KEY_RAMADAN_BANNER_YEAR, -1)
             HomeUiState.Loaded(
                 profiles.map { profile ->
-                    try {
-                        val times = cachedPrayerTimes(profile, today)
+                    val today = now.atZone(profile.effectiveZoneId()).toLocalDate()
+                    val times = cachedPrayerTimes(profile, today)
+                    if (times == null) {
+                        ProfilePage.Unavailable(profile, UNAVAILABLE_POLAR_REASON)
+                    } else {
                         ProfilePage.Ready(
                             buildProfileUiState(
                                 profile, times, now, today,
                                 qazaCounts[profile.id] ?: 0, hijriYear, dismissedYear,
                             )
                         )
-                    } catch (e: PrayerTimesUnavailableException) {
-                        ProfilePage.Unavailable(profile, UNAVAILABLE_POLAR_REASON)
                     }
                 }
             )
@@ -169,19 +209,71 @@ class HomeViewModel(
         viewModelScope.launch { qazaRepository.markPrayer(profileId, prayer, date, status) }
     }
 
-    private fun cachedPrayerTimes(profile: Profile, today: LocalDate): PrayerTimesResult {
+    /**
+     * Persist a profile created from the Prayers screen and report the id it was given.
+     *
+     * The caller needs the id to scroll the pager onto the new profile, which is the whole
+     * point of the flow — the plan asks for the user to land on what they just made. It is
+     * appended last, so it becomes the final page.
+     *
+     * Runs off the main thread: [AlarmScheduler.scheduleAll] does binder work for every
+     * reserved alarm slot and reads each placed widget's Glance state off disk.
+     *
+     * Runs in [viewModelScope], not the caller's: the caller's scope dies with the Prayers
+     * screen, and a tab switch right after Save must not cancel the alarm and widget refresh.
+     */
+    suspend fun createProfile(profile: Profile, context: Context): Long {
+        val appContext = context.applicationContext
+        return viewModelScope.async(Dispatchers.IO) {
+            val existing = profileRepository.observeAll().first()
+            val id = profileRepository.insert(profile.copy(sortOrder = existing.size))
+            AlarmScheduler.scheduleAll(appContext, profileRepository.observeAll().first())
+            updateAllPrayerWidgets(appContext)
+            id
+        }.await()
+    }
+
+    /** Today's times for [profile], or null when the location has none (polar day/night). */
+    private fun cachedPrayerTimes(profile: Profile, date: LocalDate): PrayerTimesResult? {
         val zone = profile.effectiveZoneId()
-        val key = PrayerCacheKey(profile.id, today, profile.latitude, profile.longitude, profile.calculationMethod, zone.id)
-        return prayerTimesCache.getOrPut(key) {
+        val key = PrayerCacheKey(profile.id, date, profile.latitude, profile.longitude, profile.calculationMethod, zone.id)
+        if (prayerTimesCache.containsKey(key)) return prayerTimesCache[key]
+        val computed = try {
             adhan.getPrayerTimes(
                 latitude = profile.latitude,
                 longitude = profile.longitude,
-                date = today,
+                date = date,
                 timezone = zone,
                 method = profile.calculationMethod,
             )
+        } catch (e: PrayerTimesUnavailableException) {
+            null
         }
+        prayerTimesCache[key] = computed
+        // The countdown needs yesterday and tomorrow as well as today, so the cache now grows
+        // three entries a day instead of one. This process can live for weeks; keep only the
+        // days a timeline can still reach.
+        prayerTimesCache.keys.removeAll { ChronoUnit.DAYS.between(it.date, date).let { d -> d > 2 || d < -2 } }
+        return computed
     }
+
+    /**
+     * The countdown timeline for [profile] around [today].
+     *
+     * Yesterday and tomorrow are both required: before Fajr the current event is last night's
+     * Isha, and after Isha the next one is tomorrow's Fajr. Days with no computable times are
+     * dropped rather than failing the whole timeline — near the polar circles a single day can
+     * be undefined while the days around it are fine.
+     */
+    private fun timelineFor(profile: Profile, today: LocalDate): List<TimelineEntry> =
+        buildTimeline(
+            days = (-1L..1L).mapNotNull { offset ->
+                val date = today.plusDays(offset)
+                cachedPrayerTimes(profile, date)?.let { date to it }
+            }.toMap(),
+            asrMadhab = profile.asrMadhab,
+            zone = profile.effectiveZoneId(),
+        )
 
     private fun cachedHijri(date: LocalDate, offset: Int, zone: ZoneId): String =
         hijriCache.getOrPut(Triple(date, offset, zone.id)) {
@@ -196,36 +288,41 @@ class HomeViewModel(
     private fun buildProfileUiState(
         profile: Profile,
         times: PrayerTimesResult,
-        now: LocalTime,
+        now: Instant,
         today: LocalDate,
         qazaCount: Int,
         hijriYear: Int,
         dismissedYear: Int,
     ): ProfileUiState {
-        val effectiveZone = profile.effectiveZoneId()
-        val hasLocationZone = profile.useLocationTimezone && profile.timezone.isNotBlank()
-        val effectiveNow = if (hasLocationZone) LocalTime.now(effectiveZone) else now
-        val effectiveToday = if (hasLocationZone) LocalDate.now(effectiveZone) else today
+        val zone = profile.effectiveZoneId()
+        val localNow = now.atZone(zone).toLocalTime()
         val offset = RamadanDetector.effectiveHijriOffset(
-            profile.hijriOffset, profile.hijriOffsetMonthKey, effectiveToday, effectiveZone,
+            profile.hijriOffset, profile.hijriOffsetMonthKey, today, zone,
         )
-        val ramadan = cachedIsRamadan(effectiveToday, offset, effectiveZone)
+        val ramadan = cachedIsRamadan(today, offset, zone)
+        val countdown = countdownAt(timelineFor(profile, today), now)
         return ProfileUiState(
             profile = profile,
-            ribbonRows = deriveRibbonRows(times, profile.asrMadhab, effectiveNow, ramadan, timeFormatter),
-            countdownText = deriveCountdown(times, profile.asrMadhab, effectiveNow),
-            nextPrayerName = deriveNextPrayerName(times, profile.asrMadhab, effectiveNow),
-            nextPrayerTime = deriveNextPrayerTime(times, profile.asrMadhab, effectiveNow, timeFormatter),
-            currentPhase = derivePhase(times, profile.asrMadhab, effectiveNow),
+            ribbonRows = deriveRibbonRows(times, profile.asrMadhab, localNow, today, ramadan, timeFormatter),
+            countdownText = countdown?.formatCompact() ?: NO_COUNTDOWN,
+            countdownIsElapsed = countdown is PrayerCountdown.Elapsed,
+            countdownPrayerName = countdown?.entry?.displayName() ?: "",
+            countdownPrayerTime = countdown?.entry?.time?.format(timeFormatter) ?: "",
+            currentPhase = derivePhase(times, profile.asrMadhab, localNow),
             isRamadan = ramadan,
             showRamadanBanner = ramadan && dismissedYear != hijriYear,
             outstandingQazaCount = qazaCount,
-            hijriDateText = cachedHijri(effectiveToday, offset, effectiveZone),
+            hijriDateText = cachedHijri(today, offset, zone),
         )
     }
 
     companion object {
         private const val KEY_RAMADAN_BANNER_YEAR = "ramadan_banner_dismissed_year"
+
+        // Only reachable when today has times but neither neighbouring day does, so the
+        // timeline has no event on one side of now. Em dashes rather than "00:00:00", which
+        // would read as a prayer that just started.
+        internal const val NO_COUNTDOWN = "--"
 
         internal const val UNAVAILABLE_POLAR_REASON =
             "The sun doesn't fully rise or set at this location today, so there are no times " +
@@ -258,64 +355,11 @@ internal fun derivePhase(times: PrayerTimesResult, asrMadhab: AsrMadhab, now: Lo
     }
 }
 
-internal fun deriveNextPrayerName(times: PrayerTimesResult, asrMadhab: AsrMadhab, now: LocalTime): String {
-    if (times.isha < times.fajr && now < times.isha) return "Isha"
-    if (now >= times.fajr && now < times.sunrise) return "Sunrise"
-    val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
-    val ordered = listOf(
-        times.fajr to "Fajr",
-        times.dhuhr to "Dhuhr",
-        asr to "Asr",
-        times.maghrib to "Maghrib",
-        times.isha to "Isha",
-    )
-    return ordered.firstOrNull { (t, _) -> t > now }?.second
-        ?: if (times.isha < times.fajr) "Isha" else "Fajr"
-}
-
-internal fun deriveCountdown(times: PrayerTimesResult, asrMadhab: AsrMadhab, now: LocalTime): String {
-    val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
-    val ordered = listOf(times.fajr, times.dhuhr, asr, times.maghrib, times.isha)
-    val next = if (times.isha < times.fajr && now < times.isha) times.isha
-               else if (now >= times.fajr && now < times.sunrise) times.sunrise
-               else ordered.firstOrNull { it > now }
-    val totalSeconds = if (next != null) {
-        ChronoUnit.SECONDS.between(now, next)
-    } else if (times.isha < times.fajr) {
-        ChronoUnit.SECONDS.between(now, LocalTime.MAX) + 1 +
-            ChronoUnit.SECONDS.between(LocalTime.MIDNIGHT, times.isha)
-    } else {
-        ChronoUnit.SECONDS.between(now, LocalTime.MAX) + 1 +
-            ChronoUnit.SECONDS.between(LocalTime.MIDNIGHT, times.fajr)
-    }
-    val h = totalSeconds / 3600
-    val m = (totalSeconds % 3600) / 60
-    val s = totalSeconds % 60
-    return when {
-        h > 0 -> "${h}h ${m}m"
-        m > 0 -> "${m}m"
-        else -> "${s}s"
-    }
-}
-
-internal fun deriveNextPrayerTime(
-    times: PrayerTimesResult,
-    asrMadhab: AsrMadhab,
-    now: LocalTime,
-    formatter: DateTimeFormatter,
-): String {
-    if (times.isha < times.fajr && now < times.isha) return times.isha.format(formatter)
-    if (now >= times.fajr && now < times.sunrise) return times.sunrise.format(formatter)
-    val asr = if (asrMadhab == AsrMadhab.HANAFI) times.asrHanafi else times.asrShafii
-    val ordered = listOf(times.fajr, times.dhuhr, asr, times.maghrib, times.isha)
-    val fallback = if (times.isha < times.fajr) times.isha else times.fajr
-    return (ordered.firstOrNull { it > now } ?: fallback).format(formatter)
-}
-
 internal fun deriveRibbonRows(
     times: PrayerTimesResult,
     asrMadhab: AsrMadhab,
     now: LocalTime,
+    date: LocalDate,
     isRamadan: Boolean,
     formatter: DateTimeFormatter,
 ): List<RibbonRow> {
@@ -343,11 +387,17 @@ internal fun deriveRibbonRows(
             val imsak = times.fajr.minusMinutes(10)
             add(RibbonRow.ImsakEntry(imsak.format(formatter), isPast = imsak <= now))
         }
-        add(RibbonRow.PrayerEntry(Prayer.FAJR, times.fajr.format(formatter), stateAt(0)))
+        fun prayerRow(prayer: Prayer, time: LocalTime, index: Int) = RibbonRow.PrayerEntry(
+            prayer = prayer,
+            displayName = prayerDisplayName(prayer, date),
+            displayTime = time.format(formatter),
+            ribbonState = stateAt(index),
+        )
+        add(prayerRow(Prayer.FAJR, times.fajr, 0))
         add(RibbonRow.SunriseEntry(times.sunrise.format(formatter)))
-        add(RibbonRow.PrayerEntry(Prayer.DHUHR, times.dhuhr.format(formatter), stateAt(1)))
-        add(RibbonRow.PrayerEntry(Prayer.ASR, asr.format(formatter), stateAt(2)))
-        add(RibbonRow.PrayerEntry(Prayer.MAGHRIB, times.maghrib.format(formatter), stateAt(3)))
-        add(RibbonRow.PrayerEntry(Prayer.ISHA, times.isha.format(formatter), stateAt(4)))
+        add(prayerRow(Prayer.DHUHR, times.dhuhr, 1))
+        add(prayerRow(Prayer.ASR, asr, 2))
+        add(prayerRow(Prayer.MAGHRIB, times.maghrib, 3))
+        add(prayerRow(Prayer.ISHA, times.isha, 4))
     }
 }

@@ -44,9 +44,12 @@ val IbmPlexSans = FontFamily(
     ),
 )
 
+// Static Fraunces 400/144 with equal digit advances; source Fraunces has no tnum feature.
+val FrauncesCountdown = FontFamily(Font(R.font.aynama_countdown, weight = FontWeight.Normal))
+
 val AynamaTypography = Typography(
     displayLarge = TextStyle(
-        fontFamily = frauncesFamily(144f),
+        fontFamily = FrauncesCountdown,
         fontWeight = FontWeight.Normal,
         fontSize = 72.sp,
         lineHeight = 72.sp,

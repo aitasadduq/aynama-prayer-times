@@ -16,7 +16,11 @@ class PrayerAlarmReceiver : BroadcastReceiver() {
 
         val isEarlyReminder = rawIndex >= EARLY_REMINDER_BASE_INDEX
         val prayerIndex = if (isEarlyReminder) rawIndex - EARLY_REMINDER_BASE_INDEX else rawIndex
-        val prayerName = PRAYER_NAMES[prayerIndex] ?: return
+        // Resolved when the alarm was armed, so a Friday Dhuhr announces itself as Jumuah
+        // even if delivery slips past midnight. Alarms armed by an older build have no extra.
+        val prayerName = intent.getStringExtra(EXTRA_PRAYER_NAME)?.takeIf { it.isNotEmpty() }
+            ?: PRAYER_NAMES[prayerIndex]
+            ?: return
         val notificationId = (profileId * REQUEST_CODE_MULTIPLIER + rawIndex).toInt()
 
         val prefs = (context.applicationContext as AynamaApplication).notificationPreferences

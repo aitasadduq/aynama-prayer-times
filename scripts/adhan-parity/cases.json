@@ -1,0 +1,215 @@
+{
+  "_comment": [
+    "The twelve reference cities. TODOS.md calls for these as the cross-port parity set; they",
+    "did not exist anywhere in the repo before, so they are defined here.",
+    "",
+    "Chosen to cover: all ten calculation methods the app offers, both hemispheres, both signs",
+    "of longitude, an equatorial city (Singapore, 1.3N — near-constant day length), a city above",
+    "48 degrees where the two Adhan ports disagree by default (London, 51.5N), a DST zone",
+    "(London/New York/Toronto), a zone at a half-hour-free but eastern offset (Karachi), all four",
+    "solstice/equinox dates, and one mid-season date in each hemisphere's summer."
+  ],
+  "cities": [
+    {
+      "id": "makkah",
+      "description": "Makkah, Saudi Arabia — the app's original golden case",
+      "latitude": 21.4225,
+      "longitude": 39.8262,
+      "date": "2026-03-21",
+      "timezone": "Asia/Riyadh",
+      "elevation_meters": 277,
+      "method": "MWL"
+    },
+    {
+      "id": "london",
+      "description": "London, United Kingdom — 51.5N, above the 48-degree high-latitude threshold, BST",
+      "latitude": 51.5074,
+      "longitude": -0.1278,
+      "date": "2026-06-21",
+      "timezone": "Europe/London",
+      "method": "MWL"
+    },
+    {
+      "id": "cape_town",
+      "description": "Cape Town, South Africa — southern hemisphere, winter solstice",
+      "latitude": -33.9249,
+      "longitude": 18.4241,
+      "date": "2026-06-21",
+      "timezone": "Africa/Johannesburg",
+      "method": "MWL"
+    },
+    {
+      "id": "new_york",
+      "description": "New York, United States — western longitude, EDT",
+      "latitude": 40.7128,
+      "longitude": -74.006,
+      "date": "2026-03-21",
+      "timezone": "America/New_York",
+      "method": "ISNA"
+    },
+    {
+      "id": "riyadh",
+      "description": "Riyadh, Saudi Arabia — Umm al-Qura's home method, summer solstice",
+      "latitude": 24.7136,
+      "longitude": 46.6753,
+      "date": "2026-06-21",
+      "timezone": "Asia/Riyadh",
+      "method": "UMM_AL_QURA"
+    },
+    {
+      "id": "cairo",
+      "description": "Cairo, Egypt — autumn equinox",
+      "latitude": 30.0444,
+      "longitude": 31.2357,
+      "date": "2026-09-23",
+      "timezone": "Africa/Cairo",
+      "method": "EGYPTIAN"
+    },
+    {
+      "id": "karachi",
+      "description": "Karachi, Pakistan — winter solstice",
+      "latitude": 24.8607,
+      "longitude": 67.0011,
+      "date": "2026-12-21",
+      "timezone": "Asia/Karachi",
+      "method": "KARACHI"
+    },
+    {
+      "id": "dubai",
+      "description": "Dubai, United Arab Emirates — spring equinox",
+      "latitude": 25.2048,
+      "longitude": 55.2708,
+      "date": "2026-03-21",
+      "timezone": "Asia/Dubai",
+      "method": "DUBAI"
+    },
+    {
+      "id": "kuwait_city",
+      "description": "Kuwait City, Kuwait — mid-summer",
+      "latitude": 29.3759,
+      "longitude": 47.9774,
+      "date": "2026-07-15",
+      "timezone": "Asia/Kuwait",
+      "method": "KUWAIT"
+    },
+    {
+      "id": "doha",
+      "description": "Doha, Qatar — mid-winter, fixed 90-minute Isha interval",
+      "latitude": 25.2854,
+      "longitude": 51.531,
+      "date": "2026-01-15",
+      "timezone": "Asia/Qatar",
+      "method": "QATAR"
+    },
+    {
+      "id": "singapore",
+      "description": "Singapore — 1.3N, near-constant day length year round",
+      "latitude": 1.3521,
+      "longitude": 103.8198,
+      "date": "2026-03-21",
+      "timezone": "Asia/Singapore",
+      "method": "SINGAPORE"
+    },
+    {
+      "id": "toronto",
+      "description": "Toronto, Canada — Moonsighting Committee's season-adjusted twilight, EDT",
+      "latitude": 43.6532,
+      "longitude": -79.3832,
+      "date": "2026-06-21",
+      "timezone": "America/Toronto",
+      "method": "MOON_SIGHTING_COMMITTEE"
+    }
+  ],
+  "high_latitude_probe": [
+    {
+      "id": "probe_london_jun",
+      "description": "51.5N — just above the threshold",
+      "latitude": 51.5074,
+      "longitude": -0.1278,
+      "date": "2026-06-21",
+      "timezone": "Europe/London",
+      "method": "MWL"
+    },
+    {
+      "id": "probe_london_dec",
+      "description": "51.5N in winter — the threshold applies year round, not only in summer",
+      "latitude": 51.5074,
+      "longitude": -0.1278,
+      "date": "2026-12-21",
+      "timezone": "Europe/London",
+      "method": "MWL"
+    },
+    {
+      "id": "probe_edinburgh",
+      "description": "55.95N",
+      "latitude": 55.9533,
+      "longitude": -3.1883,
+      "date": "2026-06-21",
+      "timezone": "Europe/London",
+      "method": "MWL"
+    },
+    {
+      "id": "probe_stockholm",
+      "description": "59.33N",
+      "latitude": 59.3293,
+      "longitude": 18.0686,
+      "date": "2026-06-21",
+      "timezone": "Europe/Stockholm",
+      "method": "MWL"
+    },
+    {
+      "id": "probe_reykjavik",
+      "description": "64.15N — just south of the midnight-sun band",
+      "latitude": 64.1466,
+      "longitude": -21.9426,
+      "date": "2026-06-21",
+      "timezone": "Atlantic/Reykjavik",
+      "method": "MWL"
+    },
+    {
+      "id": "probe_65n",
+      "description": "65.0N — the collapsed-day case AdhanWrapperTest pins",
+      "latitude": 65.0,
+      "longitude": 18.9553,
+      "date": "2026-06-21",
+      "timezone": "Europe/Oslo",
+      "method": "MWL"
+    },
+    {
+      "id": "probe_paris",
+      "description": "48.86N — barely above the threshold",
+      "latitude": 48.8566,
+      "longitude": 2.3522,
+      "date": "2026-06-21",
+      "timezone": "Europe/Paris",
+      "method": "MWL"
+    },
+    {
+      "id": "probe_vienna",
+      "description": "48.21N — barely above the threshold",
+      "latitude": 48.2082,
+      "longitude": 16.3738,
+      "date": "2026-06-21",
+      "timezone": "Europe/Vienna",
+      "method": "MWL"
+    },
+    {
+      "id": "probe_munich",
+      "description": "48.14N — barely above the threshold",
+      "latitude": 48.1351,
+      "longitude": 11.582,
+      "date": "2026-06-21",
+      "timezone": "Europe/Berlin",
+      "method": "MWL"
+    },
+    {
+      "id": "probe_zurich",
+      "description": "47.38N — just below the threshold, must agree",
+      "latitude": 47.3769,
+      "longitude": 8.5417,
+      "date": "2026-06-21",
+      "timezone": "Europe/Zurich",
+      "method": "MWL"
+    }
+  ]
+}

@@ -17,6 +17,7 @@ object NotificationHelper {
     // Vibration and sound are now controlled at post-time per user preference.
     const val CHANNEL_PRAYER_TIMES = "prayer_times_v2"
     const val CHANNEL_ADHAN_SERVICE = "adhan_service"
+    const val CHANNEL_LIVE_PRAYER = "live_prayer"
     const val ADHAN_SERVICE_NOTIF_ID = 1001
     private const val LEGACY_CHANNEL_PRAYER_TIMES = "prayer_times"
 
@@ -33,6 +34,20 @@ object NotificationHelper {
                 description = "Prayer time alerts"
                 setSound(null, null)
                 enableVibration(false)
+            }
+        )
+        // MIN, not LOW: this one is always present. It belongs in the shade, not on the
+        // status bar competing with everything else for the user's attention all day.
+        nm.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_LIVE_PRAYER,
+                "Live prayer countdown",
+                NotificationManager.IMPORTANCE_MIN,
+            ).apply {
+                description = "Ongoing notification showing the current prayer and countdown"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
             }
         )
         nm.createNotificationChannel(

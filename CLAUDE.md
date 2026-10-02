@@ -13,6 +13,19 @@ Hard rules (non-negotiable):
 - No system-default sans (Inter, Roboto, Arial) as final choice — use Fraunces + IBM Plex.
 - Watch scale uses only 3 tokens: ink, parchment, saffron.
 
+## Required CI validation
+
+Every change must be tested through **both Android and iOS CI**, including platform-specific
+and documentation changes. `.github/workflows/ios.yml` runs the full mobile workflow on every
+push and pull request, with no path filters or label-based opt-outs.
+
+Before declaring work complete, push the final revision and confirm the **Android and iOS**
+check passes for that revision. It requires vector validation, Swift domain tests, iOS simulator
+persistence and UI tests, Android builds/lint/unit tests, phone instrumentation, and Wear OS
+instrumentation. Add meaningful regression tests for changed behavior in the same PR. Fix
+failed checks and rerun them; local compilation or typechecking alone is insufficient. If CI
+cannot run, report the blocker and leave validation explicitly incomplete.
+
 ## Skill routing
 
 When the user's request matches an available skill, ALWAYS invoke it using the Skill
