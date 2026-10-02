@@ -2,6 +2,7 @@ package com.aynama.prayertimes
 
 import android.accessibilityservice.AccessibilityService
 import android.os.PowerManager
+import android.view.accessibility.AccessibilityEvent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -54,8 +55,24 @@ class BatteryPromptTest {
                 "the battery prompt was never requested",
                 app.prefs.getBoolean(MainActivity.KEY_BATTERY_OPT_REQUESTED, false),
             )
+            val automation = instrumentation.uiAutomation
+            automation.waitForIdle(500, 10_000)
+            // Global Back is asynchronous. Keep this Activity alive until the system
+            // prompt has closed, so the action cannot dismiss the next test's Activity.
+            automation.executeAndWaitForEvent(
+                {
+                    assertTrue(
+                        "the battery prompt could not be dismissed",
+                        automation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK),
+                    )
+                },
+                { event ->
+                    (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
+                        event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) &&
+                        automation.rootInActiveWindow?.packageName?.toString() == app.packageName
+                },
+                10_000,
+            ).recycle()
         }
-        // Dismiss the system prompt the launch opened, so it does not sit over later tests.
-        instrumentation.uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
     }
 }
