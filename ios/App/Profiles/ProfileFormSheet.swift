@@ -134,8 +134,10 @@ struct ProfileFormSheet: View {
                     guard !Task.isCancelled else { return }
                 }
                 await selectedLocation.resolve(coordinates)
+                // Resolving a display name must preserve an existing time-zone choice.
                 guard !Task.isCancelled, self.coordinates == coordinates,
-                      !manualLocation, let zone = selectedPlace?.timezone, !zone.isEmpty else { return }
+                      !manualLocation, timezone.isEmpty,
+                      let zone = selectedPlace?.timezone, !zone.isEmpty else { return }
                 timezone = zone
             }
             .onChange(of: location.location) { _, fix in
