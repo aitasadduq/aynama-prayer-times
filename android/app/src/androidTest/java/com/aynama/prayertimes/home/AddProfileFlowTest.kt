@@ -6,6 +6,7 @@ import android.location.LocationManager
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -91,6 +92,7 @@ class AddProfileFlowTest {
         compose.onNode(hasSetTextAction() and hasText("Name")).performTextInput(name)
         compose.onNodeWithText("Use current location").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Save") and isEnabled(), TIMEOUT_MS)
+        compose.onNodeWithText("21.4225, 39.8262").assertDoesNotExist()
         compose.onNodeWithText("Save").performClick()
 
         // The pager composes only the page on screen, so finding the new page means landing on it.

@@ -22,6 +22,8 @@ final class ProfileRecord {
     var name: String
     var latitude: Double
     var longitude: Double
+    // Optional with a default so existing stores migrate without losing profiles or history.
+    var locationName: String? = nil
     var calculationMethodRaw: String
     var asrMadhabRaw: String
     var isGps: Bool
@@ -36,6 +38,7 @@ final class ProfileRecord {
         name = profile.name
         latitude = profile.latitude
         longitude = profile.longitude
+        locationName = profile.locationName
         calculationMethodRaw = profile.calculationMethod.rawValue
         asrMadhabRaw = profile.asrMadhab.rawValue
         isGps = profile.isGps
@@ -62,7 +65,8 @@ final class ProfileRecord {
             timezone: timezone,
             useLocationTimezone: useLocationTimezone,
             hijriOffset: hijriOffset,
-            hijriOffsetMonthKey: hijriOffsetMonthKey
+            hijriOffsetMonthKey: hijriOffsetMonthKey,
+            locationName: locationName
         )
     }
 
@@ -70,6 +74,7 @@ final class ProfileRecord {
         name = profile.name
         latitude = profile.latitude
         longitude = profile.longitude
+        locationName = profile.locationName
         calculationMethodRaw = profile.calculationMethod.rawValue
         asrMadhabRaw = profile.asrMadhab.rawValue
         isGps = profile.isGps

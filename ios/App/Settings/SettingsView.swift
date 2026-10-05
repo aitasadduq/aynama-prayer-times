@@ -26,16 +26,20 @@ struct SettingsView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(record.name).font(AynamaFont.title)
-                            Text(String(format: "%.4f, %.4f · %@", record.latitude, record.longitude, record.profile.calculationMethod.displayName))
+                            Text("\(record.locationName ?? "Location selected") · \(record.profile.calculationMethod.displayName)")
                                 .font(AynamaFont.bodySM).foregroundStyle(palette.muted)
+                                .accessibilityIdentifier("profile-location-\(record.profileID)")
                         }.frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(record.name)
-                    .accessibilityValue(record.profile.calculationMethod.displayName)
+                    .accessibilityValue("\(record.locationName ?? "Location selected"), \(record.profile.calculationMethod.displayName)")
                     .accessibilityHint("Edit profile")
                     .listRowBackground(Color.clear)
                     .swipeActions { Button("Delete", role: .destructive) { remove(record.profile) } }
+                    .task(id: ProfileCoordinates(latitude: record.latitude, longitude: record.longitude)) {
+                        await resolveLocationName(for: record.profile)
+                    }
                 }
             } header: {
                 Text("Profiles").font(AynamaFont.displayMD).textCase(nil).foregroundStyle(palette.foreground)
@@ -69,6 +73,19 @@ struct SettingsView: View {
             alerts.removeProfile(id: profile.id)
         }
         catch { self.error = "Couldn't delete this profile. Please try again." }
+    }
+
+    private func resolveLocationName(for profile: Profile) async {
+        guard profile.locationName == nil else { return }
+        let coordinates = ProfileCoordinates(latitude: profile.latitude, longitude: profile.longitude)
+        guard let place = try? await ProfilePlace.reverseGeocode(coordinates),
+              let name = place.name, !Task.isCancelled else { return }
+        let repository = ProfileRepository(context: context)
+        // The user may have edited or deleted the profile while the lookup was running.
+        guard var current = repository.profile(id: profile.id), current.locationName == nil,
+              current.latitude == profile.latitude, current.longitude == profile.longitude else { return }
+        current.locationName = name
+        try? repository.update(current)
     }
 }
 

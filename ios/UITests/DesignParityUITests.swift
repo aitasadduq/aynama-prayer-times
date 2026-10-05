@@ -138,4 +138,24 @@ final class DesignParityUITests: XCTestCase {
         XCTAssertTrue(app.buttons["alert-fixed-time"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Not set"].exists)
     }
+
+    @MainActor
+    func testCityAndCountryAppearInSettingsAndEditingAfterRelaunch() {
+        let app = launch()
+        for _ in 0..<2 {
+            app.tabBars.buttons["Settings"].tap()
+            let profile = app.buttons["London"]
+            XCTAssertTrue(profile.waitForExistence(timeout: 5))
+            XCTAssertTrue((profile.value as? String)?.contains("London, United Kingdom") == true)
+            XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "51.5074, -0.1278")).firstMatch.exists)
+            profile.tap()
+            let location = app.staticTexts["profile-location-name"]
+            XCTAssertTrue(location.waitForExistence(timeout: 5))
+            XCTAssertEqual(location.label, "London, United Kingdom")
+            XCTAssertFalse(app.staticTexts["51.5074, -0.1278"].exists)
+            app.buttons["Cancel"].tap()
+            app.terminate()
+            app.launch()
+        }
+    }
 }

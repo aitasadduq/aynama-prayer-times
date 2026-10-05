@@ -40,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aynama.prayertimes.AynamaApplication
 import com.aynama.prayertimes.shared.data.entity.Profile
+import com.aynama.prayertimes.shared.data.entity.displayLocationName
 import com.aynama.prayertimes.ui.theme.Ink
 import com.aynama.prayertimes.ui.theme.Saffron
 @Composable
@@ -47,6 +48,7 @@ fun SettingsScreen(onNavigateToNotifications: () -> Unit = {}) {
     val app = LocalContext.current.applicationContext as AynamaApplication
     val vm: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(app))
     val profiles by vm.profiles.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { vm.resolveLocationNames() }
 
     var editingProfile by remember { mutableStateOf<Profile?>(null) }
     var showSheet by remember { mutableStateOf(false) }
@@ -168,7 +170,7 @@ private fun NotificationsEntryRow(onClick: () -> Unit) {
 }
 
 @Composable
-private fun ProfileRow(profile: Profile, onClick: () -> Unit) {
+internal fun ProfileRow(profile: Profile, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -182,7 +184,7 @@ private fun ProfileRow(profile: Profile, onClick: () -> Unit) {
         )
         Spacer(Modifier.height(2.dp))
         Text(
-            text = "${profile.latitude.formatCoord()}, ${profile.longitude.formatCoord()} · ${profile.calculationMethod.displayName()}",
+            text = "${profile.displayLocationName} · ${profile.calculationMethod.displayName()}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

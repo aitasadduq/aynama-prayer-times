@@ -601,14 +601,6 @@ private fun EmptyContent(onCreateProfile: () -> Unit) {
         verticalArrangement = Arrangement.Center,
     ) {
         Text(
-            text = "🕋",
-            style = MaterialTheme.typography.displayMedium,
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        Text(
             text = "Set up your first prayer profile",
             style = MaterialTheme.typography.headlineMedium,
             color = Parchment,

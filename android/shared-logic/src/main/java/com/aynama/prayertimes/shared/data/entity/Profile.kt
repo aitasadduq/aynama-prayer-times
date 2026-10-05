@@ -24,7 +24,11 @@ data class Profile(
     // Adjusted-calendar Hijri month (year*12+month) the offset was set for; offset auto-expires
     // once the perceived month changes. 0 = none.
     val hijriOffsetMonthKey: Int = 0,
+    @ColumnInfo(defaultValue = "NULL") val locationName: String? = null,
 )
+
+val Profile.displayLocationName: String
+    get() = locationName?.takeIf { it.isNotBlank() } ?: "Location selected"
 
 fun Profile.effectiveZoneId(): ZoneId =
     if (useLocationTimezone && timezone.isNotBlank()) ZoneId.of(timezone)

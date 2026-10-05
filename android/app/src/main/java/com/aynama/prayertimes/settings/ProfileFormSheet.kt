@@ -139,16 +139,16 @@ internal fun ProfileFormSheet(
 
     var locationLat by remember { mutableStateOf(initial?.latitude) }
     var locationLng by remember { mutableStateOf(initial?.longitude) }
-    var locationLabel by remember { mutableStateOf("") }
+    var locationLabel by remember { mutableStateOf(initial?.locationName ?: "") }
+    var locationRevision by remember { mutableStateOf(0) }
     var locationTimezone by remember { mutableStateOf(initial?.timezone ?: "") }
     var useLocationTimezone by remember { mutableStateOf(initial?.useLocationTimezone ?: true) }
 
     LaunchedEffect(Unit) {
-        if (initial != null) {
+        if (initial != null && (initial.locationName == null || initial.timezone.isBlank())) {
             withContext(Dispatchers.IO) {
                 val address = reverseGeocodeAddress(context, initial.latitude, initial.longitude)
-                val label = address?.let { buildCityLabel(it) }
-                    ?: "${initial.latitude.formatCoord()}, ${initial.longitude.formatCoord()}"
+                val label = initial.locationName ?: address?.let { buildCityLabel(it) } ?: ""
                 val tz = when {
                     initial.timezone.isNotBlank() -> initial.timezone
                     initial.isGps -> ZoneId.systemDefault().id
@@ -157,6 +157,7 @@ internal fun ProfileFormSheet(
                 }
                 label to tz
             }.also { (label, tz) ->
+                if (locationRevision != 0) return@LaunchedEffect
                 locationLabel = label
                 if (locationTimezone.isBlank()) locationTimezone = tz
             }
@@ -203,6 +204,7 @@ internal fun ProfileFormSheet(
                     label = locationLabel,
                     hasSelection = locationLat != null,
                     onLocationSelected = { lat, lng, label, tz ->
+                        locationRevision++
                         locationLat = lat
                         locationLng = lng
                         locationLabel = label
@@ -210,9 +212,10 @@ internal fun ProfileFormSheet(
                         if (tz.isBlank()) useLocationTimezone = false
                     },
                     onGpsRequested = {
+                        val revision = ++locationRevision
                         scope.launch {
                             val result = withContext(Dispatchers.IO) { getGpsLocation(context) }
-                            if (result != null) {
+                            if (result != null && revision == locationRevision) {
                                 locationLat = result.first
                                 locationLng = result.second
                                 locationLabel = result.third
@@ -274,6 +277,7 @@ internal fun ProfileFormSheet(
                         name = name.trim(),
                         latitude = locationLat!!,
                         longitude = locationLng!!,
+                        locationName = locationLabel.takeIf { it.isNotBlank() },
                         calculationMethod = method,
                         asrMadhab = madhab,
                         timezone = locationTimezone,
@@ -320,8 +324,15 @@ private fun LocationSection(
     // boundary table, which must not happen on the main thread inside the tap handler.
     var suggestions by remember { mutableStateOf<List<Pair<Address, String>>>(emptyList()) }
 
+    LaunchedEffect(hasSelection) {
+        if (hasSelection) isSearching = false
+    }
+
     val permLauncher = rememberLauncherForActivityResult(RequestPermission()) { granted ->
-        if (granted) onGpsRequested()
+        if (granted) {
+            onGpsRequested()
+            isSearching = false
+        }
     }
 
     LaunchedEffect(query) {
@@ -349,7 +360,7 @@ private fun LocationSection(
                 )
                 Spacer(Modifier.padding(4.dp))
                 Text(
-                    text = label,
+                    text = label.ifBlank { "Location selected" },
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(start = 4.dp),
                 )
@@ -374,13 +385,13 @@ private fun LocationSection(
         if (suggestions.isNotEmpty()) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 suggestions.forEach { (address, tz) ->
-                    val cityLabel = buildCityLabel(address)
+                    val cityLabel = buildCityLabel(address) ?: "Location selected"
                     Text(
                         text = cityLabel,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                onLocationSelected(address.latitude, address.longitude, cityLabel, tz)
+                                onLocationSelected(address.latitude, address.longitude, buildCityLabel(address) ?: "", tz)
                                 isSearching = false
                                 query = ""
                                 suggestions = emptyList()
@@ -523,16 +534,15 @@ private fun LocationTimezoneToggle(
     }
 }
 
-private fun buildCityLabel(address: Address): String {
-    val city = address.locality ?: address.subAdminArea ?: address.adminArea
-    val country = address.countryName
-    return listOfNotNull(city, country).joinToString(", ").ifBlank {
-        address.getAddressLine(0) ?: "${address.latitude.formatCoord()}, ${address.longitude.formatCoord()}"
-    }
+internal fun buildCityLabel(address: Address): String? {
+    fun String?.nonBlank(): String? = this?.trim()?.takeIf { it.isNotEmpty() }
+    val city = address.locality.nonBlank() ?: address.subAdminArea.nonBlank() ?: address.adminArea.nonBlank()
+    val country = address.countryName.nonBlank()
+    return listOfNotNull(city, country).joinToString(", ").takeIf { it.isNotEmpty() }
 }
 
 @Suppress("DEPRECATION")
-private fun reverseGeocodeAddress(context: android.content.Context, lat: Double, lng: Double): Address? {
+internal fun reverseGeocodeAddress(context: android.content.Context, lat: Double, lng: Double): Address? {
     if (!Geocoder.isPresent()) return null
     return try {
         val geocoder = Geocoder(context)
@@ -590,11 +600,9 @@ private fun getGpsLocation(context: android.content.Context): Triple<Double, Dou
         } catch (_: Exception) { null }
     } ?: return null
     val label = reverseGeocode(context, location.latitude, location.longitude)
-        ?: "${location.latitude.formatCoord()}, ${location.longitude.formatCoord()}"
+        ?: ""
     return Triple(location.latitude, location.longitude, label)
 }
-
-internal fun Double.formatCoord(): String = "%.4f".format(this)
 
 internal fun CalculationMethodKey.displayName(): String = when (this) {
     CalculationMethodKey.MWL -> "Muslim World League"
