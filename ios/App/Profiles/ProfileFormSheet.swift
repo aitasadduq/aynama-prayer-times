@@ -133,12 +133,8 @@ struct ProfileFormSheet: View {
                     try? await Task.sleep(for: .milliseconds(400))
                     guard !Task.isCancelled else { return }
                 }
+                // Name lookup is independent of the user's calculation/time-zone settings.
                 await selectedLocation.resolve(coordinates)
-                // Resolving a display name must preserve an existing time-zone choice.
-                guard !Task.isCancelled, self.coordinates == coordinates,
-                      !manualLocation, timezone.isEmpty,
-                      let zone = selectedPlace?.timezone, !zone.isEmpty else { return }
-                timezone = zone
             }
             .onChange(of: location.location) { _, fix in
                 guard let fix else { return }
