@@ -181,9 +181,6 @@ private struct EmptyProfilesView: View {
     let onCreate: () -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // A quiet architectural mark, without calligraphy or stock ornament.
-            Rectangle().stroke(AynamaColor.parchment.opacity(0.6), lineWidth: 1.5)
-                .frame(width: 40, height: 40).accessibilityHidden(true)
             Text("Set up your first prayer profile").font(AynamaFont.displayMD)
             Text("Add a location to see accurate prayer times.").font(AynamaFont.bodyLG)
                 .foregroundStyle(AynamaColor.parchmentMuted)

@@ -14,7 +14,7 @@ import com.aynama.prayertimes.shared.data.entity.QazaEntry
 
 @Database(
     entities = [Profile::class, QazaEntry::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -23,6 +23,12 @@ abstract class AynamaDatabase : RoomDatabase() {
     abstract fun qazaEntryDao(): QazaEntryDao
 
     companion object {
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE profiles ADD COLUMN locationName TEXT DEFAULT NULL")
+            }
+        }
+
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE profiles ADD COLUMN timezone TEXT NOT NULL DEFAULT ''")
@@ -47,7 +53,7 @@ abstract class AynamaDatabase : RoomDatabase() {
 
         fun build(context: Context): AynamaDatabase =
             Room.databaseBuilder(context, AynamaDatabase::class.java, "aynama.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }
