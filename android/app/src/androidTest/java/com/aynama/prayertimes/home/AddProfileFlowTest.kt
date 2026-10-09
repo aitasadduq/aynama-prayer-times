@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -89,6 +90,8 @@ class AddProfileFlowTest {
 
         compose.onNodeWithContentDescription("Add profile").performClick()
         compose.onNode(hasSetTextAction() and hasText("Name")).performTextInput(name)
+        compose.onNodeWithText("Save").assertIsNotEnabled()
+        publishAndAwaitTestLocation()
         compose.onNodeWithText("Use current location").performClick()
         compose.waitUntilAtLeastOneExists(hasText("Save") and isEnabled(), TIMEOUT_MS)
         compose.onNodeWithText("21.4225, 39.8262").assertDoesNotExist()
@@ -109,6 +112,25 @@ class AddProfileFlowTest {
             Criteria.POWER_LOW, Criteria.ACCURACY_COARSE,
         )
         locationManager.setTestProviderEnabled(provider, true)
+    }
+
+    @Suppress("DEPRECATION", "MissingPermission")
+    private fun publishAndAwaitTestLocation() {
+        // Provider installation and location delivery are separate. Publish after the activity
+        // is foregrounded, and wait until the same last-known API used by the sheet can read it.
+        // A one-off fix in @Before can otherwise leave Save disabled on API 31.
+        compose.waitUntil("The mock location is available to the profile sheet", TIMEOUT_MS) {
+            PROVIDERS.forEach(::publishTestLocation)
+            // The sheet prefers the network provider; don't accept readiness of GPS alone.
+            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) &&
+                locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)?.let { fix ->
+                    fix.isFromMockProvider &&
+                        SystemClock.elapsedRealtimeNanos() - fix.elapsedRealtimeNanos < FIX_MAX_AGE_NANOS
+                } == true
+        }
+    }
+
+    private fun publishTestLocation(provider: String) {
         locationManager.setTestProviderLocation(
             provider,
             Location(provider).apply {
@@ -128,6 +150,7 @@ class AddProfileFlowTest {
 
     private companion object {
         const val TIMEOUT_MS = 20_000L
+        const val FIX_MAX_AGE_NANOS = 30L * 1_000_000_000
         val PROVIDERS = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
         val SEED = Profile(
             name = "Seed",
