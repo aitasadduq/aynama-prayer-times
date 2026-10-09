@@ -40,4 +40,24 @@ class WearPhoneSeenTest {
         assertEquals(1_000L, nextSyncStamp(previous = 1_000L, phoneSeen = false, now = 2_000L))
         assertEquals(0L, nextSyncStamp(previous = 0L, phoneSeen = false, now = 2_000L))
     }
+
+    @Test
+    fun aLocalPublicationDoesNotCountAsHearingFromThePhone() {
+        val phoneSeen = isRemoteProfilePublication(publisherId = "watch-node", localNodeId = "watch-node")
+        assertFalse(phoneSeen)
+        assertEquals(0L, nextSyncStamp(previous = 0L, phoneSeen = phoneSeen, now = 2_000L))
+    }
+
+    @Test
+    fun aRemotePublicationCountsAsHearingFromThePhone() {
+        val phoneSeen = isRemoteProfilePublication(publisherId = "phone-node", localNodeId = "watch-node")
+        assertTrue(phoneSeen)
+        assertEquals(2_000L, nextSyncStamp(previous = 0L, phoneSeen = phoneSeen, now = 2_000L))
+    }
+
+    @Test
+    fun anUnknownPublisherDoesNotCountAsHearingFromThePhone() {
+        assertFalse(isRemoteProfilePublication(publisherId = null, localNodeId = "watch-node"))
+        assertFalse(isRemoteProfilePublication(publisherId = "", localNodeId = "watch-node"))
+    }
 }
