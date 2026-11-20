@@ -57,6 +57,7 @@ final class ProfileRepositoryTests: XCTestCase {
         updated.name = "Travel"
         updated.latitude = 25.2048
         updated.longitude = 55.2708
+        updated.locationName = "Dubai, United Arab Emirates"
         updated.calculationMethod = .dubai
         updated.asrMadhab = .hanafi
         updated.useLocationTimezone = true
@@ -70,6 +71,7 @@ final class ProfileRepositoryTests: XCTestCase {
         XCTAssertEqual(saved.name, "Travel")
         XCTAssertEqual(saved.latitude, 25.2048)
         XCTAssertEqual(saved.longitude, 55.2708)
+        XCTAssertEqual(saved.locationName, "Dubai, United Arab Emirates")
         XCTAssertEqual(saved.calculationMethod, .dubai)
         XCTAssertEqual(saved.asrMadhab, .hanafi)
         XCTAssertTrue(saved.useLocationTimezone)

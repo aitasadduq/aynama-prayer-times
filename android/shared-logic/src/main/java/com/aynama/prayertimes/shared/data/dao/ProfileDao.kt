@@ -29,6 +29,9 @@ interface ProfileDao {
     @Update
     suspend fun update(profile: Profile)
 
+    @Query("UPDATE profiles SET locationName = :name WHERE id = :id AND latitude = :latitude AND longitude = :longitude AND locationName IS NULL")
+    suspend fun updateLocationName(id: Long, latitude: Double, longitude: Double, name: String)
+
     @Delete
     suspend fun delete(profile: Profile)
 

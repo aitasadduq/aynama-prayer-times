@@ -34,6 +34,8 @@ public struct Profile: Identifiable, Hashable, Codable, Sendable {
     public var name: String
     public var latitude: Double
     public var longitude: Double
+    /// Resolved city and country, independent of the user's profile name. Nil for older profiles.
+    public var locationName: String?
     public var calculationMethod: CalculationMethodKey
     public var asrMadhab: AsrMadhab
     public var isGps: Bool
@@ -57,12 +59,14 @@ public struct Profile: Identifiable, Hashable, Codable, Sendable {
         timezone: String = "",
         useLocationTimezone: Bool = false,
         hijriOffset: Int = 0,
-        hijriOffsetMonthKey: Int = 0
+        hijriOffsetMonthKey: Int = 0,
+        locationName: String? = nil
     ) {
         self.id = id
         self.name = name
         self.latitude = latitude
         self.longitude = longitude
+        self.locationName = locationName
         self.calculationMethod = calculationMethod
         self.asrMadhab = asrMadhab
         self.isGps = isGps

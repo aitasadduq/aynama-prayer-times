@@ -13,9 +13,9 @@ enum ScreenshotFixtures {
         guard repository.all().isEmpty else { return }
         do {
             let london = try repository.insert(Profile(name: "London", latitude: 51.5074, longitude: -0.1278,
-                calculationMethod: .mwl, asrMadhab: .shafii, timezone: "Europe/London", useLocationTimezone: true))
+                calculationMethod: .mwl, asrMadhab: .shafii, timezone: "Europe/London", useLocationTimezone: true, locationName: "London, United Kingdom"))
             try repository.insert(Profile(name: "Dubai", latitude: 25.2048, longitude: 55.2708,
-                calculationMethod: .dubai, asrMadhab: .hanafi, timezone: "Asia/Dubai", useLocationTimezone: true))
+                calculationMethod: .dubai, asrMadhab: .hanafi, timezone: "Asia/Dubai", useLocationTimezone: true, locationName: "Dubai, United Arab Emirates"))
             let today = CalendarDate.from(AppClock.now, in: TimeZone(identifier: "Europe/London")!)
             for offset in 1...8 {
                 for prayer in Prayer.allCases {

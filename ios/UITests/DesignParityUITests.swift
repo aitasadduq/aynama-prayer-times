@@ -72,7 +72,7 @@ final class DesignParityUITests: XCTestCase {
             XCTAssertTrue(title.exists, "Missing \(name) profile row")
             XCTAssertEqual(title.frame.minX, margin, accuracy: 1, "\(name) must sit on the 24 pt utilitarian margin")
         }
-        let metadata = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '51.5074'")).firstMatch
+        let metadata = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH 'profile-location-'")).firstMatch
         XCTAssertTrue(metadata.exists)
         XCTAssertGreaterThanOrEqual(metadata.frame.height, 18, "Profile metadata must stay at body size, not caption size")
         let notifications = app.staticTexts.matching(NSPredicate(format: "label == 'Notifications'")).firstMatch
@@ -156,5 +156,25 @@ final class DesignParityUITests: XCTestCase {
         app.buttons["Cancel"].tap()
         XCTAssertTrue(app.buttons["alert-fixed-time"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Not set"].exists)
+    }
+
+    @MainActor
+    func testCityAndCountryAppearInSettingsAndEditingAfterRelaunch() {
+        let app = launch()
+        for _ in 0..<2 {
+            app.tabBars.buttons["Settings"].tap()
+            let profile = app.buttons["London"]
+            XCTAssertTrue(profile.waitForExistence(timeout: 5))
+            XCTAssertTrue((profile.value as? String)?.contains("London, United Kingdom") == true)
+            XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "51.5074, -0.1278")).firstMatch.exists)
+            profile.tap()
+            let location = app.staticTexts["profile-location-name"]
+            XCTAssertTrue(location.waitForExistence(timeout: 5))
+            XCTAssertEqual(location.label, "London, United Kingdom")
+            XCTAssertFalse(app.staticTexts["51.5074, -0.1278"].exists)
+            app.buttons["Cancel"].tap()
+            app.terminate()
+            app.launch()
+        }
     }
 }

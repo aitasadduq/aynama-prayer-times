@@ -480,7 +480,6 @@ Not built in Android v1; the Home hero is the countdown surface. The spec is kep
 - **Utilitarian chrome:** Compose Material Icons: Add, Delete, LocationOn, Place, Notifications, KeyboardArrowRight (chevron), ArrowBack, Check, PlayCircleOutline.
 - **Custom-drawn:** the Qibla arrow, the "N" glyph and its tick, the ribbon's ✓ and current-prayer dot, the tracker's status squares, the radio marks.
 - **Placeholders still in place:**
-  - The empty-state Kaaba mark is the 🕋 emoji, which renders in the system colour-emoji font — a black cube with a gold band. That's gold ornament, and it isn't the custom mark this section asks for (DS17).
   - The notification icon is a crescent (DS22, PR #14 V1).
   - There is no launcher icon, so Android shows its generic default (DS8).
 - **Still to design:** the Kaaba abstract mark, the launcher icon, the notification icon, the watch prayer initials, the tasbeeh bead.
@@ -1093,7 +1092,7 @@ Squares, not circles. That keeps clear of circular-ring territory (§10) and rea
 │ ──────────────────────────────── │
 │ Profiles                         │  ← display-md
 │ London                           │  ← title
-│ 51.5074, -0.1278 ·               │  ← body-sm, ink-muted
+│ London, United Kingdom ·        │  ← body-sm, ink-muted
 │ Muslim World League              │
 │ ──────────────────────────────── │
 │ London (Ḥanafī)                  │
@@ -1103,7 +1102,7 @@ Squares, not circles. That keeps clear of circular-ring territory (§10) and rea
 ```
 
 - **Notifications row.** A bell icon, "Notifications" in `body`, and a chevron. It opens §15. It sits above Profiles; PR #16 A4 questions that order.
-- **Profile rows.** The name in `title`. Under it, the coordinates to four decimal places and the method's full name, in `body-sm`, `ink-muted`. The city name isn't stored, so it can't be shown (PR #15 A1).
+- **Profile rows.** The name in `title`. Under it, the saved city and country and the method's full name, in `body-sm`, `ink-muted`. Location labels persist independently of the user's profile name and remain available offline. Older profiles resolve and save their city and country when Settings or the edit sheet opens. If the place cannot be resolved, show "Location selected"; never substitute coordinates.
 - **Actions.** Tapping a row opens the edit sheet. Swiping it right-to-left deletes it immediately over Material's error-container red, with no confirmation (PR #15 M10).
 - **FAB.** The saffron button with an ink "+" opens the create sheet: the same `ProfileFormSheet` that Home's FAB and empty-state button open (§21).
 
@@ -1134,6 +1133,8 @@ Shifts the Hijri date and Ramadan for local moon sighting. …
 - **Search** uses the platform `Geocoder`. Results appear as "City, Country" rows under the field. With no results the list just stays empty; there's no "No cities found" message.
 - **"Use current location"** asks for approximate location and fills in the device's last known position. It is a one-time fill: it doesn't create a GPS profile that follows the device.
 - **"Change"** reopens an empty search (PR #15 M5).
+
+**Location labels.** City search and current-location selection show and save "City, Country". Reverse-geocode a device fix to name it. Fall back to a named district or region when a city is unavailable. Coordinates remain internal calculation data, except in the explicitly expanded manual-coordinate editor on iOS. A failed lookup never reveals coordinates or prevents saving a valid location.
 
 **Calculation method.** A dropdown listing Muslim World League, ISNA, Umm al-Qurā, Egyptian, Karachi, Dubai, Moon Sighting Committee, Kuwait, Qatar and Singapore. The default is Muslim World League. The architecture plan's default was ISNA, and it planned a short description for each method.
 
@@ -1638,7 +1639,7 @@ Loading is never a shimmer (§8).
 | State | Treatment |
 |---|---|
 | Loading | Plain `ink` surface. |
-| No profiles | `ink` surface, with a Kaaba mark (the emoji placeholder, DS17). "Set up your first prayer profile" in `title`, parchment. "Add a location to see accurate prayer times." in `body`, parchment at 60%. A "Create profile" button, saffron with an ink label, opens the profile sheet in place (§21). |
+| No profiles | `ink` surface, without a placeholder mark or ornament. "Set up your first prayer profile" in `title`, parchment. "Add a location to see accurate prayer times." in `body`, parchment at 60%. A "Create profile" button, saffron with an ink label, opens the profile sheet in place (§21). |
 | Error | `ink` surface, "Something went wrong" and the raw exception message. There's no specific cause and no way to recover (DS24). |
 | A page with no times today (polar day or night) | That page only, on the Isha surface. The profile name in `body-sm`. "No prayer times today" in `display-md`. Then, in `body` at 70%: "The sun doesn't fully rise or set at this location today, so there are no times to calculate from. This happens inside the polar circles around midsummer and midwinter. Other profiles are unaffected." |
 
@@ -1670,7 +1671,7 @@ Loading is never a shimmer (§8).
 | Widgets | No profile, or no times | §25. |
 | Watch | No profiles, or no times | "No profiles yet", saying to open aynama on the phone (or, after a sync, to add a profile there). "No times today" for a polar day. "Phone not seen recently" under the countdown when the sync is stale. |
 
-The empty-state rule from `architecture-design.md` still applies: a small meaningful visual, a plain-language heading, one primary action, and at most one sentence of context.
+Empty states use a plain-language heading, one primary action, and at most one sentence of context. Include a visual only when it conveys useful information; the first-profile screen starts with its heading.
 
 ---
 
@@ -1692,7 +1693,6 @@ Where the shipped Android app stands against this document's rules. Each gap has
 | §15 — alerts behave well | ✗ No tap action, no stop action, Imsak treated as a prayer, placeholder audio. | DS14 |
 | §16 — "on time" only within the window; missed distinct from unmarked | ✗ | DS15 |
 | §15 — Notifications survives a polar profile | ✗ | DS16 |
-| §6 — custom Kaaba mark, no gold | ✗ Emoji. | DS17 |
 | §11 — the surface extends behind the status bar | ✗ | DS18 |
 | §3 — no colours outside the tokens | ~ Calibration amber, error red, the oxblood banner. | DS19 |
 | §4 — Material slots used as designed | ~ `mono-num` also styles the nav labels. | DS20 |

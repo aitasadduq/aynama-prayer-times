@@ -357,7 +357,7 @@ Depends on: Phase 1.
 - [x] Profile switcher never disrupts ribbon structure — only times and label change
 
 **Empty + error states**
-- [x] Empty state (no profiles): "Set up your first prayer profile", "Create profile" CTA — *the Kaaba mark is the 🕋 emoji placeholder (DS17)*
+- [x] Empty state (no profiles): "Set up your first prayer profile", "Create profile" CTA
 - [ ] Error state names cause + recovery action — **not met:** a generic "Something went wrong" plus the exception message (DS24)
 - [x] Per-profile "No prayer times today" page for polar days (PR #21)
 - [ ] Location stale: last-known times + "Tap to refresh" badge (deferred to Phase 6 GPS work)

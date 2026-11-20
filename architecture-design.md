@@ -190,7 +190,7 @@ Prayer is a 5-times-daily practice with spiritual weight. The app's tone is: **c
 **Design tone:** Calm, correct, unhurried. No gamification, no streaks on the home screen, no badges competing for attention. The app's job is to be right and stay out of the way.
 
 **Android v1:** where the journey plays out differently:
-- **First install:** the empty state is an ink screen, a Kaaba mark (still the 🕋 emoji placeholder, DS17) and "Create profile", which opens the profile sheet in place (DESIGN.md §21).
+- **First install:** the empty state is an ink screen, the heading "Set up your first prayer profile" and "Create profile", which opens the profile sheet in place (DESIGN.md §21).
 - **Fajr window:** the hero counts down to Sunrise ("Sunrise · 6:48 AM"). There's no separate urgency styling.
 - **Prayer time passes:** the surface cross-fades over 3 s. The countdown and timeline text swap without a fade (DS28).
 - **Adding a second profile:** the saffron FAB on Home opens the profile sheet in place, and Save lands the pager on the new profile. Pages move with the pager's default fling motion, not a custom spring.
@@ -376,7 +376,7 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 
 | Feature | Loading | Empty | Error | Success | Partial |
 |---|---|---|---|---|---|
-| Home screen (prayer times) | Shimmer on countdown + prayer list rows | Warm empty state: Kaaba illustration, "Set up your first prayer profile", "Create profile" CTA button | Error names cause + recovery action (e.g. "Location needed — Update location", "High-latitude times estimated — Learn more") | Prayer times shown, countdown live | Profile exists but location is stale — show last-known times with "Tap to refresh" badge |
+| Home screen (prayer times) | Shimmer on countdown + prayer list rows | Warm empty state: "Set up your first prayer profile", "Create profile" CTA button | Error names cause + recovery action (e.g. "Location needed — Update location", "High-latitude times estimated — Learn more") | Prayer times shown, countdown live | Profile exists but location is stale — show last-known times with "Tap to refresh" badge |
 | Profile switcher | Skeleton dots during first load | (Covered by Home empty state) | (Covered by Home error state) | Dot indicator shows correct count + active position | — |
 | Qibla compass | Compass rose shown, needle animated to "searching" | N/A (always shows compass; worst case = inaccurate) | Magnetometer unavailable: "Compass not available on this device". Low accuracy: persistent amber banner "Hold phone flat and move in a figure-8 to calibrate" | Needle stable, accuracy = high | Low accuracy: compass shown but needle slightly desaturated + calibration banner |
 | Prayer tracker (today) | Shimmer on 6 time rows | First day: "No prayers tracked yet today — tap a prayer to mark it" | DB read error: "Could not load prayer history" + retry | Prayers shown with status icons | Some prayers prayed, some pending, some missed |
@@ -388,14 +388,14 @@ Switching UX: horizontal swipe between profiles (like iOS Weather), with a dot i
 
 | Feature | What shipped |
 |---|---|
-| Home | **Loading:** a plain ink surface, not a shimmer — DESIGN.md forbids shimmer loaders. **Empty:** as specified, but the Kaaba mark is the 🕋 emoji (DS17). **Error:** a generic "Something went wrong" plus the exception message, with no cause-specific copy or recovery action (DS24). **New per-page state:** a profile with no times today (polar) shows "No prayer times today" and an explanation while the other pages keep working. **Stale location:** not built. |
+| Home | **Loading:** a plain ink surface, not a shimmer — DESIGN.md forbids shimmer loaders. **Empty:** a heading, one sentence and "Create profile", without a placeholder mark. **Error:** a generic "Something went wrong" plus the exception message, with no cause-specific copy or recovery action (DS24). **New per-page state:** a profile with no times today (polar) shows "No prayer times today" and an explanation while the other pages keep working. **Stale location:** not built. |
 | Qibla | **Loading:** ink surface; no "searching" needle. **No sensor:** as specified, triggered by a missing rotation-vector sensor. **Low accuracy:** the persistent banner is built; the desaturated arrow isn't. **New states:** no profile, and polar (the compass still works). |
 | Tracker | **Loading:** blank. **Empty (no profile):** "Create a profile to track prayers". **Database error:** falls back to that same empty state, not an error with retry. |
 | Notification permission | Requested at first launch on Android 13+. No Home banner. With permission denied, Notifications shows "Enable in Settings →". |
 | Profile creation | No save spinner — saving is instant. No "No cities found" message; the list just stays empty. |
 
 **Empty states rule:** Never ship "No items found." Every empty state has:
-1. A small, meaningful visual (not a decorative blob)
+1. An optional small visual when it conveys useful information
 2. A clear heading that explains the state in plain language
 3. A single primary action button
 4. Optional: one sentence of context

@@ -50,20 +50,34 @@ class ProfileRepositoryTest {
 
     @Test
     fun insert_and_read() = runBlocking {
-        val id = repo.insert(profile("Home"))
+        val id = repo.insert(profile("Home").copy(locationName = "Makkah, Saudi Arabia"))
         val all = repo.observeAll().first()
         assertEquals(1, all.size)
         assertEquals("Home", all[0].name)
+        assertEquals("Makkah, Saudi Arabia", all[0].locationName)
         assertEquals(id, all[0].id)
     }
 
     @Test
     fun update_profile() = runBlocking {
         val id = repo.insert(profile("Home"))
-        val updated = profile("London").copy(id = id)
+        val updated = profile("London").copy(id = id, locationName = "London, United Kingdom")
         repo.update(updated)
         val all = repo.observeAll().first()
         assertEquals("London", all[0].name)
+        assertEquals("London, United Kingdom", all[0].locationName)
+    }
+
+    @Test
+    fun lateLocationNameLookupCannotOverwriteANewerSelection() = runBlocking {
+        val id = repo.insert(profile("Home"))
+        val before = repo.observeAll().first().single()
+        repo.update(before.copy(latitude = 51.5074, longitude = -0.1278, locationName = "London, United Kingdom"))
+        repo.updateLocationName(before, "Makkah, Saudi Arabia")
+        val after = repo.observeAll().first().single()
+        assertEquals(id, after.id)
+        assertEquals("London, United Kingdom", after.locationName)
+        assertEquals(51.5074, after.latitude, 0.0)
     }
 
     @Test

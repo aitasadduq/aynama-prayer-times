@@ -113,17 +113,31 @@ internal suspend fun isPhoneConnected(connectedNodes: suspend () -> List<*>): Bo
 internal fun nextSyncStamp(previous: Long, phoneSeen: Boolean, now: Long): Long =
     if (phoneSeen) now else previous
 
+/** A local Data Layer write is not evidence that the watch heard from the phone. */
+internal fun isRemoteProfilePublication(publisherId: String?, localNodeId: String): Boolean =
+    !publisherId.isNullOrBlank() && publisherId != localNodeId
+
 /** Receives profile changes pushed from the phone. */
 class WearProfileSyncService : WearableListenerService() {
 
     override fun onDataChanged(events: DataEventBuffer) {
-        for (event in events) {
-            if (event.type != DataEvent.TYPE_CHANGED) continue
-            if (event.dataItem.uri.path != WearSyncContract.PATH_PROFILES) continue
-            // WearableListenerService callbacks already run off the main thread and the
-            // service stays alive for their duration, so blocking here is the contract rather
-            // than a shortcut — launching into a scope would race the service being torn down.
-            runBlocking {
+        val changes = events.filter {
+            it.type == DataEvent.TYPE_CHANGED && it.dataItem.uri.path == WearSyncContract.PATH_PROFILES
+        }
+        if (changes.isEmpty()) return
+        // Keep the callback alive until all matching events have been handled. Publishing on
+        // this node also raises a change event, so check the URI's publisher before applying it.
+        runBlocking {
+            val localNodeId = try {
+                Wearable.getNodeClient(applicationContext).localNode.await().id
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("WearProfileSync", "could not identify the local Data Layer node", e)
+                return@runBlocking
+            }
+            for (event in changes) {
+                if (!isRemoteProfilePublication(event.dataItem.uri.host, localNodeId)) continue
                 WearProfileSync.apply(
                     applicationContext,
                     DataMapItem.fromDataItem(event.dataItem).dataMap,

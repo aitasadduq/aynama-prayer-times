@@ -25,6 +25,19 @@ class SettingsViewModel(
     val profiles: StateFlow<List<Profile>> = repo.observeAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    fun resolveLocationNames() {
+        // Older profiles have no label. Resolve once when Settings opens, retaining their
+        // calculation settings and history. Cached names never need a network connection.
+        viewModelScope.launch(Dispatchers.IO) {
+            for (profile in repo.observeAll().first().filter { it.locationName == null }) {
+                val name = reverseGeocodeAddress(context, profile.latitude, profile.longitude)
+                    ?.let(::buildCityLabel) ?: continue
+                // Update only the label, atomically checking that its coordinates are current.
+                repo.updateLocationName(profile, name)
+            }
+        }
+    }
+
     // scheduleAll does binder work for every reserved alarm slot and reads each placed
     // widget's Glance state off disk, so it must not run on the main thread.
     fun save(profile: Profile) {

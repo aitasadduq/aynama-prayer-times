@@ -9,6 +9,7 @@ struct ProfileFormSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var scheme
     @StateObject private var location = LocationService()
+    @StateObject private var selectedLocation: ProfileLocation
     @State private var name: String
     @State private var latitudeText: String
     @State private var longitudeText: String
@@ -27,6 +28,10 @@ struct ProfileFormSheet: View {
         self.editing = editing
         self.onDelete = onDelete
         self.onSave = onSave
+        _selectedLocation = StateObject(wrappedValue: ProfileLocation(place: editing.map {
+            ProfilePlace(coordinates: ProfileCoordinates(latitude: $0.latitude, longitude: $0.longitude),
+                         name: $0.locationName, timezone: $0.timezone)
+        }))
         _name = State(initialValue: editing?.name ?? "")
         _latitudeText = State(initialValue: editing.map { String($0.latitude) } ?? "")
         _longitudeText = State(initialValue: editing.map { String($0.longitude) } ?? "")
@@ -61,9 +66,10 @@ struct ProfileFormSheet: View {
                             .frame(minHeight: 44)
                     }.disabled(location.isLocating)
                     if let error = location.error { Text(error).font(AynamaFont.bodySM).foregroundStyle(palette.muted) }
-                    if let latitude, let longitude {
-                        Text(String(format: "%.4f, %.4f", latitude, longitude))
+                    if coordinates != nil {
+                        Text(selectedPlace?.name ?? (selectedLocation.isResolving ? "Finding city…" : "Location selected"))
                             .font(AynamaFont.bodySM).foregroundStyle(palette.muted)
+                            .accessibilityIdentifier("profile-location-name")
                     }
                     DisclosureGroup("Enter coordinates", isExpanded: $manualLocation) {
                         coordinateField("Latitude", text: $latitudeText, example: "21.4225", id: "profile-latitude")
@@ -121,6 +127,15 @@ struct ProfileFormSheet: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.font(AynamaFont.body).foregroundStyle(palette.foreground).disabled(!isValid) }
             }
             .task(id: search) { await findPlaces() }
+            .task(id: coordinates) {
+                guard let coordinates else { return }
+                if manualLocation {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard !Task.isCancelled else { return }
+                }
+                // Name lookup is independent of the user's calculation/time-zone settings.
+                await selectedLocation.resolve(coordinates)
+            }
             .onChange(of: location.location) { _, fix in
                 guard let fix else { return }
                 latitudeText = String(fix.coordinate.latitude)
@@ -154,12 +169,20 @@ struct ProfileFormSheet: View {
         Double(longitudeText.trimmingCharacters(in: .whitespaces)).flatMap { (-180.0...180.0).contains($0) ? $0 : nil }
     }
     private var isValid: Bool { !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && latitude != nil && longitude != nil }
+    private var coordinates: ProfileCoordinates? {
+        guard let latitude, let longitude else { return nil }
+        return ProfileCoordinates(latitude: latitude, longitude: longitude)
+    }
+    private var selectedPlace: ProfilePlace? {
+        selectedLocation.place?.coordinates == coordinates ? selectedLocation.place : nil
+    }
 
     private func placeLabel(_ place: CLPlacemark) -> String {
-        [place.locality ?? place.name, place.country].compactMap { $0 }.joined(separator: ", ")
+        ProfilePlace(place).name ?? "Location selected"
     }
     private func choose(_ place: CLPlacemark) {
         guard let fix = place.location else { return }
+        selectedLocation.select(ProfilePlace(place))
         latitudeText = String(fix.coordinate.latitude)
         longitudeText = String(fix.coordinate.longitude)
         timezone = place.timeZone?.identifier ?? ""
@@ -193,6 +216,7 @@ struct ProfileFormSheet: View {
         profile.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         profile.latitude = latitude
         profile.longitude = longitude
+        profile.locationName = selectedPlace?.name
         profile.calculationMethod = method
         profile.asrMadhab = madhab
         // Keep the detected zone when the toggle is off, so enabling it later remains possible.

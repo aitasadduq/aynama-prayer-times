@@ -24,6 +24,9 @@ class ProfileRepository(private val dao: ProfileDao) {
 
     suspend fun update(profile: Profile) = dao.update(profile)
 
+    suspend fun updateLocationName(profile: Profile, name: String) =
+        dao.updateLocationName(profile.id, profile.latitude, profile.longitude, name)
+
     suspend fun delete(profile: Profile) = dao.delete(profile)
 
     /** @see ProfileDao.mirror — the watch's copy of the phone's profile set. */

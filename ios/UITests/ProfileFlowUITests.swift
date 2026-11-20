@@ -39,6 +39,16 @@ final class ProfileFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testFirstProfileScreenStartsWithTheHeading() {
+        let app = launchApp()
+        XCTAssertTrue(app.staticTexts["Set up your first prayer profile"].exists)
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "17-first-profile-without-placeholder"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    @MainActor
     func testCancelFromEmptyStateDoesNotCreateAProfile() {
         let app = launchApp()
         app.buttons["Create profile"].tap()
