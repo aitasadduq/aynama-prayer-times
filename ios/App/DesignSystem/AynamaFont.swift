@@ -146,7 +146,7 @@ enum AynamaFont {
     @MainActor
     static func configureNativeTypography() {
         let body = uiFont(named: "IBM Plex Sans", size: 17, textStyle: .body, axes: [axisTag("wght"): 400])
-        let caption = uiFont(named: "IBM Plex Sans", size: 11, textStyle: .caption1, axes: [axisTag("wght"): 500])
+        let caption = uiFont(named: "IBM Plex Sans", size: 12, textStyle: .caption1, axes: [axisTag("wght"): 500])
         let foreground = UIColor { traits in
             traits.userInterfaceStyle == .dark ? UIColor(AynamaColor.parchment) : UIColor(AynamaColor.ink)
         }

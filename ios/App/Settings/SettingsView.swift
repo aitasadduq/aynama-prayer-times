@@ -15,31 +15,50 @@ struct SettingsView: View {
         let palette = NeutralPalette(scheme: scheme)
         List {
             NavigationLink { NotificationSettingsView() } label: {
-                Label("Notifications", systemImage: "bell").font(AynamaFont.body)
-                    .frame(minHeight: 44)
+                Label {
+                    Text("Notifications").font(AynamaFont.bodyLG)
+                } icon: {
+                    Image(systemName: "bell").frame(width: 24)
+                }
+                .frame(minHeight: 56)
             }
-            .listRowBackground(Color.clear)
+            .settingsRow()
+            .listRowSeparator(.hidden, edges: .top)
             Section {
                 ForEach(records) { record in
                     Button {
                         form = ProfileFormDestination(profile: record.profile)
                     } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(record.name).font(AynamaFont.title)
-                            Text(String(format: "%.4f, %.4f · %@", record.latitude, record.longitude, record.profile.calculationMethod.displayName))
-                                .font(AynamaFont.bodySM).foregroundStyle(palette.muted)
-                        }.frame(maxWidth: .infinity, minHeight: 56, alignment: .leading).contentShape(Rectangle())
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(record.name).font(AynamaFont.title)
+                                Text(String(format: "%.4f, %.4f · %@", record.latitude, record.longitude, record.profile.calculationMethod.displayName))
+                                    .font(AynamaFont.body).foregroundStyle(palette.muted)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
+                                .foregroundStyle(palette.muted).accessibilityHidden(true)
+                        }
+                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(record.name)
                     .accessibilityValue(record.profile.calculationMethod.displayName)
                     .accessibilityHint("Edit profile")
-                    .listRowBackground(Color.clear)
+                    .settingsRow()
                     .swipeActions { Button("Delete", role: .destructive) { remove(record.profile) } }
+                }
+                if records.isEmpty {
+                    Text("No profiles yet. Tap + to add a location.")
+                        .font(AynamaFont.body).foregroundStyle(palette.muted)
+                        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                        .settingsRow()
                 }
             } header: {
                 Text("Profiles").font(AynamaFont.displayMD).textCase(nil).foregroundStyle(palette.foreground)
-                    .padding(.vertical, 12)
+                    .padding(.top, 24).padding(.bottom, 8)
+                    .listRowInsets(EdgeInsets(top: 0, leading: SettingsLayout.margin, bottom: 0, trailing: SettingsLayout.margin))
             }
         }
         .listStyle(.plain)
@@ -69,6 +88,19 @@ struct SettingsView: View {
             alerts.removeProfile(id: profile.id)
         }
         catch { self.error = "Couldn't delete this profile. Please try again." }
+    }
+}
+
+enum SettingsLayout {
+    static let margin: CGFloat = 24
+}
+
+private extension View {
+    func settingsRow() -> some View {
+        listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: SettingsLayout.margin, bottom: 0, trailing: SettingsLayout.margin))
+            .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
+            .alignmentGuide(.listRowSeparatorTrailing) { $0[.trailing] }
     }
 }
 
