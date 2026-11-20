@@ -5,6 +5,20 @@ import XCTest
 @testable import Aynama
 
 final class DesignParityTests: XCTestCase {
+    func testHomeUsesTwoColumnsOnFoldableInnerScreen() {
+        let inner = CGSize(width: 951, height: 560)
+        XCTAssertTrue(HomePageMetrics.isWide(inner))
+        XCTAssertFalse(HomePageMetrics.isWide(CGSize(width: 466, height: 678)))
+        XCTAssertFalse(HomePageMetrics.isWide(CGSize(width: 393, height: 700)))
+        for rows in [6, 7] {
+            let metrics = HomePageMetrics(size: inner, rows: rows, hasQaza: true, headerSize: 13,
+                                          heroSize: 72, subtitleSize: 32, rowSize: 20, qazaSize: 13)
+            XCTAssertTrue(metrics.isWide)
+            XCTAssertLessThanOrEqual(CGFloat(rows) * metrics.rowHeight, inner.height + 0.01)
+            XCTAssertGreaterThanOrEqual(metrics.rowHeight, metrics.rowFont * 1.8)
+        }
+    }
+
     func testHomeCompositionFitsCompactAndAccessibilityViewports() {
         for height in [CGFloat(380), 480, 650] {
             for rows in [6, 7] {

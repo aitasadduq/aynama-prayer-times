@@ -122,27 +122,47 @@ private struct ProfilePageView: View {
                                           hasQaza: outstanding > 0, headerSize: headerSize,
                                           heroSize: heroSize, subtitleSize: subtitleSize,
                                           rowSize: rowSize, qazaSize: qazaSize)
-            VStack(alignment: .leading, spacing: 0) {
+            let intro = VStack(alignment: .leading, spacing: 0) {
                 header(state, metrics: metrics, surface: surface)
                 Spacer().frame(height: metrics.headerGap)
                 CountdownHero(text: state.countdownText, isElapsed: state.countdownIsElapsed,
                               prayerName: state.countdownPrayerName, prayerTime: state.countdownPrayerTime,
                               surface: surface, metrics: metrics)
-                Spacer().frame(height: metrics.heroGap)
-                PrayerRibbon(rows: state.ribbonRows, surface: surface,
-                             rowHeight: metrics.rowHeight, fontSize: metrics.rowFont,
-                             markFontSize: metrics.markFont, scale: metrics.scale) { prayer in
-                    if let day = PrayerSchedule.latestPrayerDay(prayer, profile: state.profile, now: now) {
-                        onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer, date: day))
-                    }
+            }
+            let ribbon = PrayerRibbon(rows: state.ribbonRows, surface: surface,
+                                      rowHeight: metrics.rowHeight, fontSize: metrics.rowFont,
+                                      markFontSize: metrics.markFont, scale: metrics.scale) { prayer in
+                if let day = PrayerSchedule.latestPrayerDay(prayer, profile: state.profile, now: now) {
+                    onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer, date: day))
                 }
+            }
+            let qaza = Group {
                 if outstanding > 0 {
                     Text("\(outstanding) outstanding Qaḍā")
                         .font(AynamaFont.homeMeta(size: metrics.qazaFont))
                         .foregroundStyle(surface.foregroundMuted)
                         .padding(.top, metrics.qazaGap)
                 }
-                Spacer(minLength: 0)
+            }
+            Group {
+                if metrics.isWide {
+                    HStack(alignment: .top, spacing: metrics.horizontalPadding) {
+                        VStack(alignment: .leading, spacing: 0) {
+                            intro
+                            qaza
+                            Spacer(minLength: 0)
+                        }.frame(maxWidth: .infinity, alignment: .topLeading)
+                        ribbon.frame(maxWidth: .infinity, alignment: .top)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        intro
+                        Spacer().frame(height: metrics.heroGap)
+                        ribbon
+                        qaza
+                        Spacer(minLength: 0)
+                    }
+                }
             }
             .padding(.horizontal, metrics.horizontalPadding)
             .padding(.top, metrics.topPadding).padding(.bottom, metrics.bottomPadding)

@@ -21,13 +21,18 @@ struct HomePageMetrics {
     let rowHeight: CGFloat
     let qazaFont: CGFloat
     let occupiedHeight: CGFloat
+    let isWide: Bool
+
+    static func isWide(_ size: CGSize) -> Bool { size.width >= size.height * 1.15 && size.width >= 600 }
 
     init(size: CGSize, rows: Int, hasQaza: Bool,
          headerSize: CGFloat, heroSize: CGFloat, subtitleSize: CGFloat,
          rowSize: CGFloat, qazaSize: CGFloat) {
         let count = max(rows, 1)
+        let wide = Self.isWide(size)
+        isWide = wide
         let padding = min(24, size.width * 0.06)
-        let stacked = size.width < 350
+        let stacked = size.width < 350 || wide
         let header = min(headerSize, 26)
         let hero = min(heroSize, 144)
         let subtitle = min(subtitleSize, 64)
@@ -42,9 +47,12 @@ struct HomePageMetrics {
         let qazaBox = hasQaza ? qaza * 1.6 : 0
         let gaps: CGFloat = 16 + 16 + 18 + (hasQaza ? 12 : 0) + 12
         let rowBox = max(44, row * 2)
-        let desired = headerBox + heroBox + subtitleBox + qazaBox + gaps + CGFloat(count) * rowBox
+        let desired = wide
+            ? max(headerBox + heroBox + subtitleBox + qazaBox + gaps, CGFloat(count) * rowBox)
+            : headerBox + heroBox + subtitleBox + qazaBox + gaps + CGFloat(count) * rowBox
         let heightFit = size.height / max(desired, 1)
-        let widthFit = (size.width - 2 * padding) / 340
+        let columnWidth = wide ? (size.width - 3 * padding) / 2 : size.width - 2 * padding
+        let widthFit = columnWidth / 340
         let fit = min(1, max(0.1, heightFit), max(0.1, widthFit))
 
         scale = fit
@@ -64,7 +72,13 @@ struct HomePageMetrics {
         qazaFont = qaza * fit
 
         let fixed = (headerBox + heroBox + subtitleBox + qazaBox + gaps) * fit
-        rowHeight = min(112, max(0, (size.height - fixed) / CGFloat(count)))
-        occupiedHeight = fixed + CGFloat(count) * rowHeight
+        if wide {
+            let available = max(0, size.height - topPadding - bottomPadding)
+            rowHeight = min(76, available / CGFloat(count))
+            occupiedHeight = max(fixed, CGFloat(count) * rowHeight)
+        } else {
+            rowHeight = min(112, max(0, (size.height - fixed) / CGFloat(count)))
+            occupiedHeight = fixed + CGFloat(count) * rowHeight
+        }
     }
 }

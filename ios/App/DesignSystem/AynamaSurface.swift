@@ -26,6 +26,8 @@ private struct NeutralSurface: ViewModifier {
             .foregroundStyle(palette.foreground)
             .tint(palette.accent)
             .scrollContentBackground(.hidden)
+            .frame(maxWidth: 680)
+            .frame(maxWidth: .infinity)
             .background(palette.background.ignoresSafeArea())
     }
 }

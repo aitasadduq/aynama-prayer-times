@@ -50,48 +50,62 @@ struct QiblaView: View {
         let distance = QiblaCalculator.distanceKm(latitude: latitude, longitude: longitude)
         let delta = ((bearing - (location.heading ?? 0)).truncatingRemainder(dividingBy: 360) + 540).truncatingRemainder(dividingBy: 360) - 180
         let panel = surface.prefersLightForeground ? AynamaColor.ink : AynamaColor.parchment
-        return ScrollView {
-            VStack(spacing: 24) {
-                HStack {
-                    Text("Qibla").font(AynamaFont.qiblaTitle)
-                    Spacer()
-                    Text(phaseDisplayName(phase, on: date).uppercased())
-                        .font(AynamaFont.bodySM).tracking(1).foregroundStyle(surface.prefersLightForeground ? AynamaColor.saffron : AynamaColor.saffronInk)
-                }.padding(16).background(panel, in: RoundedRectangle(cornerRadius: 16))
-                Text(hint(delta: delta))
-                    .font(AynamaFont.bodySM)
-                    .foregroundStyle(aligned ? surface.activeForeground : surface.foregroundMuted)
-                    .padding(.horizontal, 16).padding(.vertical, 10).background(panel, in: Capsule())
-                    .accessibilityIdentifier("qibla-hint")
-                ZStack {
-                    Circle().stroke(panel, lineWidth: 28).frame(width: 252, height: 252)
-                    QiblaArrow().fill(AynamaColor.saffron)
-                        .overlay { QiblaArrow().stroke(surface.activeForeground, lineWidth: 1.5) }
-                        .frame(width: 140, height: 200).rotationEffect(.degrees(bearing))
-                    Text("N").font(AynamaFont.north)
-                        .rotationEffect(.degrees(location.heading ?? 0)).offset(y: -126)
+        let title = HStack {
+            Text("Qibla").font(AynamaFont.qiblaTitle)
+            Spacer()
+            Text(phaseDisplayName(phase, on: date).uppercased())
+                .font(AynamaFont.bodySM).tracking(1).foregroundStyle(surface.prefersLightForeground ? AynamaColor.saffron : AynamaColor.saffronInk)
+        }.padding(16).background(panel, in: RoundedRectangle(cornerRadius: 16))
+        let hintPill = Text(hint(delta: delta))
+            .font(AynamaFont.bodySM)
+            .foregroundStyle(aligned ? surface.activeForeground : surface.foregroundMuted)
+            .padding(.horizontal, 16).padding(.vertical, 10).background(panel, in: Capsule())
+            .accessibilityIdentifier("qibla-hint")
+        let dial = ZStack {
+            Circle().stroke(panel, lineWidth: 28).frame(width: 252, height: 252)
+            QiblaArrow().fill(AynamaColor.saffron)
+                .overlay { QiblaArrow().stroke(surface.activeForeground, lineWidth: 1.5) }
+                .frame(width: 140, height: 200).rotationEffect(.degrees(bearing))
+            Text("N").font(AynamaFont.north)
+                .rotationEffect(.degrees(location.heading ?? 0)).offset(y: -126)
+        }
+        .frame(width: 280, height: 280)
+        .rotationEffect(.degrees(-(location.heading ?? 0)))
+        .animation(reduceMotion ? nil : .spring(response: 0.6, dampingFraction: 0.8), value: location.heading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Qibla bearing \(Int(bearing.rounded())) degrees from true north")
+        let readout = VStack(spacing: 8) {
+            Text("\(Int(bearing.rounded()))°").font(AynamaFont.qiblaDegree)
+            Text("\(Int(distance.rounded()).formatted()) km \(location.location == nil ? "from \(profile.name) " : "")to the Kaaba")
+                .font(AynamaFont.bodySM).foregroundStyle(surface.foregroundMuted)
+                .multilineTextAlignment(.center)
+        }.padding(20).frame(maxWidth: .infinity)
+            .background(panel, in: RoundedRectangle(cornerRadius: 16))
+        let note = Group {
+            if location.heading != nil, location.accuracy > 15 || location.accuracy < 0 {
+                Text("Hold phone flat and move in a figure-8 to calibrate")
+                    .font(AynamaFont.bodySM).padding(12)
+                    .background(panel, in: RoundedRectangle(cornerRadius: 8))
+            } else if !location.hasCompass || location.heading == nil {
+                Text("Compass unavailable. The arrow shows the bearing from true north.")
+                    .font(AynamaFont.bodySM).foregroundStyle(surface.foregroundMuted).multilineTextAlignment(.center)
+            }
+        }
+        return GeometryReader { geometry in
+            ScrollView {
+                if HomePageMetrics.isWide(geometry.size) {
+                    VStack(spacing: 24) {
+                        title
+                        HStack(spacing: 24) {
+                            VStack(spacing: 24) { hintPill; dial }.frame(maxWidth: .infinity)
+                            VStack(spacing: 24) { readout; note }.frame(maxWidth: .infinity)
+                        }
+                    }.padding(.horizontal, 24).padding(.vertical, 16)
+                } else {
+                    VStack(spacing: 24) { title; hintPill; dial; readout; note }
+                        .padding(.horizontal, 24).padding(.vertical, 16)
                 }
-                .frame(width: 280, height: 280)
-                .rotationEffect(.degrees(-(location.heading ?? 0)))
-                .animation(reduceMotion ? nil : .spring(response: 0.6, dampingFraction: 0.8), value: location.heading)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Qibla bearing \(Int(bearing.rounded())) degrees from true north")
-                VStack(spacing: 8) {
-                    Text("\(Int(bearing.rounded()))°").font(AynamaFont.qiblaDegree)
-                    Text("\(Int(distance.rounded()).formatted()) km \(location.location == nil ? "from \(profile.name) " : "")to the Kaaba")
-                        .font(AynamaFont.bodySM).foregroundStyle(surface.foregroundMuted)
-                        .multilineTextAlignment(.center)
-                }.padding(20).frame(maxWidth: .infinity)
-                    .background(panel, in: RoundedRectangle(cornerRadius: 16))
-                if location.heading != nil, location.accuracy > 15 || location.accuracy < 0 {
-                    Text("Hold phone flat and move in a figure-8 to calibrate")
-                        .font(AynamaFont.bodySM).padding(12)
-                        .background(panel, in: RoundedRectangle(cornerRadius: 8))
-                } else if !location.hasCompass || location.heading == nil {
-                    Text("Compass unavailable. The arrow shows the bearing from true north.")
-                        .font(AynamaFont.bodySM).foregroundStyle(surface.foregroundMuted).multilineTextAlignment(.center)
-                }
-            }.padding(.horizontal, 24).padding(.vertical, 16)
+            }
         }
         .foregroundStyle(surface.foreground).timeOfDaySurface(surface)
         .onChange(of: surface, initial: true) { _, new in onSurfaceChange(new) }
