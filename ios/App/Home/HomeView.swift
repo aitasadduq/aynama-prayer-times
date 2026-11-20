@@ -153,6 +153,7 @@ private struct ProfilePageView: View {
                             Spacer(minLength: 0)
                         }.frame(maxWidth: .infinity, alignment: .topLeading)
                         ribbon.frame(maxWidth: .infinity, alignment: .top)
+                            .offset(y: metrics.headerFont * 0.75 - metrics.rowHeight / 2)
                     }
                 } else {
                     VStack(alignment: .leading, spacing: 0) {
