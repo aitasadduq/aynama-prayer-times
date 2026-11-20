@@ -22,21 +22,21 @@ struct NotificationSettingsView: View {
                         if value { Task { await alerts.requestPermission() } } else { alerts.enabled = false }
                     })).frame(minHeight: 44).contentShape(Rectangle())
                 }
+                if alerts.enabled, let profile {
+                    Button { choosingProfile = true } label: {
+                        disclosure("Alerts for", value: profile.name)
+                    }
+                }
             }.listRowBackground(Color.clear)
             if alerts.enabled {
                 if let profile {
-                    Section {
-                        Button { choosingProfile = true } label: {
-                            disclosure("Alerts for", value: profile.name)
-                        }
-                    }.listRowBackground(Color.clear)
                     Section {
                         ForEach(Prayer.allCases, id: \.self) { prayer in prayerRow(prayer, profile: profile) }
                     } header: { header("PRAYERS") }
                     .listRowBackground(Color.clear)
                     Section {
                         NavigationLink { AdhanVoiceView() } label: {
-                            HStack { Text("Adhan voice"); Spacer(); Text(alerts.voice.name).font(AynamaFont.bodySM).foregroundStyle(palette.muted) }
+                            HStack { Text("Adhan voice"); Spacer(); Text(alerts.voice.name).font(AynamaFont.body).foregroundStyle(palette.muted) }
                                 .frame(minHeight: 44).contentShape(Rectangle())
                         }
                     } header: { header("ADHAN") }
@@ -57,6 +57,7 @@ struct NotificationSettingsView: View {
             }
             if let error = alerts.schedulingError { Text(error).font(AynamaFont.bodySM).listRowBackground(Color.clear) }
         }
+        .listSectionSpacing(.compact)
         .navigationTitle("Notifications").navigationBarTitleDisplayMode(.inline)
         .neutralSurface()
         .sheet(item: $detail) { PrayerAlertDetailView(target: $0) }
@@ -78,7 +79,7 @@ struct NotificationSettingsView: View {
         }
     }
     private func prayerRow(_ prayer: Prayer, profile: Profile) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             Button { detail = .init(profile: profile, prayer: prayer) } label: {
                 HStack {
                     Text(prayer.rawValue.capitalized)
@@ -95,7 +96,8 @@ struct NotificationSettingsView: View {
                 alerts.set(config, profileID: profile.id, prayer: prayer)
             })).labelsHidden()
             Button { detail = .init(profile: profile, prayer: prayer) } label: {
-                Image(systemName: "chevron.right").frame(width: 44, height: 44)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold))
+                    .frame(width: 20, height: 44, alignment: .trailing)
             }.accessibilityLabel("\(prayer.rawValue.capitalized) notification settings")
         }
     }
@@ -106,7 +108,11 @@ struct NotificationSettingsView: View {
     }
     private func header(_ title: String) -> some View { Text(title).font(AynamaFont.title).foregroundStyle(palette.foreground).textCase(nil) }
     private func disclosure(_ label: String, value: String) -> some View {
-        HStack { Text(label); Spacer(); Text(value).font(AynamaFont.bodySM).foregroundStyle(palette.muted); Image(systemName: "chevron.right") }
+        HStack {
+            Text(label); Spacer()
+            Text(value).font(AynamaFont.body).foregroundStyle(palette.muted)
+            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).frame(width: 20, alignment: .trailing)
+        }
             .frame(minHeight: 44).contentShape(Rectangle())
     }
     private func openSettings() {

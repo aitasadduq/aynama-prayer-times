@@ -62,6 +62,25 @@ final class DesignParityUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsRowsShareTheDesignMargin() {
+        let app = launch()
+        app.tabBars.buttons["Settings"].tap()
+        XCTAssertTrue(app.staticTexts["Profiles"].waitForExistence(timeout: 5))
+        let margin: CGFloat = 24
+        for name in ["London", "Dubai"] {
+            let title = app.staticTexts[name]
+            XCTAssertTrue(title.exists, "Missing \(name) profile row")
+            XCTAssertEqual(title.frame.minX, margin, accuracy: 1, "\(name) must sit on the 24 pt utilitarian margin")
+        }
+        let metadata = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH 'profile-location-'")).firstMatch
+        XCTAssertTrue(metadata.exists)
+        XCTAssertGreaterThanOrEqual(metadata.frame.height, 18, "Profile metadata must stay at body size, not caption size")
+        let notifications = app.staticTexts.matching(NSPredicate(format: "label == 'Notifications'")).firstMatch
+        XCTAssertGreaterThanOrEqual(notifications.frame.minX, margin)
+        XCTAssertLessThan(notifications.frame.minX, margin + 8, "Notifications icon and label start at the margin")
+    }
+
+    @MainActor
     func testDarkScreenshots() {
         let app = launch(dark: true)
         capture(app, "08-prayers-dark")
