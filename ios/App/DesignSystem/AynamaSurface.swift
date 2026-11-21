@@ -26,14 +26,39 @@ private struct NeutralSurface: ViewModifier {
             .foregroundStyle(palette.foreground)
             .tint(palette.accent)
             .scrollContentBackground(.hidden)
-            .frame(maxWidth: 680)
-            .frame(maxWidth: .infinity)
             .background(palette.background.ignoresSafeArea())
     }
 }
 
 extension View {
     func neutralSurface() -> some View { modifier(NeutralSurface()) }
+    func adaptiveSheet(_ detents: Set<PresentationDetent>) -> some View { modifier(AdaptiveSheet(detents: detents)) }
+}
+
+extension EnvironmentValues {
+    /// True on a regular-width window, such as the iPhone Duo's inner screen. Read from the
+    /// window and passed down, because a sheet reports its own, narrower size class.
+    @Entry var isWideLayout = false
+}
+
+/// On a wide window a bottom sheet at a medium detent is a short strip across a short screen,
+/// so it becomes a centred form sheet at full height instead.
+private struct AdaptiveSheet: ViewModifier {
+    let detents: Set<PresentationDetent>
+    @Environment(\.isWideLayout) private var isWide
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isWide {
+            if #available(iOS 18.0, *) {
+                content.presentationSizing(.form).presentationDetents([.large])
+            } else {
+                content.presentationDetents([.large])
+            }
+        } else {
+            content.presentationDetents(detents)
+        }
+    }
 }
 
 struct AddProfileButton: View {
@@ -74,6 +99,7 @@ private struct AddButtonSurface: ViewModifier {
 struct ProfileRequiredView: View {
     let title: String
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.isWideLayout) private var isWide
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title).font(AynamaFont.displayMD)
@@ -81,7 +107,8 @@ struct ProfileRequiredView: View {
                 .font(AynamaFont.bodyLG)
                 .foregroundStyle(NeutralPalette(scheme: scheme).muted)
         }
-        .padding(24)
+        .frame(maxWidth: 520, alignment: .leading)
+        .padding(isWide ? 48 : 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .neutralSurface()
     }

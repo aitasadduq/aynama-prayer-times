@@ -33,7 +33,7 @@ struct PrayerMarkSheet: View {
         }
         .padding(24)
         .neutralSurface()
-        .presentationDetents([.medium, .large])
+        .adaptiveSheet([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationBackground(palette.background)
     }

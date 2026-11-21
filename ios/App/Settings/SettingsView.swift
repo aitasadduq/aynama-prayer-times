@@ -10,6 +10,7 @@ struct SettingsView: View {
     private var records: [ProfileRecord]
     @State private var form: ProfileFormDestination?
     @State private var error: String?
+    @Environment(\.isWideLayout) private var isWide
 
     var body: some View {
         let palette = NeutralPalette(scheme: scheme)
@@ -18,10 +19,12 @@ struct SettingsView: View {
                 Label {
                     Text("Notifications").font(AynamaFont.bodyLG)
                 } icon: {
-                    Image(systemName: "bell").frame(width: 24)
+                    Image(systemName: isWide ? "bell.fill" : "bell").frame(width: 24)
                 }
-                .frame(minHeight: 56)
+                .foregroundStyle(isWide ? palette.accent : palette.foreground)
+                .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
             }
+            .accessibilityAddTraits(isWide ? .isSelected : [])
             .settingsRow()
             .listRowSeparator(.hidden, edges: .top)
             Section {

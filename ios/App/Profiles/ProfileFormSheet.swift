@@ -147,7 +147,7 @@ struct ProfileFormSheet: View {
             }
             .onDisappear { location.stop() }
         }
-        .presentationDetents([.large])
+        .adaptiveSheet([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(palette.background)
     }

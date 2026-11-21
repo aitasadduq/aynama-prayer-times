@@ -13,6 +13,7 @@ struct QiblaView: View {
     @State private var isVisible = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.isWideLayout) private var isWide
     private var profile: Profile? { (records.first(where: \.isGps) ?? records.first)?.profile }
 
     var body: some View {
@@ -92,16 +93,26 @@ struct QiblaView: View {
             }
         }
         return GeometryReader { geometry in
-            ScrollView {
-                if HomePageMetrics.isWide(geometry.size) {
-                    VStack(spacing: 24) {
+            if isWide {
+                // §5 foldable: the instrument takes the full height on the left; the panels
+                // stack beside it instead of below, so nothing scrolls.
+                let side = min(geometry.size.height - 48, geometry.size.width - 440)
+                let scale = max(1, side / 280)
+                HStack(alignment: .center, spacing: 48) {
+                    dial.scaleEffect(scale).frame(width: 280 * scale, height: 280 * scale)
+                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 20) {
                         title
-                        HStack(spacing: 24) {
-                            VStack(spacing: 24) { hintPill; dial }.frame(maxWidth: .infinity)
-                            VStack(spacing: 24) { readout; note }.frame(maxWidth: .infinity)
-                        }
-                    }.padding(.horizontal, 24).padding(.vertical, 16)
-                } else {
+                        readout
+                        hintPill
+                        note
+                    }
+                    .frame(width: 340)
+                }
+                .padding(.horizontal, 40).padding(.vertical, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
                     VStack(spacing: 24) { title; hintPill; dial; readout; note }
                         .padding(.horizontal, 24).padding(.vertical, 16)
                 }

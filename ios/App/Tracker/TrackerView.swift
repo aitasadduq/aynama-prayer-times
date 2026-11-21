@@ -9,6 +9,7 @@ struct TrackerView: View {
     @Environment(\.colorScheme) private var scheme
     @State private var expandedDay: CalendarDate?
     @State private var target: PrayerMarkTarget?
+    @Environment(\.isWideLayout) private var isWide
 
     private var profile: Profile? { (profiles.first(where: \.isGps) ?? profiles.first)?.profile }
     private var palette: NeutralPalette { NeutralPalette(scheme: scheme) }
@@ -27,45 +28,79 @@ struct TrackerView: View {
 
     private func history(_ profile: Profile) -> some View {
         let today = CalendarDate.from(AppClock.now, in: profile.effectiveTimeZone)
+        return Group {
+            if isWide {
+                // §5 foldable: today on the left, the last four weeks on the right, both in view.
+                HStack(alignment: .top, spacing: 56) {
+                    ScrollView { todaySection(profile, today: today).padding(.vertical, 16) }
+                        .scrollBounceBehavior(.basedOnSize)
+                        .frame(maxWidth: 380)
+                    ScrollView { weeksSection(profile, today: today).padding(.vertical, 4) }
+                        .scrollBounceBehavior(.basedOnSize)
+                        .frame(maxWidth: 480)
+                }
+                .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        todaySection(profile, today: today)
+                        weeksSection(profile, today: today).padding(.top, 20)
+                    }.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 24)
+                }.scrollBounceBehavior(.basedOnSize)
+            }
+        }
+    }
+
+    private func todaySection(_ profile: Profile, today: CalendarDate) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Today").font(AynamaFont.title).padding(.bottom, 8)
+            ForEach(Prayer.allCases, id: \.self) { prayer in
+                prayerRow(prayer, profile: profile, date: today)
+            }
+            let outstanding = marks.filter { $0.profileID == profile.id && $0.status == .missed }.count
+            if outstanding > 0 {
+                Text("\(outstanding) \(outstanding == 1 ? "prayer" : "prayers") outstanding").font(AynamaFont.bodySM)
+                    .foregroundStyle(palette.muted).padding(.top, 8)
+            }
+        }
+    }
+
+    private func weeksSection(_ profile: Profile, today: CalendarDate) -> some View {
         let monday = today.minusDays(today.dayOfWeek - 1)
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Today").font(AynamaFont.title).padding(.bottom, 8)
-                ForEach(Prayer.allCases, id: \.self) { prayer in
-                    prayerRow(prayer, profile: profile, date: today)
-                }
-                let outstanding = marks.filter { $0.profileID == profile.id && $0.status == .missed }.count
-                if outstanding > 0 {
-                    Text("\(outstanding) \(outstanding == 1 ? "prayer" : "prayers") outstanding").font(AynamaFont.bodySM)
-                        .foregroundStyle(palette.muted).padding(.top, 8)
-                }
-                HStack(spacing: 4) {
-                    Spacer()
-                    ForEach(Prayer.allCases, id: \.self) { prayer in
-                        Text(String(prayer.rawValue.prefix(1)).uppercased())
-                            .font(AynamaFont.bodySM).frame(width: 15)
+        let labelled = monday <= today.minusDays(1) ? 0 : 1
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<4, id: \.self) { week in
+                let start = monday.minusDays(week * 7)
+                let end = min(start.plusDays(6), today.minusDays(1))
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(weekTitle(week, start: start, end: start.plusDays(6), profile: profile))
+                        .font(AynamaFont.title)
+                    if week == 0 {
+                        Text(summary(profile, start: monday, today: today))
+                            .font(AynamaFont.bodySM).foregroundStyle(palette.muted)
                     }
-                    Color.clear.frame(width: 30, height: 1)
-                }.foregroundStyle(palette.muted).padding(.top, 32).padding(.bottom, 8)
-                ForEach(0..<4, id: \.self) { week in
-                    let start = monday.minusDays(week * 7)
-                    let end = min(start.plusDays(6), today.minusDays(1))
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(weekTitle(week, start: start, end: start.plusDays(6), profile: profile))
-                            .font(AynamaFont.title)
-                        if week == 0 {
-                            Text(summary(profile, start: monday, today: today))
-                                .font(AynamaFont.bodySM).foregroundStyle(palette.muted)
-                        }
-                    }.padding(.vertical, 12)
-                    if end >= start {
-                        ForEach((start.epochDay...end.epochDay).reversed().map { CalendarDate(epochDay: $0) }, id: \.self) { date in
-                            dayRow(date, profile: profile)
-                        }
+                }.padding(.vertical, 12)
+                if week == labelled { columnInitials }
+                if end >= start {
+                    ForEach((start.epochDay...end.epochDay).reversed().map { CalendarDate(epochDay: $0) }, id: \.self) { date in
+                        dayRow(date, profile: profile)
                     }
                 }
-            }.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 24)
-        }.scrollBounceBehavior(.basedOnSize)
+            }
+        }
+    }
+
+    /// Sits directly over the first week's squares, so the letters label the column they head.
+    private var columnInitials: some View {
+        HStack(spacing: 4) {
+            Spacer()
+            ForEach(Prayer.allCases, id: \.self) { prayer in
+                Text(String(prayer.rawValue.prefix(1)).uppercased())
+                    .font(AynamaFont.bodySM).frame(width: 15)
+            }
+            Color.clear.frame(width: 30, height: 1)
+        }.foregroundStyle(palette.muted).padding(.top, 4)
     }
 
     private func prayerRow(_ prayer: Prayer, profile: Profile, date: CalendarDate) -> some View {
