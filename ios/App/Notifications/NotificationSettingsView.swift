@@ -75,7 +75,7 @@ struct NotificationSettingsView: View {
                         }.frame(minHeight: 44).contentShape(Rectangle())
                     }.listRowBackground(Color.clear)
                 }.neutralSurface().navigationTitle("Profile").navigationBarTitleDisplayMode(.inline)
-            }.presentationDetents([.medium, .large]).presentationDragIndicator(.visible).presentationBackground(palette.background)
+            }.adaptiveSheet([.medium, .large]).presentationDragIndicator(.visible).presentationBackground(palette.background)
         }
     }
     private func prayerRow(_ prayer: Prayer, profile: Profile) -> some View {
@@ -169,7 +169,7 @@ struct PrayerAlertDetailView: View {
                 }.listRowBackground(Color.clear)
             }.neutralSurface()
         }
-        .presentationDetents([.medium, .large]).presentationDragIndicator(.visible).presentationBackground(palette.background)
+        .adaptiveSheet([.medium, .large]).presentationDragIndicator(.visible).presentationBackground(palette.background)
         .confirmationDialog("Time offset", isPresented: $choosingOffset, titleVisibility: .visible) {
             ForEach([-15, -10, -5, 0, 5, 10, 15], id: \.self) { minutes in
                 Button(minutes == 0 ? "On time" : "\(minutes > 0 ? "+" : "−")\(abs(minutes)) min") {
@@ -197,7 +197,7 @@ struct PrayerAlertDetailView: View {
                             }.foregroundStyle(palette.foreground)
                         }
                     }
-            }.presentationDetents([.medium]).presentationBackground(palette.background)
+            }.adaptiveSheet([.medium]).presentationBackground(palette.background)
         }
     }
     private var alertTime: Date? {

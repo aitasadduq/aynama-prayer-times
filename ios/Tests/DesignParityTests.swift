@@ -5,6 +5,34 @@ import XCTest
 @testable import Aynama
 
 final class DesignParityTests: XCTestCase {
+    func testWideHomeGrowsTheHeroAndFitsEveryRow() {
+        let inner = CGSize(width: 866, height: 600)
+        for rows in [6, 7] {
+            for typeScale in [CGFloat(1), 2] {
+                let metrics = HomePageMetrics(size: inner, rows: rows, hasQaza: true, wide: true,
+                                              headerSize: 13 * typeScale, heroSize: 72 * typeScale,
+                                              subtitleSize: 32 * typeScale, rowSize: 20 * typeScale,
+                                              qazaSize: 13 * typeScale)
+                XCTAssertTrue(metrics.isWide)
+                XCTAssertGreaterThan(metrics.heroFont, 72, "The inner screen should give the hero more room")
+                XCTAssertLessThanOrEqual(metrics.heroFont, 144)
+                XCTAssertLessThanOrEqual(metrics.occupiedHeight, inner.height + 0.01)
+                XCTAssertGreaterThanOrEqual(metrics.rowHeight, metrics.rowFont * 1.8)
+                XCTAssertLessThanOrEqual(metrics.ribbonWidth, 440)
+            }
+        }
+    }
+
+    func testCompactHomeIsUnchangedByTheWideLayout() {
+        let outer = CGSize(width: 418, height: 580)
+        let metrics = HomePageMetrics(size: outer, rows: 6, hasQaza: true, headerSize: 13,
+                                      heroSize: 72, subtitleSize: 32, rowSize: 20, qazaSize: 13)
+        XCTAssertFalse(metrics.isWide)
+        XCTAssertEqual(metrics.heroFont, 72 * metrics.scale, accuracy: 0.001)
+        XCTAssertEqual(metrics.horizontalPadding, 24)
+        XCTAssertFalse(metrics.headerStacked)
+    }
+
     func testHomeCompositionFitsCompactAndAccessibilityViewports() {
         for height in [CGFloat(380), 480, 650] {
             for rows in [6, 7] {

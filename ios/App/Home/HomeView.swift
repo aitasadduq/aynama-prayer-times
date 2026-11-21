@@ -14,6 +14,8 @@ struct HomeView: View {
     @State private var pagerSelection: Int64?
     @State private var target: PrayerMarkTarget?
     @State private var saveError = false
+    @State private var restoreAfterResize: Int64?
+    @Environment(\.isWideLayout) private var isWide
     private var profiles: [Profile] { records.map(\.profile) }
     private var surface: TimeOfDaySurface {
         if let page = model.pages.first(where: { $0.id == pagerSelection }), case let .ready(state) = page {
@@ -35,18 +37,7 @@ struct HomeView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .safeAreaInset(edge: .bottom) {
-                    HStack {
-                        Color.clear.frame(width: 56, height: 1)
-                        Spacer()
-                        HStack(spacing: 6) {
-                            ForEach(profiles) { profile in
-                                Circle().fill(profile.id == pagerSelection ? surface.activeForeground : surface.foreground.opacity(0.3))
-                                    .frame(width: profile.id == pagerSelection ? 8 : 5, height: profile.id == pagerSelection ? 8 : 5)
-                            }
-                        }.accessibilityLabel("Profile \(profiles.firstIndex(where: { $0.id == pagerSelection }).map { $0 + 1 } ?? 1) of \(profiles.count)")
-                        Spacer()
-                        AddProfileButton { isPresentingNewProfile = true }
-                    }.padding(.horizontal, 24).padding(.vertical, 8)
+                    if isWide { wideControls } else { compactControls }
                 }
                 .timeOfDaySurface(surface)
             }
@@ -61,8 +52,64 @@ struct HomeView: View {
         .onChange(of: model.now, initial: true) { model.refresh(profiles: profiles) }
         .onChange(of: profiles, initial: true) { syncSelection() }
         .onChange(of: requestedProfileID) { showRequestedProfile() }
-        .onChange(of: pagerSelection) { _, new in selection.id = new }
+        .onChange(of: pagerSelection) { _, new in
+            // Unfolding resizes the page TabView, and it reports its first page as selected.
+            // Put back the profile that was showing instead of following that write.
+            if let keep = restoreAfterResize, new != keep {
+                pagerSelection = keep
+                return
+            }
+            selection.id = new
+        }
+        .onChange(of: isWide) {
+            restoreAfterResize = pagerSelection
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(500))
+                restoreAfterResize = nil
+            }
+        }
         .onChange(of: surface, initial: true) { _, new in onSurfaceChange(new) }
+    }
+
+    private var compactControls: some View {
+        HStack {
+            Color.clear.frame(width: 56, height: 1)
+            Spacer()
+            HStack(spacing: 6) {
+                ForEach(profiles) { profile in
+                    Circle().fill(profile.id == pagerSelection ? surface.activeForeground : surface.foreground.opacity(0.3))
+                        .frame(width: profile.id == pagerSelection ? 8 : 5, height: profile.id == pagerSelection ? 8 : 5)
+                }
+            }.accessibilityLabel("Profile \(profiles.firstIndex(where: { $0.id == pagerSelection }).map { $0 + 1 } ?? 1) of \(profiles.count)")
+            Spacer()
+            AddProfileButton { isPresentingNewProfile = true }
+        }.padding(.horizontal, 24).padding(.vertical, 8)
+    }
+
+    /// The inner screen has room to name every profile, so switching is a tap on a city
+    /// rather than a blind swipe past anonymous dots. Swiping still works.
+    private var wideControls: some View {
+        HStack(spacing: 28) {
+            ForEach(profiles) { profile in
+                let selected = profile.id == pagerSelection
+                Button {
+                    withAnimation(.easeOut(duration: 0.3)) { pagerSelection = profile.id }
+                } label: {
+                    HStack(spacing: 8) {
+                        Circle().fill(selected ? surface.activeForeground : .clear)
+                            .frame(width: 6, height: 6)
+                        Text(profile.name).font(AynamaFont.body)
+                            .foregroundStyle(selected ? surface.activeForeground : surface.foregroundMuted)
+                            .lineLimit(1)
+                    }.frame(minHeight: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .accessibilityHint("Show this profile's prayer times")
+            }
+            Spacer(minLength: 0)
+            AddProfileButton { isPresentingNewProfile = true }
+        }.padding(.horizontal, 40).padding(.vertical, 8)
     }
 
     private func create(_ profile: Profile) {
@@ -100,6 +147,7 @@ private struct ProfilePageView: View {
     @ScaledMetric(relativeTo: .title3) private var rowSize: CGFloat = 20
     @ScaledMetric(relativeTo: .footnote) private var qazaSize: CGFloat = 13
     @Query private var marks: [QazaRecord]
+    @Environment(\.isWideLayout) private var isWide
 
     var body: some View {
         switch page {
@@ -109,8 +157,9 @@ private struct ProfilePageView: View {
                 Text(profile.name).font(AynamaFont.bodySM)
                 Text("No prayer times today").font(AynamaFont.displayMD)
                 Text(reason).font(AynamaFont.bodyLG).foregroundStyle(TimeOfDaySurface.isha.foregroundMuted)
-            }.padding(24).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .foregroundStyle(TimeOfDaySurface.isha.foreground).timeOfDaySurface(.isha)
+            }.frame(maxWidth: 560, alignment: .leading).padding(isWide ? 48 : 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .foregroundStyle(TimeOfDaySurface.isha.foreground)
         }
     }
 
@@ -119,35 +168,61 @@ private struct ProfilePageView: View {
         return GeometryReader { geometry in
             let outstanding = marks.filter { $0.profileID == state.profile.id && $0.status == .missed }.count
             let metrics = HomePageMetrics(size: geometry.size, rows: state.ribbonRows.count,
-                                          hasQaza: outstanding > 0, headerSize: headerSize,
+                                          hasQaza: outstanding > 0, wide: isWide, headerSize: headerSize,
                                           heroSize: heroSize, subtitleSize: subtitleSize,
                                           rowSize: rowSize, qazaSize: qazaSize)
-            VStack(alignment: .leading, spacing: 0) {
-                header(state, metrics: metrics, surface: surface)
-                Spacer().frame(height: metrics.headerGap)
-                CountdownHero(text: state.countdownText, isElapsed: state.countdownIsElapsed,
-                              prayerName: state.countdownPrayerName, prayerTime: state.countdownPrayerTime,
-                              surface: surface, metrics: metrics)
-                Spacer().frame(height: metrics.heroGap)
-                PrayerRibbon(rows: state.ribbonRows, surface: surface,
-                             rowHeight: metrics.rowHeight, fontSize: metrics.rowFont,
-                             markFontSize: metrics.markFont, scale: metrics.scale) { prayer in
-                    if let day = PrayerSchedule.latestPrayerDay(prayer, profile: state.profile, now: now) {
-                        onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer, date: day))
-                    }
+            let hero = CountdownHero(text: state.countdownText, isElapsed: state.countdownIsElapsed,
+                                     prayerName: state.countdownPrayerName, prayerTime: state.countdownPrayerTime,
+                                     surface: surface, metrics: metrics)
+            let ribbon = PrayerRibbon(rows: state.ribbonRows, surface: surface,
+                                      rowHeight: metrics.rowHeight, fontSize: metrics.rowFont,
+                                      markFontSize: metrics.markFont, scale: metrics.scale) { prayer in
+                if let day = PrayerSchedule.latestPrayerDay(prayer, profile: state.profile, now: now) {
+                    onMark(PrayerMarkTarget(profile: state.profile, prayer: prayer, date: day))
                 }
+            }
+            let qaza = Group {
                 if outstanding > 0 {
                     Text("\(outstanding) outstanding Qaḍā")
                         .font(AynamaFont.homeMeta(size: metrics.qazaFont))
                         .foregroundStyle(surface.foregroundMuted)
                         .padding(.top, metrics.qazaGap)
                 }
-                Spacer(minLength: 0)
+            }
+            Group {
+                if metrics.isWide {
+                    // §5 foldable spread: header across the top, the hero centred in its column,
+                    // the full-day timeline filling the other, and the Qaḍā line on the bottom edge.
+                    VStack(alignment: .leading, spacing: 0) {
+                        header(state, metrics: metrics, surface: surface)
+                        Spacer().frame(height: metrics.headerGap)
+                        HStack(alignment: .top, spacing: metrics.columnGap) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                Spacer(minLength: 0)
+                                hero
+                                Spacer(minLength: metrics.heroGap)
+                                qaza
+                            }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                            ribbon.frame(width: metrics.ribbonWidth)
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        header(state, metrics: metrics, surface: surface)
+                        Spacer().frame(height: metrics.headerGap)
+                        hero
+                        Spacer().frame(height: metrics.heroGap)
+                        ribbon
+                        qaza
+                        Spacer(minLength: 0)
+                    }
+                }
             }
             .padding(.horizontal, metrics.horizontalPadding)
             .padding(.top, metrics.topPadding).padding(.bottom, metrics.bottomPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .timeOfDaySurface(surface)
+            // The pager paints the surface once, edge to edge. A page painting its own stops
+            // at the profile controls and the tab bar, leaving a visible seam on dark phases.
         }
     }
 

@@ -10,6 +10,7 @@ struct AppRootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Query(sort: [SortDescriptor(\ProfileRecord.sortOrder), SortDescriptor(\ProfileRecord.profileID)])
     private var records: [ProfileRecord]
     @StateObject private var alerts = PrayerAlertSettings.shared
@@ -41,11 +42,12 @@ struct AppRootView: View {
                 .toolbarColorScheme(chrome.scheme, for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
                 .tabItem { Label("Tracker", systemImage: "calendar").symbolVariant(.none) }.tag(2)
-            NavigationStack { SettingsView() }
+            SettingsContainer(isWide: sizeClass == .regular)
                 .toolbarColorScheme(chrome.scheme, for: .tabBar)
                 .toolbarBackground(.visible, for: .tabBar)
                 .tabItem { Label("Settings", systemImage: tab == 3 ? "gearshape.fill" : "gearshape").symbolVariant(.none) }.tag(3)
         }
+        .environment(\.isWideLayout, sizeClass == .regular)
         .preferredColorScheme(testAppearance)
         .tint(chrome.tint)
         .onAppear { ScreenshotFixtures.seed(context) }
@@ -63,6 +65,28 @@ struct AppRootView: View {
                 AynamaAppDelegate.scheduleRefresh()
                 Task { await alerts.reschedule(profiles: records.map(\.profile)) }
             }
+        }
+    }
+}
+
+/// On a wide window Settings keeps its list beside Notifications, so alert switches are one tap
+/// away instead of a push. The compact phone keeps its single stack.
+private struct SettingsContainer: View {
+    let isWide: Bool
+    @State private var columns = NavigationSplitViewVisibility.all
+
+    var body: some View {
+        if isWide {
+            NavigationSplitView(columnVisibility: $columns) {
+                SettingsView()
+                    .navigationSplitViewColumnWidth(min: 340, ideal: 380, max: 420)
+                    .toolbar(removing: .sidebarToggle)
+            } detail: {
+                NavigationStack { NotificationSettingsView() }
+            }
+            .navigationSplitViewStyle(.balanced)
+        } else {
+            NavigationStack { SettingsView() }
         }
     }
 }
