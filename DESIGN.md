@@ -273,7 +273,7 @@ Code builds these ad hoc. PR #12 M8 asks for them to become named styles.
 - The bar is parchment with a parchment-muted indicator (ink and ink-muted in dark mode), and uses filled icons (DS21). Labels are capped at 1.3× font scale.
 - On the Notifications and Adhan voice routes, no tab shows as selected, because selection compares exact routes (DS21).
 - Content, including the time-of-day surface, is laid out below the status bar (DS18).
-- Phone only, portrait only. There is no tablet or foldable layout yet.
+- Android: phone only, portrait only. iOS adds a wide layout for regular-width windows such as the iPhone Duo's inner screen (see *Foldable inner screen* below).
 
 ### Home — countdown hero + prayer timeline
 
@@ -344,7 +344,7 @@ Never on this list: coloured left borders, cards per row, or row background fill
 - Dots sit under the pager, one per profile. The selected dot is 8 dp `saffron`; the others are 5 dp at 30% of the foreground, 6 dp apart.
 - The whole screen takes the active page's phase surface. Paging between profiles in different phases cross-fades over 3 s.
 - Paging never changes the structure; only the times, labels and surface change.
-- Swiping is the only way to switch profiles. The April "tap reveals a card stack" switcher and its "[Profile: Home ▾]" chip were not built.
+- Swiping is the only way to switch profiles on a phone-width screen. The April "tap reveals a card stack" switcher and its "[Profile: Home ▾]" chip were not built. On the iOS foldable inner screen the dots become named profiles that can be tapped (below).
 
 Which profile each surface uses:
 
@@ -464,6 +464,23 @@ Not built in Android v1; the Home hero is the countdown surface. The spec is kep
 - Segmented choices (Asr school, Hijri adjustment): a row of equal-width buttons. The selected one is filled saffron with an ink label; the others are outlined.
 
 **Sheets.** Material `ModalBottomSheet` with its default 28 dp top corners and drag handle, on `surfaceContainerLow`: parchment, or ink in dark mode.
+
+### Foldable inner screen (iOS, regular width)
+
+The iPhone Duo's inner screen (951 × 669 pt, regular width and height) is not a stretched phone. When the window reports a regular horizontal size class, each surface uses the extra width to show more at once. The outer screen and every compact-width phone keep the layouts above unchanged.
+
+| Surface | Wide layout |
+|---|---|
+| Home | One spread. The header line runs across the top: profile and method on the left, Hijri date on the right edge of the timeline. The countdown hero sits in the left column, centred vertically, and grows with that column (up to `display-xl`'s 144 pt cap); the prayer line scales with it. The full-day timeline fills the right column at a readable width (at most 440 pt), with rows sharing the page height. The Qaḍā line sits on the bottom edge of the left column. |
+| Home profile controls | The page dots become the profiles' names, `body-sm`, each a 44 pt tap target. The selected name and its 6 pt dot use the phase's active foreground; the others use its muted foreground. Swiping still works. The Add profile FAB stays at the bottom right. |
+| Qibla | The rose takes the full height on the left, scaled up from 280 pt. The title, readout, hint and calibration panels stack in a 340 pt column beside it, so nothing scrolls. |
+| Tracker | Two panes: Today on the left (380 pt), the four-week history on the right (480 pt), each scrolling on its own. |
+| Settings | A split view: the Settings list on the left and Notifications on the right, open by default, with the Notifications row marked as selected. Adhan voice pushes inside the right pane. Profile editing stays a sheet. |
+| Sheets | Every bottom sheet (profile, mark prayer, alert detail, profile picker, fixed time) becomes a centred form sheet at full height; a medium detent on a 669 pt-tall screen is too short to use. |
+
+On every phone width, Home's surface is painted once by the pager, edge to edge, and pages don't paint their own. A page-sized gradient stopped at the profile controls and the tab bar and left a visible seam on dark phases. The Tracker's F D A M I initials sit directly over the first week's squares.
+
+Unfolding must not change which profile is showing.
 
 ---
 
@@ -641,6 +658,7 @@ Everything else on this list holds.
 - Liquid Glass surfaces allowed on utilitarian screens (Settings modals, share sheets). Do not apply Liquid Glass over contemplative time-of-day surfaces — the effect clashes.
 - SF Symbols on utilitarian chrome. Custom SVGs on contemplative screens.
 - Dynamic Type supported through `display-xl` down to `body-sm`.
+- Regular-width windows (the iPhone Duo's inner screen) use the wide layouts in §5 *Foldable inner screen*; the app reads the window's horizontal size class and passes it down, because a sheet reports its own narrower class.
 
 ### Android
 - **Colour.** Material You colour extraction is **disabled**; the design IS the palette. Every Material role except `error` is mapped from the tokens (§3).
